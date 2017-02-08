@@ -4,6 +4,26 @@ import se.sics.kompics.*;
 
 public class Proxy extends ComponentDefinition{
 
+  private final ComponentDefinition cut;
+
+  <T extends ComponentDefinition>
+  Proxy(Class<T> cutClass, Init<T> initEvent) {
+    // // TODO: 2/8/17 nosuchmethodexception with initEvent when Init.NONE
+    //cut = create(cutClass, initEvent).getComponent();
+    cut = create(cutClass, Init.NONE).getComponent();
+  }
+
+  ComponentDefinition getCut() {
+    return cut;
+  }
+
+  <T extends ComponentDefinition> Component createNewSetupComponent(Class<T> cClass, Init<T> initEvent) {
+    return create(cClass, initEvent);
+  }
+
+  <T extends ComponentDefinition> Component createNewSetupComponent(Class<T> cClass, Init.None initEvent) {
+    return create(cClass, initEvent);
+  }
   <P extends PortType> Negative<P> provideProxy(Class<P> portType) {
     return provides(portType);
   }

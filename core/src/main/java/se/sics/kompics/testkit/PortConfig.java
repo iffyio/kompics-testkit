@@ -9,9 +9,9 @@ import java.util.Map;
 
 class PortConfig {
   private final Map<Port<? extends PortType>, PortStructure<? extends PortType>> portStructure;
-  private final Parent parent;
+  private final Proxy parent;
 
-  PortConfig(Parent parent) {
+  PortConfig(Proxy parent) {
     this.parent = parent;
     portStructure = new HashMap<>();
   }

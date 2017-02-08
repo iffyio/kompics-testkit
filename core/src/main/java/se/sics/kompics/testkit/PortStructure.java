@@ -2,44 +2,38 @@ package se.sics.kompics.testkit;
 
 import se.sics.kompics.*;
 
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 
 class PortStructure<P extends PortType> {
-  private Set<Port<P>> connectedPorts;
+  private List<Port<P>> connectedPorts;
   private Port<P> ownerPort;
   private boolean isPositive;
-  private Component proxyComponent;
-  private Proxy proxy;
   private Port<? extends PortType> inPort;
   private Port<? extends PortType> outPort;
-  private Parent parent;
+  private Proxy proxy;
   private boolean isMockedPort;
 
   private Set<IncomingHandler> incomingHandlers;
   private Set<OutgoingHandler> outgoingHandlers;
 
-  PortStructure(Parent parent, Port<P> ownerPort, boolean isPositive) {
-    initialize(parent, ownerPort);
+  PortStructure(Proxy proxy, Port<P> ownerPort, boolean isPositive) {
+    initialize(proxy, ownerPort);
     PortType portType = ownerPort.getPortType();
     this.isPositive = isPositive;
-    proxyComponent = parent.createNewSetupComponent(Proxy.class, Init.NONE);
-    proxy = (Proxy) proxyComponent.getComponent();
     inPort = isPositive? proxy.provideProxy(portType.getClass()):
             proxy.requireProxy(portType.getClass());
     outPort = inPort.getPair();
     isMockedPort = false;
   }
 
-  PortStructure(Parent parent, Port<P> ownerPort) {
-    initialize(parent, ownerPort);
+  PortStructure(Proxy proxy, Port<P> ownerPort) {
+    initialize(proxy, ownerPort);
     isMockedPort = true;
   }
 
-  private void initialize(Parent parent, Port<P> ownerPort) {
-    this.parent = parent;
-    connectedPorts = new HashSet<>();
+  private void initialize(Proxy proxy, Port<P> ownerPort) {
+    this.proxy = proxy;
+    connectedPorts = new ArrayList<>();
     this.ownerPort = ownerPort;
     incomingHandlers = new HashSet<>();
     outgoingHandlers = new HashSet<>();
@@ -47,12 +41,10 @@ class PortStructure<P extends PortType> {
 
   void addConnectedPort(PortCore<P> other, ChannelFactory factory) {
     assert !isMockedPort;
-    if (connectedPorts.add(other)) {
-      if (isPositive) {
-        factory.connect((PortCore<P>) outPort, other);
-      } else {
-        factory.connect(other, (PortCore<P>) outPort);
-      }
+    if (isPositive) {
+      factory.connect((PortCore<P>) outPort, other);
+    } else {
+      factory.connect(other, (PortCore<P>) outPort);
     }
   }
 
@@ -73,7 +65,7 @@ class PortStructure<P extends PortType> {
     Class<? extends KompicsEvent> eventType = event.getClass();
     if (hasEquivalentHandler(eventType, TestKit.Direction.OUTGOING)) {
       // already have a capable handler for this event
-      Kompics.logger.error("ignoring unnecessary outgoing handler");
+      Kompics.logger.info("ignoring unnecessary outgoing handler");
       return;
     }
 

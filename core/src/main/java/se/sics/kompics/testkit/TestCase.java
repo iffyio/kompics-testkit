@@ -7,8 +7,8 @@ import se.sics.kompics.testkit.fsm.Trigger;
 
 
 class TestCase {
-  private final Parent parent;
-  private final Component parentComponent;
+  private final Proxy proxy;
+  private final Component proxyComponent;
   private final ComponentDefinition cut;
   private final PortConfig portConfig;
   private FSM fsm;
@@ -16,11 +16,11 @@ class TestCase {
 
   <T extends ComponentDefinition> TestCase(
           Class<T> cutClass, Init<T> initEvent) {
-    parent = new Parent(cutClass, initEvent);
-    parentComponent = parent.getComponentCore();
-    cut = parent.getCut();
-    portConfig = new PortConfig(parent);
-    fsm = new FSM((ComponentCore) parentComponent);
+    proxy = new Proxy(cutClass, initEvent);
+    proxyComponent = proxy.getComponentCore();
+    cut = proxy.getCut();
+    portConfig = new PortConfig(proxy);
+    fsm = new FSM((ComponentCore) proxyComponent);
     scheduler = new ThreadPoolScheduler(1);
     Kompics.setScheduler(scheduler);
   }
@@ -31,13 +31,13 @@ class TestCase {
 
   <T extends ComponentDefinition> Component create(
           Class<T> cutClass, Init<T> initEvent) {
-    return parent.createNewSetupComponent(cutClass, initEvent);
+    return proxy.createNewSetupComponent(cutClass, initEvent);
   }
 
   // // TODO: 2/8/17 create with init, config
   <T extends ComponentDefinition> Component create(
           Class<T> cutClass, Init.None initEvent) {
-    return parent.createNewSetupComponent(cutClass, initEvent);
+    return proxy.createNewSetupComponent(cutClass, initEvent);
   }
 
   // // TODO: 2/8/17 connect with channel, channelSelector
@@ -46,21 +46,23 @@ class TestCase {
   }
 
   <P extends PortType> TestCase connect(Positive<P> positive, Negative<P> negative) {
-    boolean posIsParent = positive.getOwner() == parentComponent;
-    boolean negIsParent = negative.getOwner() == parentComponent;
-    // non interfacing ports
-    if (!(posIsParent || negIsParent)) {
+    boolean cutOwnsPositive = positive.getPair().getOwner() == cut.getComponentCore();
+    boolean cutOwnsNegative = negative.getPair().getOwner() == cut.getComponentCore();
+
+    // non monitoring ports => connect normally
+    if (!(cutOwnsPositive || cutOwnsNegative)) {
       Channel.TWO_WAY.connect((PortCore<P>) positive, (PortCore<P>) negative);
       return this;
     }
 
-    PortCore<P> parentPort = (PortCore<P>) (posIsParent? positive : negative);
-    PortCore<P> otherPort = (PortCore<P>) (posIsParent? negative : positive);
+    PortCore<P> proxyPort = (PortCore<P>) (cutOwnsPositive? positive : negative);
+    PortCore<P> otherPort = (PortCore<P>) (cutOwnsPositive? negative : positive);
 
-    addConnectedPort(parentPort == positive, parentPort, otherPort);
-    if (posIsParent && negIsParent) {
-      addConnectedPort(otherPort == positive, otherPort, parentPort);
+    addConnectedPort(proxyPort == positive, proxyPort, otherPort);
+    if (cutOwnsPositive && cutOwnsNegative) {
+      addConnectedPort(otherPort == positive, otherPort, proxyPort);
     }
+
     return this;
   }
 
@@ -74,7 +76,7 @@ class TestCase {
 
   <P extends  PortType> TestCase expect(
           KompicsEvent event, Port<P> port, TestKit.Direction direction) {
-    if (port.getOwner() != parentComponent) {
+    if (port.getOwner() != proxyComponent) {
       // // TODO: 2/8/17 support inside ports as well
       throw new UnsupportedOperationException("Expect messages are supported only for the component being tested");
     }
@@ -108,6 +110,11 @@ class TestCase {
 
   void check() {
     fsm.start();
+    try {
+      Thread.sleep(1000);
+    } catch (InterruptedException e) {
+      e.printStackTrace();
+    }
     scheduler.shutdown();
   }
 }
