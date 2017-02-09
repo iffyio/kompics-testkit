@@ -102,7 +102,7 @@ class TestCase {
   }
 
   <P extends PortType> TestCase trigger(
-          KompicsEvent event, PortCore<P> port) {
+          KompicsEvent event, Port<P> port) {
     // register state
     fsm.addState(new Trigger(event, port));
     return this;

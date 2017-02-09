@@ -2,23 +2,36 @@ package se.sics.kompics.testkit;
 
 import se.sics.kompics.*;
 
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.List;
 
 class OutgoingHandler extends TestHandler {
-  private Port sourcePort;
-  private Set<? extends Port<? extends PortType>> destPorts;
+  private Port<? extends PortType> sourcePort;
+  private List<? extends Port<? extends PortType>> destPorts;
 
-  OutgoingHandler(Class<? extends KompicsEvent> eventType,
-          Port sourcePort, Collection<? extends Port<? extends PortType>> destPorts) {
-    super(eventType);
+  OutgoingHandler(
+          Proxy proxy, PortStructure portStruct,
+          Class<? extends KompicsEvent> eventType, Port sourcePort,
+          Collection<? extends Port<? extends PortType>> destPorts) {
+    super(proxy, portStruct, eventType);
     this.sourcePort = sourcePort;
-    this.destPorts = new HashSet<>(destPorts);
+    this.destPorts = new ArrayList<>(destPorts);
   }
 
   @Override
   public void handle(KompicsEvent event) {
-    Kompics.logger.error("OutgoingHandler");
+    Kompics.logger.info("OutgoingHandler: {} received event: {}",
+            this, event.getClass().getSimpleName());
+    Kompics.logger.info("OutgoingHandler: connected ports: {}", destPorts.size());
+
+    if (event instanceof Request) {
+      Request request = (Request) event;
+      request.pushPathElement(proxy.getComponentCore());
+    }
+
+    for (Port<? extends PortType> port : destPorts) {
+      port.doTrigger(event, 0, portStruct.getChannel(port));
+    }
   }
 }

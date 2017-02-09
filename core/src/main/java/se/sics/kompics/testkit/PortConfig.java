@@ -1,5 +1,6 @@
 package se.sics.kompics.testkit;
 
+import se.sics.kompics.ChannelCore;
 import se.sics.kompics.Port;
 import se.sics.kompics.PortCore;
 import se.sics.kompics.PortType;
@@ -48,4 +49,5 @@ class PortConfig {
           Port<P> port, PortStructure<P> portStruct) {
     portStructure.put(port, portStruct);
   }
+
 }

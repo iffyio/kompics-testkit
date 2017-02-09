@@ -12,6 +12,7 @@ class PortStructure<P extends PortType> {
   private Port<? extends PortType> outPort;
   private Proxy proxy;
   private boolean isMockedPort;
+  private Map<Port, Channel> portToChannel = new HashMap<>();
 
   private Set<IncomingHandler> incomingHandlers;
   private Set<OutgoingHandler> outgoingHandlers;
@@ -41,11 +42,14 @@ class PortStructure<P extends PortType> {
 
   void addConnectedPort(PortCore<P> other, ChannelFactory factory) {
     assert !isMockedPort;
+    Channel<P> channel;
     if (isPositive) {
-      factory.connect((PortCore<P>) outPort, other);
+      channel = factory.connect((PortCore<P>) outPort, other);
     } else {
-      factory.connect(other, (PortCore<P>) outPort);
+      channel = factory.connect(other, (PortCore<P>) outPort);
     }
+    connectedPorts.add(other);
+    portToChannel.put(other, channel);
   }
 
   void addIncomingHandler(KompicsEvent event) {
@@ -56,7 +60,7 @@ class PortStructure<P extends PortType> {
       return;
     }
 
-    IncomingHandler incomingHandler = new IncomingHandler(eventType, connectedPorts, ownerPort);
+    IncomingHandler incomingHandler = new IncomingHandler(proxy, this, eventType, connectedPorts, ownerPort);
     incomingHandlers.add(incomingHandler);
     inPort.doSubscribe(incomingHandler);
   }
@@ -69,9 +73,15 @@ class PortStructure<P extends PortType> {
       return;
     }
 
-    OutgoingHandler outgoingHandler = new OutgoingHandler(eventType, ownerPort, connectedPorts);
+    OutgoingHandler outgoingHandler = new OutgoingHandler(proxy, this, eventType, ownerPort, connectedPorts);
     outgoingHandlers.add(outgoingHandler);
     ownerPort.doSubscribe(outgoingHandler);
+  }
+
+  <P extends PortType> ChannelCore<P> getChannel(Port<P> port) {
+    Channel channel = portToChannel.get(port);
+    assert channel != null;
+    return (ChannelCore<P>) channel;
   }
 
   private boolean hasEquivalentHandler(
