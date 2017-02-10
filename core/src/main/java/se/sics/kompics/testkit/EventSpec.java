@@ -1,17 +1,18 @@
-package se.sics.kompics.testkit.fsm;
+package se.sics.kompics.testkit;
 
 import se.sics.kompics.KompicsEvent;
 import se.sics.kompics.Port;
 import se.sics.kompics.PortType;
-import se.sics.kompics.testkit.TestKit;
 
 public class EventSpec {
 
   private final KompicsEvent event;
   private final Port<? extends PortType> port;
   private final TestKit.Direction direction;
+  private TestHandler handler;
 
-  public EventSpec(KompicsEvent event, Port<? extends PortType> port, TestKit.Direction direction) {
+  EventSpec(KompicsEvent event, Port<? extends PortType> port,
+                   TestKit.Direction direction) {
     this.event = event;
     this.port = port;
     this.direction = direction;
@@ -27,6 +28,14 @@ public class EventSpec {
 
   public TestKit.Direction getDirection() {
     return direction;
+  }
+
+  void setHandler(TestHandler handler) {
+    this.handler = handler;
+  }
+
+  public void handle() {
+    handler.doHandle(event);
   }
 
   public boolean equals(Object o) {

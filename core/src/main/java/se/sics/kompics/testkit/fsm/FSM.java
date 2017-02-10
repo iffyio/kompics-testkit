@@ -2,6 +2,7 @@ package se.sics.kompics.testkit.fsm;
 
 import se.sics.kompics.ComponentCore;
 import se.sics.kompics.Kompics;
+import se.sics.kompics.testkit.EventSpec;
 import se.sics.kompics.testkit.Proxy;
 
 import java.util.LinkedList;

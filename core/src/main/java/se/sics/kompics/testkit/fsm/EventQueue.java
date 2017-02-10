@@ -1,5 +1,7 @@
 package se.sics.kompics.testkit.fsm;
 
+import se.sics.kompics.testkit.EventSpec;
+
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class EventQueue {

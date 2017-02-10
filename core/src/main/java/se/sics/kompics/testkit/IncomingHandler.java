@@ -1,7 +1,6 @@
 package se.sics.kompics.testkit;
 
 import se.sics.kompics.*;
-import se.sics.kompics.testkit.fsm.EventSpec;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -27,7 +26,13 @@ class IncomingHandler extends TestHandler {
       Response response = (Response) event;
       assert response.getTopPathElementFirst().getComponent() == destPort.getPair().getOwner();
     }
-    eventQueue.offer(new EventSpec(event, destPort, TestKit.Direction.INCOMING));
+    EventSpec eventSpec = new EventSpec(event, destPort, TestKit.Direction.INCOMING);
+    eventSpec.setHandler(this);
+    eventQueue.offer(eventSpec);
+  }
+
+  @Override
+  public void doHandle(KompicsEvent event) {
     destPort.doTrigger(event, 0, proxy.getComponentCore());
   }
 }

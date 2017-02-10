@@ -99,7 +99,8 @@ class TestCase {
       portStruct.addIncomingHandler(event);
     }
 
-    fsm.addState(new ExpectState(fsm, event, port, direction));
+
+    fsm.addState(new ExpectState(fsm, new EventSpec(event, port, direction)));
 
     return this;
   }

@@ -1,6 +1,7 @@
 package se.sics.kompics.testkit.fsm;
 
 import se.sics.kompics.*;
+import se.sics.kompics.testkit.EventSpec;
 import se.sics.kompics.testkit.TestKit;
 
 public class ExpectState extends State{
@@ -9,11 +10,10 @@ public class ExpectState extends State{
   private final EventSpec expectedSpec;
 
   public ExpectState(
-          FSM fsm, KompicsEvent event,
-          Port<? extends PortType> port, TestKit.Direction direction) {
+          FSM fsm, EventSpec expectedSpec) {
 
     this.fsm = fsm;
-    expectedSpec = new EventSpec(event, port, direction);
+    this.expectedSpec = expectedSpec;
   }
 
   @Override
@@ -24,6 +24,7 @@ public class ExpectState extends State{
 
     if (expectedSpec.equals(queuedSpec)) {
       Kompics.logger.info("expect: PASS");
+      queuedSpec.handle();
       return true;
     } else {
       Kompics.logger.info("expect: FAILED -> received {} instead", expectedSpec, queuedSpec);

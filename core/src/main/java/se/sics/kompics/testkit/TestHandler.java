@@ -4,7 +4,7 @@ import se.sics.kompics.Handler;
 import se.sics.kompics.KompicsEvent;
 import se.sics.kompics.testkit.fsm.EventQueue;
 
-abstract class TestHandler extends Handler {
+public abstract class TestHandler extends Handler {
   final Proxy proxy;
   final PortStructure portStruct;
   final EventQueue eventQueue;
@@ -16,4 +16,6 @@ abstract class TestHandler extends Handler {
     this.eventQueue = proxy.getEventQueue();
     this.portStruct = portStruct;
   }
+
+  abstract void doHandle(KompicsEvent event);
 }
