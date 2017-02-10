@@ -38,36 +38,18 @@ public class FSM {
     State currentState = stateQueue.peek();
     while (!stateQueue.isEmpty()) {
       Kompics.logger.info("Current State = {}", currentState.getClass().getSimpleName());
-      boolean completed = currentState.run();
-      Kompics.logger.info("returned {}", completed);
-      if (completed) {
+      boolean completedWithoutError = currentState.run();
+      Kompics.logger.info("returned {}", completedWithoutError);
+      if (completedWithoutError) {
         stateQueue.poll();
         currentState = stateQueue.peek();
       } else {
-        try {
-          Thread.sleep(1000);
-        } catch (InterruptedException e) {
-          e.printStackTrace();
-        }
+        break;
       }
     }
-  }
-
-  KompicsEvent peekEventQueue() {
-    return eventQueue.peek();
   }
 
   KompicsEvent pollEventQueue() {
     return eventQueue.poll();
-  }
-
-  void waitNewEvent() {
-    synchronized (eventQueue) {
-      try {
-        eventQueue.wait();
-      } catch (InterruptedException e) {
-        throw new RuntimeException(e);
-      }
-    }
   }
 }

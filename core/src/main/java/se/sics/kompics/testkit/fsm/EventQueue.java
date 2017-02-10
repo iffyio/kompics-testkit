@@ -8,18 +8,19 @@ public class EventQueue {
 
   private final ConcurrentLinkedQueue<KompicsEvent> q = new ConcurrentLinkedQueue<>();
 
-  public void offer(KompicsEvent event) {
+  public synchronized void offer(KompicsEvent event) {
     q.offer(event);
-    synchronized (this) {
-      this.notifyAll();
+    this.notifyAll();
+  }
+
+  public synchronized KompicsEvent poll() {
+    while (q.peek() == null) {
+      try {
+        wait();
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
     }
-  }
-
-  public KompicsEvent poll() {
     return q.poll();
-  }
-
-  public KompicsEvent peek() {
-    return q.peek();
   }
 }

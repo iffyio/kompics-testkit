@@ -22,18 +22,13 @@ public class ExpectState extends State{
 
   @Override
   protected boolean run() {
-    // check queue
-    KompicsEvent queuedEvent = fsm.peekEventQueue();
-    if (queuedEvent == null) {
-      Kompics.logger.info("expect: Empty queue, Expecting {}", event);
-      fsm.waitNewEvent();
-      return false;
-    } else if (!queuedEvent.equals(event)) {
+    KompicsEvent queuedEvent = fsm.pollEventQueue();
+    assert queuedEvent != null;
+
+    if (!queuedEvent.equals(event)) {
       Kompics.logger.info("expect: Expecting {}, received {}", event, queuedEvent);
-      fsm.waitNewEvent();
       return false;
     } else {
-      fsm.pollEventQueue();
       return true;
     }
   }
