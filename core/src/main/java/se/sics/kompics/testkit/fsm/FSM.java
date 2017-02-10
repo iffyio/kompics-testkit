@@ -49,7 +49,7 @@ public class FSM {
     }
   }
 
-  KompicsEvent pollEventQueue() {
+  QueuedEvent pollEventQueue() {
     return eventQueue.poll();
   }
 }

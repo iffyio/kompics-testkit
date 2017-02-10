@@ -6,30 +6,26 @@ import se.sics.kompics.testkit.TestKit;
 public class ExpectState extends State{
 
   private final FSM fsm;
-  private final KompicsEvent event;
-  private final Port<? extends PortType> port;
-  private final TestKit.Direction direction;
+  private final QueuedEvent expectedEvent;
 
   public ExpectState(
           FSM fsm, KompicsEvent event,
           Port<? extends PortType> port, TestKit.Direction direction) {
 
     this.fsm = fsm;
-    this.event = event;
-    this.port = port;
-    this.direction = direction;
+    expectedEvent = new QueuedEvent(event, port, direction);
   }
 
   @Override
   protected boolean run() {
-    KompicsEvent queuedEvent = fsm.pollEventQueue();
+    QueuedEvent  queuedEvent = fsm.pollEventQueue();
     assert queuedEvent != null;
 
-    if (!queuedEvent.equals(event)) {
-      Kompics.logger.info("expect: Expecting {}, received {}", event, queuedEvent);
-      return false;
-    } else {
+    if (expectedEvent.equals(queuedEvent)) {
       return true;
+    } else {
+      Kompics.logger.info("expect: Expected {}\nreceived {}", expectedEvent, queuedEvent);
+      return false;
     }
   }
 

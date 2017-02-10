@@ -2,6 +2,7 @@ package se.sics.kompics.testkit;
 
 import se.sics.kompics.*;
 import se.sics.kompics.testkit.fsm.EventQueue;
+import se.sics.kompics.testkit.fsm.QueuedEvent;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -31,7 +32,7 @@ class OutgoingHandler extends TestHandler {
       request.pushPathElement(proxy.getComponentCore());
     }
 
-    eventQueue.offer(event);
+    eventQueue.offer(new QueuedEvent(event, sourcePort, TestKit.Direction.OUTGOING));
     for (Port<? extends PortType> port : destPorts) {
       port.doTrigger(event, 0, portStruct.getChannel(port));
     }

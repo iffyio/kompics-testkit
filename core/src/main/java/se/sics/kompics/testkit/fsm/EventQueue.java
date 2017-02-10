@@ -6,14 +6,14 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class EventQueue {
 
-  private final ConcurrentLinkedQueue<KompicsEvent> q = new ConcurrentLinkedQueue<>();
+  private final ConcurrentLinkedQueue<QueuedEvent> q = new ConcurrentLinkedQueue<>();
 
-  public synchronized void offer(KompicsEvent event) {
+  public synchronized void offer(QueuedEvent event) {
     q.offer(event);
     this.notifyAll();
   }
 
-  public synchronized KompicsEvent poll() {
+  public synchronized QueuedEvent poll() {
     while (q.peek() == null) {
       try {
         wait();
