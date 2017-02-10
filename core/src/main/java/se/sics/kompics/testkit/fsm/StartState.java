@@ -6,15 +6,15 @@ import se.sics.kompics.Start;
 
 class StartState extends State {
 
-  private ComponentCore parent;
-  StartState(ComponentCore parent) {
-    this.parent = parent;
+  private ComponentCore proxy;
+  StartState(ComponentCore proxy) {
+    this.proxy = proxy;
   }
 
   @Override
   protected boolean run() {
     Kompics.logger.info("Start State!");
-    parent.getControl().doTrigger(Start.event, 0, parent);
+    proxy.getControl().doTrigger(Start.event, 0, proxy);
     return true;
   }
 }

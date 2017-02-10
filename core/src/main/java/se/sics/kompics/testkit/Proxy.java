@@ -1,9 +1,11 @@
 package se.sics.kompics.testkit;
 
 import se.sics.kompics.*;
+import se.sics.kompics.testkit.fsm.EventQueue;
 
 public class Proxy extends ComponentDefinition{
 
+  private final EventQueue eventQueue = new EventQueue();
   private final ComponentDefinition cut;
 
   <T extends ComponentDefinition>
@@ -15,6 +17,10 @@ public class Proxy extends ComponentDefinition{
 
   ComponentDefinition getCut() {
     return cut;
+  }
+
+  public EventQueue getEventQueue() {
+    return eventQueue;
   }
 
   <T extends ComponentDefinition> Component createNewSetupComponent(Class<T> cClass, Init<T> initEvent) {

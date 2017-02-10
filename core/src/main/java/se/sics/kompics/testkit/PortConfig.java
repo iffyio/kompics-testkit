@@ -1,6 +1,5 @@
 package se.sics.kompics.testkit;
 
-import se.sics.kompics.ChannelCore;
 import se.sics.kompics.Port;
 import se.sics.kompics.PortCore;
 import se.sics.kompics.PortType;

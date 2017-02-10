@@ -2,13 +2,14 @@ package se.sics.kompics.testkit;
 
 import se.sics.kompics.*;
 import se.sics.kompics.scheduler.ThreadPoolScheduler;
+import se.sics.kompics.testkit.fsm.ExpectState;
 import se.sics.kompics.testkit.fsm.FSM;
 import se.sics.kompics.testkit.fsm.Trigger;
 
 
 class TestCase {
   private final Proxy proxy;
-  private final Component proxyComponent;
+  private final ComponentCore proxyComponent;
   private final ComponentDefinition cut;
   private final PortConfig portConfig;
   private FSM fsm;
@@ -20,7 +21,7 @@ class TestCase {
     proxyComponent = proxy.getComponentCore();
     cut = proxy.getCut();
     portConfig = new PortConfig(proxy);
-    fsm = new FSM((ComponentCore) proxyComponent);
+    fsm = new FSM(proxy);
     scheduler = new ThreadPoolScheduler(1);
     Kompics.setScheduler(scheduler);
   }
@@ -98,6 +99,8 @@ class TestCase {
       portStruct.addIncomingHandler(event);
     }
 
+    fsm.addState(new ExpectState(fsm, event, port, direction));
+
     return this;
   }
 
@@ -110,11 +113,11 @@ class TestCase {
 
   void check() {
     fsm.start();
-    try {
+/*    try {
       Thread.sleep(1000);
     } catch (InterruptedException e) {
       e.printStackTrace();
-    }
+    }*/
     scheduler.shutdown();
   }
 }

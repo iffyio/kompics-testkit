@@ -21,7 +21,12 @@ class IncomingHandler extends TestHandler {
 
   @Override
   public void handle(KompicsEvent event) {
-    Kompics.logger.info("IncomingHandler: {} received event: {}", this, event.getClass().getSimpleName());
+    Kompics.logger.info("IncomingHandler: {} received event: {}", this, event);
+    if (event instanceof Response) {
+      Response response = (Response) event;
+      assert response.getTopPathElementFirst().getComponent() == destPort.getPair().getOwner();
+    }
+    eventQueue.offer(event);
     destPort.doTrigger(event, 0, proxy.getComponentCore());
   }
 }
