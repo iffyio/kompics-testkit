@@ -1,19 +1,17 @@
 package se.sics.kompics.testkit.fsm;
 
-import se.sics.kompics.KompicsEvent;
-
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class EventQueue {
 
-  private final ConcurrentLinkedQueue<QueuedEvent> q = new ConcurrentLinkedQueue<>();
+  private final ConcurrentLinkedQueue<EventSpec> q = new ConcurrentLinkedQueue<>();
 
-  public synchronized void offer(QueuedEvent event) {
+  public synchronized void offer(EventSpec event) {
     q.offer(event);
     this.notifyAll();
   }
 
-  public synchronized QueuedEvent poll() {
+  public synchronized EventSpec poll() {
     while (q.peek() == null) {
       try {
         wait();

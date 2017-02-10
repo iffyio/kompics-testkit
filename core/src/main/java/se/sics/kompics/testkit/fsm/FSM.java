@@ -2,7 +2,6 @@ package se.sics.kompics.testkit.fsm;
 
 import se.sics.kompics.ComponentCore;
 import se.sics.kompics.Kompics;
-import se.sics.kompics.KompicsEvent;
 import se.sics.kompics.testkit.Proxy;
 
 import java.util.LinkedList;
@@ -49,7 +48,7 @@ public class FSM {
     }
   }
 
-  QueuedEvent pollEventQueue() {
+  EventSpec pollEventQueue() {
     return eventQueue.poll();
   }
 }
