@@ -2,9 +2,12 @@ package se.sics.kompics.testkit;
 
 import se.sics.kompics.*;
 import se.sics.kompics.scheduler.ThreadPoolScheduler;
+import se.sics.kompics.testkit.fsm.Env;
 import se.sics.kompics.testkit.fsm.ExpectState;
 import se.sics.kompics.testkit.fsm.FSM;
 import se.sics.kompics.testkit.fsm.Trigger;
+
+import java.util.Stack;
 
 
 class TestCase {
@@ -14,6 +17,7 @@ class TestCase {
   private final PortConfig portConfig;
   private FSM fsm;
   private ThreadPoolScheduler scheduler;
+  private boolean checked;
 
   <T extends ComponentDefinition> TestCase(
           Class<T> cutClass, Init<T> initEvent) {
@@ -100,7 +104,8 @@ class TestCase {
     }
 
 
-    fsm.addState(new ExpectState(fsm, new EventSpec(event, port, direction)));
+    fsm.addState(new ExpectState(fsm.getCurrentEnv(),
+            fsm, new EventSpec(event, port, direction)));
 
     return this;
   }
@@ -108,17 +113,44 @@ class TestCase {
   <P extends PortType> TestCase trigger(
           KompicsEvent event, Port<P> port) {
     // register state
-    fsm.addState(new Trigger(event, port));
+    fsm.addState(new Trigger(fsm.getCurrentEnv(), event, port));
     return this;
   }
 
+  TestCase repeat(int times) {
+    fsm.repeat(times);
+    return this;
+  }
+
+  TestCase endRepeat() {
+    fsm.endRepeat();
+    return this;
+  }
+
+  TestCase notAllow(EventSpec eventSpec) {
+    fsm.blacklist(eventSpec);
+    return this;
+  }
+
+  TestCase allow(EventSpec eventSpec) {
+    fsm.whitelist(eventSpec);
+    return this;
+  }
+
+  TestCase conditionalDrop(EventSpec eventSpec) {
+    fsm.conditionalDrop(eventSpec);
+    return this;
+  }
+
+
   void check() {
+
+    if (checked) {
+      throw new IllegalStateException("test has been run");
+    } else {
+      checked = true;
+    }
     fsm.start();
-/*    try {
-      Thread.sleep(1000);
-    } catch (InterruptedException e) {
-      e.printStackTrace();
-    }*/
     scheduler.shutdown();
   }
 }
