@@ -5,23 +5,23 @@ import se.sics.kompics.testkit.EventSpec;
 import java.util.HashSet;
 import java.util.Set;
 
-class Env {
+class StateTable {
 
-  private Set<EventSpec> blacklist;
-  private Set<EventSpec> whitelist;
+  private Set<EventSpec> blacklist; // stimuli that lead to error state
+  private Set<EventSpec> whitelist; // stimuli that lead to same stateevents
   private Set<EventSpec> conditionalDrop;
 
-  Env(Env previousEnv) {
-    if (previousEnv == null) {
-      initEnv();
+  StateTable(StateTable previousTable) {
+    if (previousTable == null) {
+      initTables();
     } else {
-      this.blacklist = new HashSet<>(previousEnv.getBlacklist());
-      this.whitelist = new HashSet<>(previousEnv.getWhitelist());
-      this.conditionalDrop = previousEnv.getConditionalDrop();
+      this.blacklist = new HashSet<>(previousTable.getBlacklist());
+      this.whitelist = new HashSet<>(previousTable.getWhitelist());
+      this.conditionalDrop = previousTable.getConditionalDrop();
     }
   }
 
-  private void initEnv() {
+  private void initTables() {
     blacklist = new HashSet<>();
     whitelist = new HashSet<>();
     conditionalDrop = new HashSet<>();

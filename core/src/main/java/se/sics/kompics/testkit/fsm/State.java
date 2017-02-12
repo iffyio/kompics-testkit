@@ -2,14 +2,14 @@ package se.sics.kompics.testkit.fsm;
 
 abstract class State {
 
-  Env env;
+  private StateTable stateTable;
 
-  protected void setEnv(Env env) {
-    this.env = env;
+  void setStateTable(StateTable stateTable) {
+    this.stateTable = stateTable;
   }
 
-  protected Env getEnv() {
-    return env;
+  StateTable getStateTable() {
+    return stateTable;
   }
 
   protected abstract boolean run();

@@ -13,7 +13,7 @@ public class FSM {
   private final ComponentCore proxyComponent;
   private boolean start = false;
   private final Stack<Loop> balancedRepeat = new Stack<>();
-  private Env currentEnv;
+  private StateTable currentTable;
 
   // running fsm
   private int currentStateIndex = 0;
@@ -28,25 +28,25 @@ public class FSM {
   }
 
   private void addStartState() {
-    repeat(1); // initial environment
+    repeat(1); // set initial state table
     addStateToFSM(new StartState(proxyComponent));
   }
 
   public void addStateToFSM(State state) {
-    state.setEnv(currentEnv);
+    state.setStateTable(currentTable);
     states.add(state);
   }
 
   public void blacklist(EventSpec eventSpec) {
-    currentEnv.blacklist(eventSpec);
+    currentTable.blacklist(eventSpec);
   }
 
   public void whitelist(EventSpec eventSpec) {
-    currentEnv.whitelist(eventSpec);
+    currentTable.whitelist(eventSpec);
   }
 
   public void conditionalDrop(EventSpec eventSpec) {
-    currentEnv.conditionalDrop(eventSpec);
+    currentTable.conditionalDrop(eventSpec);
   }
 
   public void repeat(int count) {
@@ -54,8 +54,8 @@ public class FSM {
       throw new IllegalArgumentException("only positive count allowed for repeat");
     }
 
-    // replace current with new env
-    currentEnv = new Env(currentEnv);
+    // replace current with new stateTable
+    currentTable = new StateTable(currentTable);
 
     Loop loopStart = new Loop(count, states.size());
 
@@ -86,6 +86,12 @@ public class FSM {
 
   private void run() {
     while (currentStateIndex < states.size()) {
+      //Kompics.logger.info("current end state = {}", currentTable.getEndState());
+/*      try {
+        Thread.sleep(500);
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+      }*/
       currentState = states.get(currentStateIndex);
 
       if (!(startLoopWasRun() || endLoopWasRun())) { // current state is regular
@@ -104,7 +110,7 @@ public class FSM {
     boolean startLoopRan = false;
     if (currentState instanceof Loop) {
       startLoopRan = true;
-      currentEnv = currentState.getEnv();
+      currentTable = currentState.getStateTable();
       ((Loop) currentState).initialize();
       currentStateIndex++;
     }
@@ -138,28 +144,25 @@ public class FSM {
     }
 
     Loop loopStart = balancedRepeat.pop();
-    assert loopStart.getEnv() == currentEnv;
+    assert loopStart.getStateTable() == currentTable;
 
     EndLoop loopEnd = new EndLoop(loopStart);
     addStateToFSM(loopEnd);
 
-    restorePreviousEnvironment();
+    restorePreviousStateTable();
 
   }
 
-  private void restorePreviousEnvironment() {
+  private void restorePreviousStateTable() {
     if (!balancedRepeat.isEmpty()) { // false only for start state
-      currentEnv = balancedRepeat.peek().getEnv();
+      currentTable = balancedRepeat.peek().getStateTable();
     }
   }
 
   private boolean currentRepeatBlockIsEmpty() {
-    if (balancedRepeat.isEmpty()) {
-      return true;
-    } else {
-      // compare current index with loopstart index
-      return balancedRepeat.peek().getIndex() == states.size() - 1;
-    }
+    // compare current index with loopstart index
+    return  balancedRepeat.isEmpty() ||
+            balancedRepeat.peek().getIndex() == states.size() - 1;
   }
 
   EventSpec pollEventQueue() {
