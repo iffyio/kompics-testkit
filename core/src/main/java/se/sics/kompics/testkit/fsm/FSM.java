@@ -1,7 +1,6 @@
 package se.sics.kompics.testkit.fsm;
 
 import se.sics.kompics.ComponentCore;
-import se.sics.kompics.Kompics;
 import se.sics.kompics.testkit.EventSpec;
 import se.sics.kompics.testkit.Proxy;
 
@@ -16,126 +15,26 @@ public class FSM {
   private final Stack<Loop> balancedRepeat = new Stack<>();
   private Env currentEnv;
 
+  // running fsm
+  private int currentStateIndex = 0;
+  private State currentState = null;
+
   public FSM(Proxy proxy) {
     this.proxy = proxy;
     this.eventQueue = proxy.getEventQueue();
     this.proxyComponent =  proxy.getComponentCore();
 
-    // init
+    addStartState();
+  }
+
+  private void addStartState() {
     repeat(1); // initial environment
-    addState(new StartState(currentEnv, proxyComponent));
+    addStateToFSM(new StartState(proxyComponent));
   }
 
-  public void addState(State state) {
+  public void addStateToFSM(State state) {
+    state.setEnv(currentEnv);
     states.add(state);
-    if (currentEnv.getStartState() == null) {
-      state.setStartOfEnv();
-      currentEnv.setStartState(state);
-    }
-  }
-
-  public void start() {
-    if (!start) {
-      start = true;
-      addState(new FinalState(currentEnv));
-      endRepeat();
-      if (!balancedRepeat.isEmpty()) {
-        throw new IllegalStateException("unmatched repeat loop");
-      }
-      run();
-    }
-  }
-
-  private void run() {
-    int currentStateIndex = 0;
-    State currentState;
-    for (State state : states) {
-      Kompics.logger.info("{}", state.getClass().getSimpleName());
-    }
-    //if (true) return;
-    while (currentStateIndex < states.size()) {
-      //Kompics.logger.info("current end state = {}", currentEnv.getEndState());
-      try {
-        Thread.sleep(500);
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-      }
-      currentState = states.get(currentStateIndex);
-
-      if (currentState instanceof Loop) {
-        Kompics.logger.info("Start of loop, count = {}", ((Loop) currentState).getCurrentCount());
-        currentEnv = currentState.getEnv();
-        ((Loop) currentState).initialize();
-        currentStateIndex++;
-        continue;
-      }
-
-      if (currentState instanceof EndLoop) {
-        EndLoop loopEnd = (EndLoop) currentState;
-        Loop loopStart = loopEnd.getLoop();
-        loopStart.decrementCount();
-        Kompics.logger.info("End of loop, count = {}", loopStart.getCurrentCount());
-        if (loopStart.getCurrentCount() > 0) {
-          currentStateIndex = loopStart.getStartIndex() + 1; // first (possibly) real state in loop
-          continue;
-        } else {
-          currentStateIndex++;
-          continue;
-        }
-      }
-      boolean completedWithoutError = currentState.run();
-
-      if (!completedWithoutError) {
-        // run error state
-        break;
-      } else {
-        currentStateIndex++;
-      }
-    }
-  }
-
-  public Env getCurrentEnv() {
-    return currentEnv;
-  }
-
-  EventSpec pollEventQueue() {
-    return eventQueue.poll();
-  }
-
-  public void repeat(int count) {
-    if (count <= 0) {
-      throw new IllegalArgumentException("negative count not allowed for repeat");
-    }
-
-    Env env = new Env(count, currentEnv);
-    currentEnv = env;
-    Loop loopStart = new Loop(env, count, states.size());
-    addState(loopStart);
-    balancedRepeat.push(loopStart);
-  }
-
-  public void endRepeat() {
-    if (currentEnv.getStartState() == null) {
-      throw new IllegalStateException("empty repeat blocks are not allowed");
-    }
-
-    Loop loopStart = balancedRepeat.pop();
-    Env previousEnv = loopStart.getEnv();
-    EndLoop loopEnd = new EndLoop(loopStart.getEnv(), loopStart);
-    states.add(loopEnd);
-    if (previousEnv == null) {
-      throw new IllegalStateException("matching loop not found");
-    }
-
-    assert previousEnv == currentEnv;
-
-    if (!balancedRepeat.isEmpty()) { // false only for start state
-      currentEnv = balancedRepeat.peek().getEnv();
-    }
-
-    State lastAddedState = states.get(states.size() - 1);
-    currentEnv.setEndState(lastAddedState);
-    lastAddedState.setEndOfEnv();
   }
 
   public void blacklist(EventSpec eventSpec) {
@@ -150,4 +49,120 @@ public class FSM {
     currentEnv.conditionalDrop(eventSpec);
   }
 
+  public void repeat(int count) {
+    if (count <= 0) {
+      throw new IllegalArgumentException("only positive count allowed for repeat");
+    }
+
+    // replace current with new env
+    currentEnv = new Env(currentEnv);
+
+    Loop loopStart = new Loop(count, states.size());
+
+    addStateToFSM(loopStart);
+    balancedRepeat.push(loopStart);
+  }
+
+
+  public void start() {
+    if (!start) {
+      start = true;
+      addFinalState();
+      checkBalancedRepeatBlocks();
+      run();
+    }
+  }
+
+  private void addFinalState() {
+    addStateToFSM(new FinalState());
+    endRepeat();
+  }
+
+  private void checkBalancedRepeatBlocks() {
+    if (!balancedRepeat.isEmpty()) {
+      throw new IllegalStateException("unmatched end for loop");
+    }
+  }
+
+  private void run() {
+    while (currentStateIndex < states.size()) {
+      currentState = states.get(currentStateIndex);
+
+      if (!(startLoopWasRun() || endLoopWasRun())) { // current state is regular
+        boolean completedWithoutError = currentState.run();
+        if (completedWithoutError) {
+          currentStateIndex++; // go to next state
+        } else {
+          // run error state
+          break;
+        }
+      }
+    }
+  }
+
+  private boolean startLoopWasRun() {
+    boolean startLoopRan = false;
+    if (currentState instanceof Loop) {
+      startLoopRan = true;
+      currentEnv = currentState.getEnv();
+      ((Loop) currentState).initialize();
+      currentStateIndex++;
+    }
+    return startLoopRan;
+  }
+
+  private boolean endLoopWasRun() {
+    boolean endLoopRan = false;
+    if (currentState instanceof EndLoop) {
+      endLoopRan = true;
+
+      EndLoop loopEnd = (EndLoop) currentState;
+      loopEnd.signalIterationComplete();
+
+      // set next state from loop end
+      // if there are more iterations in the loop then go back to first state of loop
+      if (loopEnd.hasMoreIterations()) {
+        currentStateIndex = loopEnd.indexOfFirstState();
+      } else {
+        currentStateIndex++;
+      }
+    }
+    return endLoopRan;
+  }
+
+  public void endRepeat() {
+    if (balancedRepeat.isEmpty()) {
+      throw new IllegalStateException("matching loop not found for end");
+    } else if (currentRepeatBlockIsEmpty()) {
+      throw new IllegalStateException("empty repeat blocks are not allowed");
+    }
+
+    Loop loopStart = balancedRepeat.pop();
+    assert loopStart.getEnv() == currentEnv;
+
+    EndLoop loopEnd = new EndLoop(loopStart);
+    addStateToFSM(loopEnd);
+
+    restorePreviousEnvironment();
+
+  }
+
+  private void restorePreviousEnvironment() {
+    if (!balancedRepeat.isEmpty()) { // false only for start state
+      currentEnv = balancedRepeat.peek().getEnv();
+    }
+  }
+
+  private boolean currentRepeatBlockIsEmpty() {
+    if (balancedRepeat.isEmpty()) {
+      return true;
+    } else {
+      // compare current index with loopstart index
+      return balancedRepeat.peek().getIndex() == states.size() - 1;
+    }
+  }
+
+  EventSpec pollEventQueue() {
+    return eventQueue.poll();
+  }
 }

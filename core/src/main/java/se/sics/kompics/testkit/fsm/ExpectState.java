@@ -2,7 +2,6 @@ package se.sics.kompics.testkit.fsm;
 
 import se.sics.kompics.*;
 import se.sics.kompics.testkit.EventSpec;
-import se.sics.kompics.testkit.TestKit;
 
 public class ExpectState extends State{
 
@@ -30,6 +29,8 @@ public class ExpectState extends State{
       Kompics.logger.info("expect: FAILED -> received {} instead", expectedSpec, queuedSpec);
       return false;
     }
+/*    Kompics.logger.info("expect running");
+    return true;*/
   }
 
 }

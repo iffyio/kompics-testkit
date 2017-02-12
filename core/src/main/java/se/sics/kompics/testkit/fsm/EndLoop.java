@@ -1,16 +1,23 @@
 package se.sics.kompics.testkit.fsm;
 
-public class EndLoop extends State{
+class EndLoop extends State{
 
-  private final Loop loop;
+  private final Loop startLoop;
 
-  protected EndLoop(Env env, Loop loop) {
-    super(env);
-    this.loop = loop;
+  EndLoop(Loop startLoop) {
+    this.startLoop = startLoop;
   }
 
-  Loop getLoop() {
-    return loop;
+  void signalIterationComplete() {
+    startLoop.decrementCount();
+  }
+
+  boolean hasMoreIterations() {
+    return startLoop.getCurrentCount() > 0;
+  }
+
+  int indexOfFirstState() {
+    return startLoop.getIndex() + 1;
   }
 
   @Override

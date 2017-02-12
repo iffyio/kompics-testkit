@@ -2,12 +2,11 @@ package se.sics.kompics.testkit.fsm;
 
 class Loop extends State{
 
-  private final int count, startIndex;
+  private final int count, index;
   private int currentCount;
-  Loop(Env env, int count, int startIndex) {
-    super(env);
+  Loop(int count, int index) {
     this.count = count;
-    this.startIndex = startIndex;
+    this.index = index;
   }
 
   void initialize() {
@@ -22,8 +21,8 @@ class Loop extends State{
     return currentCount;
   }
 
-  int getStartIndex() {
-    return startIndex;
+  int getIndex() {
+    return index;
   }
 
   @Override

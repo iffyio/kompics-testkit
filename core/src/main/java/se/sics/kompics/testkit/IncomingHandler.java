@@ -24,7 +24,7 @@ class IncomingHandler extends TestHandler {
     Kompics.logger.info("IncomingHandler: {} received event: {}", this, event);
     if (event instanceof Response) {
       Response response = (Response) event;
-      assert response.getTopPathElementFirst().getComponent() == destPort.getPair().getOwner();
+      //assert response.getTopPathElementFirst().getComponent() == destPort.getPair().getOwner();
     }
     EventSpec eventSpec = new EventSpec(event, destPort, TestKit.Direction.INCOMING);
     eventSpec.setHandler(this);

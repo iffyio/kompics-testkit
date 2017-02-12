@@ -1,9 +1,6 @@
 package se.sics.kompics.testkit.fsm;
 
-import se.sics.kompics.ComponentCore;
-import se.sics.kompics.KompicsEvent;
-import se.sics.kompics.Port;
-import se.sics.kompics.PortType;
+import se.sics.kompics.*;
 
 public class Trigger extends State{
 
@@ -20,5 +17,7 @@ public class Trigger extends State{
     // // TODO: 2/8/17 worker id, component?
     port.doTrigger(event, 0, port.getOwner());
     return true;
+/*    Kompics.logger.info("trigger running");
+    return true;*/
   }
 }

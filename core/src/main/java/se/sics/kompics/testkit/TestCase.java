@@ -2,12 +2,9 @@ package se.sics.kompics.testkit;
 
 import se.sics.kompics.*;
 import se.sics.kompics.scheduler.ThreadPoolScheduler;
-import se.sics.kompics.testkit.fsm.Env;
 import se.sics.kompics.testkit.fsm.ExpectState;
 import se.sics.kompics.testkit.fsm.FSM;
 import se.sics.kompics.testkit.fsm.Trigger;
-
-import java.util.Stack;
 
 
 class TestCase {
@@ -103,9 +100,7 @@ class TestCase {
       portStruct.addIncomingHandler(event);
     }
 
-
-    fsm.addState(new ExpectState(fsm.getCurrentEnv(),
-            fsm, new EventSpec(event, port, direction)));
+    fsm.addStateToFSM(new ExpectState(fsm, new EventSpec(event, port, direction)));
 
     return this;
   }
@@ -113,7 +108,7 @@ class TestCase {
   <P extends PortType> TestCase trigger(
           KompicsEvent event, Port<P> port) {
     // register state
-    fsm.addState(new Trigger(fsm.getCurrentEnv(), event, port));
+    fsm.addStateToFSM(new Trigger(event, port));
     return this;
   }
 
@@ -127,7 +122,7 @@ class TestCase {
     return this;
   }
 
-  TestCase notAllow(EventSpec eventSpec) {
+  TestCase disallow(EventSpec eventSpec) {
     fsm.blacklist(eventSpec);
     return this;
   }
@@ -144,13 +139,12 @@ class TestCase {
 
 
   void check() {
-
     if (checked) {
-      throw new IllegalStateException("test has been run");
+      throw new IllegalStateException("test has previously been run");
     } else {
       checked = true;
+      fsm.start();
+      scheduler.shutdown();
     }
-    fsm.start();
-    scheduler.shutdown();
   }
 }

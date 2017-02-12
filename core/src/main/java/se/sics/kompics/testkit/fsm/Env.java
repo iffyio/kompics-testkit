@@ -5,20 +5,13 @@ import se.sics.kompics.testkit.EventSpec;
 import java.util.HashSet;
 import java.util.Set;
 
-public class Env {
+class Env {
 
-  private final int count;
-  private int currentCount;
-  private State startState;
-  private State endState;
   private Set<EventSpec> blacklist;
   private Set<EventSpec> whitelist;
   private Set<EventSpec> conditionalDrop;
-  private Env previousEnv;
 
-  public Env(int count, Env previousEnv) {
-    this.count = count;
-    this.previousEnv = previousEnv;
+  Env(Env previousEnv) {
     if (previousEnv == null) {
       initEnv();
     } else {
@@ -28,48 +21,10 @@ public class Env {
     }
   }
 
-  public Env(int count) {
-    this.count = count;
-    initEnv();
-  }
-
   private void initEnv() {
     blacklist = new HashSet<>();
     whitelist = new HashSet<>();
     conditionalDrop = new HashSet<>();
-  }
-
-  public void initialize() {
-    currentCount = count;
-  }
-
-  int getCurrentCount() {
-    return currentCount;
-  }
-
-  void decrementCurrentCount() {
-    currentCount--;
-    assert currentCount >= 0;
-  }
-
-  Env getPreviousEnv() {
-    return previousEnv;
-  }
-
-  void setStartState(State startState) {
-    this.startState = startState;
-  }
-
-  State getStartState() {
-    return startState;
-  }
-
-  void setEndState(State endState) {
-    this.endState = endState;
-  }
-
-  State getEndState() {
-    return endState;
   }
 
   void blacklist(EventSpec eventSpec) {
