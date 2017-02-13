@@ -38,12 +38,8 @@ abstract class State {
         fsm.removeEventFromQueue();
         eventSpec.handle();
       } else {
-        Kompics.logger.info("event = {}", eventSpec);
-        Kompics.logger.info("blacklist = {}", stateTable.getBlacklist());
-        Kompics.logger.info("isblacklisted = {}",stateTable.isBlacklisted(eventSpec));
-        return false;
-/*        Kompics.logger.info("transition: regular event {}", eventSpec);
-        break; // regualar event may be handled*/
+        Kompics.logger.info("transition: regular event {}", eventSpec);
+        break; // regualar event may be handled
       }
     }
     return runS();

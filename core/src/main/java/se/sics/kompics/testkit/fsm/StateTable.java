@@ -8,8 +8,8 @@ import java.util.Set;
 
 class StateTable {
 
-  private Set<EventSpec> blacklist; // stimuli that lead to error state
-  private Set<EventSpec> whitelist; // stimuli that lead to same stateevents
+  private Set<EventSpec> blacklist; // events that transition to error state
+  private Set<EventSpec> whitelist; // events that self-transition
   private Set<EventSpec> conditionalDrop;
 
   StateTable(StateTable previousTable) {

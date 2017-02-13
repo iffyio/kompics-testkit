@@ -2,6 +2,7 @@ package se.sics.kompics.testkit;
 
 import se.sics.kompics.*;
 import se.sics.kompics.testkit.fsm.EventQueue;
+import se.sics.kompics.testkit.scheduler.CallingThreadScheduler;
 
 public class Proxy extends ComponentDefinition{
 
@@ -13,6 +14,7 @@ public class Proxy extends ComponentDefinition{
     // // TODO: 2/8/17 nosuchmethodexception with initEvent when Init.NONE
     //cut = create(cutClass, initEvent).getComponent();
     cut = create(cutClass, Init.NONE).getComponent();
+    getComponentCore().setScheduler(new CallingThreadScheduler());
   }
 
   ComponentDefinition getCut() {
