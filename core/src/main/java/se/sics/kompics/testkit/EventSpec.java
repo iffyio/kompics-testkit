@@ -9,7 +9,7 @@ public class EventSpec {
   private final KompicsEvent event;
   private final Port<? extends PortType> port;
   private final TestKit.Direction direction;
-  private TestHandler handler;
+  private ProxyHandler handler;
 
   EventSpec(KompicsEvent event, Port<? extends PortType> port,
                    TestKit.Direction direction) {
@@ -30,7 +30,7 @@ public class EventSpec {
     return direction;
   }
 
-  void setHandler(TestHandler handler) {
+  void setHandler(ProxyHandler handler) {
     this.handler = handler;
   }
 

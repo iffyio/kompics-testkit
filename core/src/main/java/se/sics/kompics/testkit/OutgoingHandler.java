@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-class OutgoingHandler extends TestHandler {
+class OutgoingHandler extends ProxyHandler {
   private Port<? extends PortType> sourcePort;
   private List<? extends Port<? extends PortType>> destPorts;
 

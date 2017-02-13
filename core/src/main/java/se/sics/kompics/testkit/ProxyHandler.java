@@ -4,11 +4,11 @@ import se.sics.kompics.Handler;
 import se.sics.kompics.KompicsEvent;
 import se.sics.kompics.testkit.fsm.EventQueue;
 
-public abstract class TestHandler extends Handler {
+public abstract class ProxyHandler extends Handler {
   final Proxy proxy;
   final PortStructure portStruct;
   final EventQueue eventQueue;
-  TestHandler(
+  ProxyHandler(
           Proxy proxy,
           PortStructure portStruct, Class<? extends KompicsEvent> eventType) {
     setEventType(eventType);
