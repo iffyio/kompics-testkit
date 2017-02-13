@@ -25,8 +25,4 @@ class Loop extends State{
     return index;
   }
 
-  @Override
-  protected boolean run() {
-    return false;
-  }
 }

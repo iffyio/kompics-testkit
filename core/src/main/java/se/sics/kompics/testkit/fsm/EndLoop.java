@@ -19,9 +19,4 @@ class EndLoop extends State{
   int indexOfFirstState() {
     return startLoop.getIndex() + 1;
   }
-
-  @Override
-  protected boolean run() {
-    return false;
-  }
 }

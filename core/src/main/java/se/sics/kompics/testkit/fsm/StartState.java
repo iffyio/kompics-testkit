@@ -12,7 +12,7 @@ class StartState extends State {
   }
 
   @Override
-  protected boolean run() {
+  protected boolean runS() {
     Kompics.logger.info("Start State!");
     proxy.getControl().doTrigger(Start.event, 0, proxy);
     return true;

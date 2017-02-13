@@ -78,15 +78,28 @@ class TestCase {
 
   <P extends  PortType> TestCase expect(
           KompicsEvent event, Port<P> port, TestKit.Direction direction) {
+
+    EventSpec eventSpec = new EventSpec(event, port, direction);
+    configurePort(eventSpec);
+    fsm.addStateToFSM(new ExpectState(eventSpec));
+
+    return this;
+  }
+
+  private <P extends PortType> void configurePort(EventSpec eventSpec) {
+    Port<P> port = (Port<P>) eventSpec.getPort();
+    TestKit.Direction direction = eventSpec.getDirection();
+    KompicsEvent event = eventSpec.getEvent();
+
     if (port.getOwner() != proxyComponent) {
       // // TODO: 2/8/17 support inside ports as well
-      throw new UnsupportedOperationException("Expect messages are supported only for the component being tested");
+      throw new UnsupportedOperationException("Watching messages are supported only for the component being tested");
     }
     PortStructure<P> portStruct = portConfig.get(port);
 
     if (portStruct == null) {
       if (direction == TestKit.Direction.INCOMING) {
-        throw new IllegalStateException("Can not expect incoming message on an unconnected port");
+        throw new IllegalStateException("Can not watch incoming message on an unconnected port");
       } else {
         portStruct = portConfig.create(port);
       }
@@ -99,10 +112,6 @@ class TestCase {
       // register incoming handler
       portStruct.addIncomingHandler(event);
     }
-
-    fsm.addStateToFSM(new ExpectState(fsm, new EventSpec(event, port, direction)));
-
-    return this;
   }
 
   <P extends PortType> TestCase trigger(
@@ -122,17 +131,24 @@ class TestCase {
     return this;
   }
 
-  TestCase disallow(EventSpec eventSpec) {
+  <P extends  PortType> TestCase disallow(
+            KompicsEvent event, Port<P> port, TestKit.Direction direction) {
+    EventSpec eventSpec = new EventSpec(event, port, direction);
+    configurePort(eventSpec);
     fsm.blacklist(eventSpec);
     return this;
   }
 
-  TestCase allow(EventSpec eventSpec) {
+  <P extends  PortType> TestCase allow(
+            KompicsEvent event, Port<P> port, TestKit.Direction direction) {
+    EventSpec eventSpec = new EventSpec(event, port, direction);
     fsm.whitelist(eventSpec);
     return this;
   }
 
-  TestCase conditionalDrop(EventSpec eventSpec) {
+  <P extends  PortType> TestCase conditionalDrop(
+            KompicsEvent event, Port<P> port, TestKit.Direction direction) {
+    EventSpec eventSpec = new EventSpec(event, port, direction);
     fsm.conditionalDrop(eventSpec);
     return this;
   }

@@ -23,4 +23,8 @@ public class EventQueue {
     }
     return q.poll();
   }
+
+  public synchronized EventSpec peek() {
+    return q.peek();
+  }
 }

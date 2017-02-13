@@ -13,7 +13,7 @@ public class Trigger extends State{
   }
 
   @Override
-  protected boolean run() {
+  protected boolean runS() {
     // // TODO: 2/8/17 worker id, component?
     port.doTrigger(event, 0, port.getOwner());
     return true;

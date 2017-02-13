@@ -1,6 +1,7 @@
 package se.sics.kompics.testkit.fsm;
 
 import se.sics.kompics.ComponentCore;
+import se.sics.kompics.Kompics;
 import se.sics.kompics.testkit.EventSpec;
 import se.sics.kompics.testkit.Proxy;
 
@@ -33,6 +34,7 @@ public class FSM {
   }
 
   public void addStateToFSM(State state) {
+    state.setFsm(this);
     state.setStateTable(currentTable);
     states.add(state);
   }
@@ -46,7 +48,7 @@ public class FSM {
   }
 
   public void conditionalDrop(EventSpec eventSpec) {
-    currentTable.conditionalDrop(eventSpec);
+    currentTable.conditionallyDrop(eventSpec);
   }
 
   public void repeat(int count) {
@@ -95,6 +97,7 @@ public class FSM {
       currentState = states.get(currentStateIndex);
 
       if (!(startLoopWasRun() || endLoopWasRun())) { // current state is regular
+        // run self and error transitions
         boolean completedWithoutError = currentState.run();
         if (completedWithoutError) {
           currentStateIndex++; // go to next state
@@ -105,6 +108,7 @@ public class FSM {
       }
     }
   }
+
 
   private boolean startLoopWasRun() {
     boolean startLoopRan = false;
@@ -165,7 +169,10 @@ public class FSM {
             balancedRepeat.peek().getIndex() == states.size() - 1;
   }
 
-  EventSpec pollEventQueue() {
+  EventSpec peekEventQueue() {
+    return eventQueue.peek();
+  }
+  EventSpec removeEventFromQueue() {
     return eventQueue.poll();
   }
 }

@@ -5,8 +5,8 @@ import se.sics.kompics.Kompics;
 class FinalState extends State{
 
   @Override
-  protected boolean run() {
-    Kompics.logger.info("Final State!");
+  protected boolean runS() {
+    Kompics.logger.info("Final State!{}",fsm.peekEventQueue());
     return true;
   }
 }
