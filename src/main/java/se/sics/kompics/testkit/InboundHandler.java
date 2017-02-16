@@ -8,13 +8,13 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-class IncomingHandler extends ProxyHandler {
-  private static final Logger logger = LoggerFactory.getLogger(IncomingHandler.class);
+class InboundHandler extends ProxyHandler {
+  private static final Logger logger = LoggerFactory.getLogger(InboundHandler.class);
 
   private List<Port<? extends PortType>> sourcePorts;
   private Port<? extends PortType> destPort;
 
-  IncomingHandler(
+  InboundHandler(
           Proxy proxy, PortStructure portStruct,
           Class<? extends KompicsEvent> type, Collection<? extends Port<? extends PortType>> sourcePorts,
           Port<? extends PortType> destPort) {
@@ -25,7 +25,7 @@ class IncomingHandler extends ProxyHandler {
 
   @Override
   public void handle(KompicsEvent event) {
-    //logger.warn("IncomingHandler: {} received event: {}", this, event);
+    //logger.warn("received event: {}", event);
     if (event instanceof Response) {
       Response response = (Response) event;
       //assert response.getTopPathElementFirst().getComponent() == destPort.getPair().getOwner();

@@ -18,8 +18,8 @@ class PortStructure<P extends PortType> {
   private boolean isMockedPort;
   private Map<Port, Channel> portToChannel = new HashMap<>();
 
-  private Set<IncomingHandler> incomingHandlers;
-  private Set<OutgoingHandler> outgoingHandlers;
+  private Set<InboundHandler> inboundHandlers;
+  private Set<OutBoundHandler> outBoundHandlers;
 
   PortStructure(Proxy proxy, Port<P> ownerPort, boolean isPositive) {
     initialize(proxy, ownerPort);
@@ -40,8 +40,8 @@ class PortStructure<P extends PortType> {
     this.proxy = proxy;
     connectedPorts = new ArrayList<>();
     this.ownerPort = ownerPort;
-    incomingHandlers = new HashSet<>();
-    outgoingHandlers = new HashSet<>();
+    inboundHandlers = new HashSet<>();
+    outBoundHandlers = new HashSet<>();
   }
 
   void addConnectedPort(PortCore<P> other, ChannelFactory factory) {
@@ -64,9 +64,9 @@ class PortStructure<P extends PortType> {
       return;
     }
 
-    IncomingHandler incomingHandler = new IncomingHandler(proxy, this, eventType, connectedPorts, ownerPort);
-    incomingHandlers.add(incomingHandler);
-    inPort.doSubscribe(incomingHandler);
+    InboundHandler inboundHandler = new InboundHandler(proxy, this, eventType, connectedPorts, ownerPort);
+    inboundHandlers.add(inboundHandler);
+    inPort.doSubscribe(inboundHandler);
   }
 
   void addOutgoingHandler(KompicsEvent event) {
@@ -77,9 +77,9 @@ class PortStructure<P extends PortType> {
       return;
     }
 
-    OutgoingHandler outgoingHandler = new OutgoingHandler(proxy, this, eventType, ownerPort, connectedPorts);
-    outgoingHandlers.add(outgoingHandler);
-    ownerPort.doSubscribe(outgoingHandler);
+    OutBoundHandler outBoundHandler = new OutBoundHandler(proxy, this, eventType, ownerPort, connectedPorts);
+    outBoundHandlers.add(outBoundHandler);
+    ownerPort.doSubscribe(outBoundHandler);
   }
 
   <P extends PortType> ChannelCore<P> getChannel(Port<P> port) {
@@ -91,7 +91,7 @@ class PortStructure<P extends PortType> {
   private boolean hasEquivalentHandler(
           Class<? extends KompicsEvent> eventType, TestKit.Direction direction) {
     Collection<? extends Handler> handlers = direction == TestKit.Direction.INCOMING?
-            incomingHandlers : outgoingHandlers;
+            inboundHandlers : outBoundHandlers;
     for (Handler h : handlers) {
       if (h.getEventType().isAssignableFrom(eventType)) {
         return true;

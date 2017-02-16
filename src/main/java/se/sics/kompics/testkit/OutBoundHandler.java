@@ -8,13 +8,13 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-class OutgoingHandler extends ProxyHandler {
-  private static final Logger logger = LoggerFactory.getLogger(OutgoingHandler.class);
+class OutBoundHandler extends ProxyHandler {
+  private static final Logger logger = LoggerFactory.getLogger(OutBoundHandler.class);
   
   private Port<? extends PortType> sourcePort;
   private List<? extends Port<? extends PortType>> destPorts;
 
-  OutgoingHandler(
+  OutBoundHandler(
           Proxy proxy, PortStructure portStruct,
           Class<? extends KompicsEvent> eventType, Port sourcePort,
           Collection<? extends Port<? extends PortType>> destPorts) {
