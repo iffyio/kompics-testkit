@@ -57,6 +57,7 @@ public class EventSpec {
   }
 
   public String toString() {
-    return direction + " event " + event + " on port " + port;
+    //return direction + " event " + event + " on port " + port;
+    return direction + " " + event.getClass().getSimpleName();
   }
 }

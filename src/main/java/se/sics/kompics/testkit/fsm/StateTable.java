@@ -1,6 +1,6 @@
 package se.sics.kompics.testkit.fsm;
 
-import se.sics.kompics.Kompics;
+
 import se.sics.kompics.testkit.EventSpec;
 
 import java.util.HashSet;
@@ -18,7 +18,7 @@ class StateTable {
     } else {
       this.blacklist = new HashSet<>(previousTable.getBlacklist());
       this.whitelist = new HashSet<>(previousTable.getWhitelist());
-      this.conditionalDrop = previousTable.getConditionalDrop();
+      this.conditionalDrop = new HashSet<>(previousTable.getConditionalDrop());
     }
   }
 
@@ -61,15 +61,15 @@ class StateTable {
     return conditionalDrop.contains(eventSpec);
   }
 
-  Set<EventSpec> getBlacklist() {
+  private Set<EventSpec> getBlacklist() {
     return blacklist;
   }
 
-  Set<EventSpec> getWhitelist() {
+  private Set<EventSpec> getWhitelist() {
     return whitelist;
   }
 
-  Set<EventSpec> getConditionalDrop() {
+  private Set<EventSpec> getConditionalDrop() {
     return conditionalDrop;
   }
 

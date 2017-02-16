@@ -1,5 +1,7 @@
 package se.sics.kompics.testkit;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import se.sics.kompics.*;
 
 import java.util.ArrayList;
@@ -7,6 +9,8 @@ import java.util.Collection;
 import java.util.List;
 
 class OutgoingHandler extends ProxyHandler {
+  private static final Logger logger = LoggerFactory.getLogger(OutgoingHandler.class);
+  
   private Port<? extends PortType> sourcePort;
   private List<? extends Port<? extends PortType>> destPorts;
 
@@ -21,9 +25,8 @@ class OutgoingHandler extends ProxyHandler {
 
   @Override
   public void handle(KompicsEvent event) {
-    Kompics.logger.info("OutgoingHandler: {} received event: {}",
-            this, event.getClass().getSimpleName());
-    Kompics.logger.info("OutgoingHandler: connected ports: {}", destPorts.size());
+    //logger.warn("received event: {}", event.getClass().getSimpleName());
+    //logger.warn("connected ports: {}", destPorts.size());
 
     if (event instanceof Request) {
       Request request = (Request) event;

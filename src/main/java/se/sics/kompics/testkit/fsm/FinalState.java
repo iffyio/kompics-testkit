@@ -1,15 +1,17 @@
 package se.sics.kompics.testkit.fsm;
 
-import se.sics.kompics.Kompics;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import se.sics.kompics.testkit.EventSpec;
 
 class FinalState extends State{
+  private static final Logger logger = LoggerFactory.getLogger(FinalState.class);
 
   @Override
   protected boolean runS() {
     EventSpec unexpectedEvent = fsm.peekEventQueue();
     String msg = unexpectedEvent == null? "PASS" : "FAIL " + unexpectedEvent;
-    Kompics.logger.info("Final State! = {}", msg);
+    logger.warn("Final State! = {}", msg);
     return true;
   }
 }

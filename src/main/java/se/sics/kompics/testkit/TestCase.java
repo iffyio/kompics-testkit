@@ -7,7 +7,7 @@ import se.sics.kompics.testkit.fsm.FSM;
 import se.sics.kompics.testkit.fsm.Trigger;
 
 
-class TestCase {
+public class TestCase {
   private final Proxy proxy;
   private final ComponentCore proxyComponent;
   private final ComponentDefinition cut;
@@ -27,27 +27,27 @@ class TestCase {
     Kompics.setScheduler(scheduler);
   }
 
-  Component getComponentUnderTest() {
+  public Component getComponentUnderTest() {
     return cut.getComponentCore();
   }
 
-  <T extends ComponentDefinition> Component create(
+  public <T extends ComponentDefinition> Component create(
           Class<T> cutClass, Init<T> initEvent) {
     return proxy.createNewSetupComponent(cutClass, initEvent);
   }
 
   // // TODO: 2/8/17 create with init, config
-  <T extends ComponentDefinition> Component create(
+  public <T extends ComponentDefinition> Component create(
           Class<T> cutClass, Init.None initEvent) {
     return proxy.createNewSetupComponent(cutClass, initEvent);
   }
 
   // // TODO: 2/8/17 connect with channel, channelSelector
-  <P extends PortType> TestCase connect( Negative<P> negative, Positive<P> positive) {
+  public <P extends PortType> TestCase connect( Negative<P> negative, Positive<P> positive) {
     return connect(positive, negative);
   }
 
-  <P extends PortType> TestCase connect(Positive<P> positive, Negative<P> negative) {
+  public <P extends PortType> TestCase connect(Positive<P> positive, Negative<P> negative) {
     boolean cutOwnsPositive = positive.getPair().getOwner() == cut.getComponentCore();
     boolean cutOwnsNegative = negative.getPair().getOwner() == cut.getComponentCore();
 
@@ -76,7 +76,7 @@ class TestCase {
 
 
 
-  <P extends  PortType> TestCase expect(
+  public <P extends  PortType> TestCase expect(
           KompicsEvent event, Port<P> port, TestKit.Direction direction) {
 
     EventSpec eventSpec = new EventSpec(event, port, direction);
@@ -114,24 +114,24 @@ class TestCase {
     }
   }
 
-  <P extends PortType> TestCase trigger(
+  public <P extends PortType> TestCase trigger(
           KompicsEvent event, Port<P> port) {
     // register state
     fsm.addStateToFSM(new Trigger(event, port));
     return this;
   }
 
-  TestCase repeat(int times) {
+  public TestCase repeat(int times) {
     fsm.repeat(times);
     return this;
   }
 
-  TestCase endRepeat() {
+  public TestCase endRepeat() {
     fsm.endRepeat();
     return this;
   }
 
-  <P extends  PortType> TestCase disallow(
+  public <P extends  PortType> TestCase disallow(
             KompicsEvent event, Port<P> port, TestKit.Direction direction) {
     EventSpec eventSpec = new EventSpec(event, port, direction);
     configurePort(eventSpec);
@@ -139,14 +139,14 @@ class TestCase {
     return this;
   }
 
-  <P extends  PortType> TestCase allow(
+  public <P extends  PortType> TestCase allow(
             KompicsEvent event, Port<P> port, TestKit.Direction direction) {
     EventSpec eventSpec = new EventSpec(event, port, direction);
     fsm.whitelist(eventSpec);
     return this;
   }
 
-  <P extends  PortType> TestCase conditionalDrop(
+  public <P extends  PortType> TestCase conditionalDrop(
             KompicsEvent event, Port<P> port, TestKit.Direction direction) {
     EventSpec eventSpec = new EventSpec(event, port, direction);
     fsm.conditionalDrop(eventSpec);
@@ -154,7 +154,7 @@ class TestCase {
   }
 
 
-  void check() {
+  public void check() {
     if (checked) {
       throw new IllegalStateException("test has previously been run");
     } else {

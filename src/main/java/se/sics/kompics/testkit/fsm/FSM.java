@@ -1,7 +1,6 @@
 package se.sics.kompics.testkit.fsm;
 
 import se.sics.kompics.ComponentCore;
-import se.sics.kompics.Kompics;
 import se.sics.kompics.testkit.EventSpec;
 import se.sics.kompics.testkit.Proxy;
 
@@ -88,12 +87,6 @@ public class FSM {
 
   private void run() {
     while (currentStateIndex < states.size()) {
-      //Kompics.logger.info("current end state = {}", currentTable.getEndState());
-/*      try {
-        Thread.sleep(500);
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-      }*/
       currentState = states.get(currentStateIndex);
 
       if (!(startLoopWasRun() || endLoopWasRun())) { // current state is regular
@@ -129,8 +122,6 @@ public class FSM {
       EndLoop loopEnd = (EndLoop) currentState;
       loopEnd.signalIterationComplete();
 
-      // set next state from loop end
-      // if there are more iterations in the loop then go back to first state of loop
       if (loopEnd.hasMoreIterations()) {
         currentStateIndex = loopEnd.indexOfFirstState();
       } else {

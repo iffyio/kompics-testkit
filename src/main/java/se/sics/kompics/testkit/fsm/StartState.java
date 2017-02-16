@@ -1,10 +1,12 @@
 package se.sics.kompics.testkit.fsm;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import se.sics.kompics.ComponentCore;
-import se.sics.kompics.Kompics;
 import se.sics.kompics.Start;
 
 class StartState extends State {
+  private static final Logger logger = LoggerFactory.getLogger(StartState.class);
 
   private ComponentCore proxy;
   StartState(ComponentCore proxy) {
@@ -13,7 +15,7 @@ class StartState extends State {
 
   @Override
   protected boolean runS() {
-    Kompics.logger.info("Start State!");
+    logger.warn("Start State!");
     proxy.getControl().doTrigger(Start.event, 0, proxy);
     return true;
   }

@@ -1,10 +1,14 @@
 package se.sics.kompics.testkit;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import se.sics.kompics.*;
 
 import java.util.*;
 
 class PortStructure<P extends PortType> {
+  private static final Logger logger = LoggerFactory.getLogger(PortStructure.class);
+
   private List<Port<P>> connectedPorts;
   private Port<P> ownerPort;
   private boolean isPositive;
@@ -56,7 +60,7 @@ class PortStructure<P extends PortType> {
     Class<? extends KompicsEvent> eventType = event.getClass();
     if (hasEquivalentHandler(eventType, TestKit.Direction.INCOMING)) {
       // already have a capable handler for this event
-      Kompics.logger.info("ignoring unnecessary incoming handler");
+      logger.warn("ignoring unnecessary incoming handler");
       return;
     }
 
@@ -69,7 +73,7 @@ class PortStructure<P extends PortType> {
     Class<? extends KompicsEvent> eventType = event.getClass();
     if (hasEquivalentHandler(eventType, TestKit.Direction.OUTGOING)) {
       // already have a capable handler for this event
-      Kompics.logger.info("ignoring unnecessary outgoing handler");
+      logger.warn("ignoring unnecessary outgoing handler");
       return;
     }
 
