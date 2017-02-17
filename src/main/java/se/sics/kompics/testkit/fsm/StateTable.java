@@ -1,76 +1,96 @@
 package se.sics.kompics.testkit.fsm;
 
+import se.sics.kompics.Kompics;
 
-import se.sics.kompics.testkit.EventSpec;
-
-import java.util.HashSet;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 class StateTable {
 
-  private Set<EventSpec> blacklist; // events that transition to error state
-  private Set<EventSpec> whitelist; // events that self-transition
-  private Set<EventSpec> conditionalDrop;
+  private Map<Integer, List<Action>> table = new HashMap<>();
 
-  StateTable(StateTable previousTable) {
-    if (previousTable == null) {
-      initTables();
-    } else {
-      this.blacklist = new HashSet<>(previousTable.getBlacklist());
-      this.whitelist = new HashSet<>(previousTable.getWhitelist());
-      this.conditionalDrop = new HashSet<>(previousTable.getConditionalDrop());
+
+  void addStateClause(int stateIndex, EventSpec eventSpec, int nextState, Environment env) {
+    List<Action> entry = getOrCreateStateEntry(stateIndex, env);
+    entry.add(new Action(eventSpec, true, nextState));
+  }
+
+  Action lookUp(int stateIndex, EventSpec eventSpec) {
+    List<Action> actions = table.get(stateIndex);
+    assert actions != null;
+
+    for (Action a : actions) {
+      if (a.matches(eventSpec)) {
+        return a;
+      }
+    }
+
+    Kompics.logger.info("spec = {}", eventSpec);
+    for (Action a : actions)
+      Kompics.logger.info("{}", a);
+
+    return new Action(null, false, -1);
+  }
+
+  void printTable(int final_state) {
+    for (int i = 0; i <= final_state; i++) {
+      List<Action> as = table.get(i);
+      if (as != null) {
+        System.out.println(i);
+        for (Action a : as) {
+          System.out.println("\t\t" + a);
+        }
+      }
     }
   }
 
-  private void initTables() {
-    blacklist = new HashSet<>();
-    whitelist = new HashSet<>();
-    conditionalDrop = new HashSet<>();
-  }
+  private List<Action> getOrCreateStateEntry(int stateIndex, Environment env) {
+    List<Action> row = table.get(stateIndex);
 
-  void blacklist(EventSpec eventSpec) {
-    if (blacklist.add(eventSpec)) {
-      whitelist.remove(eventSpec);
-      conditionalDrop.remove(eventSpec);
+    if (row != null) {
+      return row;
     }
-  }
 
-  void whitelist(EventSpec eventSpec) {
-    if (whitelist.add(eventSpec)) {
-      blacklist.remove(eventSpec);
-      conditionalDrop.remove(eventSpec);
+    row = new ArrayList<>();
+    table.put(stateIndex, row);
+    for (EventSpec e : env.getDisallowedEvents()) {
+      row.add(new Action(e, false, FSM.ERROR_STATE));
     }
-  }
 
-  void conditionallyDrop(EventSpec eventSpec) {
-    if (conditionalDrop.add(eventSpec)) {
-      blacklist.remove(eventSpec);
-      whitelist.remove(eventSpec);
+    for (EventSpec e : env.getAllowedEvents()) {
+      row.add(new Action(e, true, stateIndex));
     }
+
+    for (EventSpec e : env.getDroppedEvents()) {
+      row.add(new Action(e, false, FSM.ERROR_STATE));
+    }
+
+    return row;
   }
 
-  boolean isBlacklisted(EventSpec eventSpec) {
-    return blacklist.contains(eventSpec);
-  }
+  class Action {
+    final EventSpec eventSpec;
+    final boolean handle;
+    final int nextIndex;
+    Action(EventSpec eventSpec, boolean handle, int nextIndex) {
+      this.eventSpec = eventSpec;
+      this.handle = handle;
+      this.nextIndex = nextIndex;
+    }
 
-  boolean isWhitelisted(EventSpec eventSpec) {
-    return whitelist.contains(eventSpec);
-  }
+    public boolean handleEvent() {
+      return handle;
+    }
 
-  boolean isConditionallyDropped(EventSpec eventSpec) {
-    return conditionalDrop.contains(eventSpec);
-  }
+    boolean matches(EventSpec eventSpec) {
+      return this.eventSpec.equals(eventSpec);
+    }
 
-  private Set<EventSpec> getBlacklist() {
-    return blacklist;
-  }
-
-  private Set<EventSpec> getWhitelist() {
-    return whitelist;
-  }
-
-  private Set<EventSpec> getConditionalDrop() {
-    return conditionalDrop;
+    public String toString() {
+      return "( " + eventSpec + " ) " + (handle? "handle " : "drop ") + nextIndex;
+    }
   }
 
 }

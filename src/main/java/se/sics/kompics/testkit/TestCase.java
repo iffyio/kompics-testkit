@@ -2,9 +2,9 @@ package se.sics.kompics.testkit;
 
 import se.sics.kompics.*;
 import se.sics.kompics.scheduler.ThreadPoolScheduler;
-import se.sics.kompics.testkit.fsm.ExpectState;
 import se.sics.kompics.testkit.fsm.FSM;
-import se.sics.kompics.testkit.fsm.Trigger;
+
+import java.util.Comparator;
 
 
 public class TestCase {
@@ -79,17 +79,16 @@ public class TestCase {
   public <P extends  PortType> TestCase expect(
           KompicsEvent event, Port<P> port, TestKit.Direction direction) {
 
-    EventSpec eventSpec = new EventSpec(event, port, direction);
-    configurePort(eventSpec);
-    fsm.addStateToFSM(new ExpectState(eventSpec));
-
+    //EventSpec eventSpec = new EventSpec(event, port, direction);
+    configurePort(event, port, direction);
+    //fsm.addStateToFSM(new ExpectState(eventSpec));
+    //fsm.addExpect(new ExpectState(eventSpec));
+    fsm.expectMessage(event, port, direction);
     return this;
   }
 
-  private <P extends PortType> void configurePort(EventSpec eventSpec) {
-    Port<P> port = (Port<P>) eventSpec.getPort();
-    TestKit.Direction direction = eventSpec.getDirection();
-    KompicsEvent event = eventSpec.getEvent();
+  public <P extends  PortType> void configurePort(
+          KompicsEvent event, Port<P> port, TestKit.Direction direction) {
 
     if (port.getOwner() != proxyComponent) {
       // // TODO: 2/8/17 support inside ports as well
@@ -116,8 +115,10 @@ public class TestCase {
 
   public <P extends PortType> TestCase trigger(
           KompicsEvent event, Port<P> port) {
-    // register state
-    fsm.addStateToFSM(new Trigger(event, port));
+    if (port.getOwner() == cut.getComponentCore()) {
+      throw new IllegalStateException("Triggers are not allowed on component being tested");
+    }
+    fsm.addTrigger(event, port);
     return this;
   }
 
@@ -126,30 +127,42 @@ public class TestCase {
     return this;
   }
 
-  public TestCase endRepeat() {
+  public TestCase end() {
     fsm.endRepeat();
+    return this;
+  }
+
+  public TestCase body() {
+    fsm.body();
     return this;
   }
 
   public <P extends  PortType> TestCase disallow(
             KompicsEvent event, Port<P> port, TestKit.Direction direction) {
-    EventSpec eventSpec = new EventSpec(event, port, direction);
-    configurePort(eventSpec);
-    fsm.blacklist(eventSpec);
+    //EventSpec eventSpec = new EventSpec(event, port, direction);
+    configurePort(event, port, direction);
+    fsm.addDisallowedEvent(event, port, direction);
     return this;
   }
 
   public <P extends  PortType> TestCase allow(
             KompicsEvent event, Port<P> port, TestKit.Direction direction) {
-    EventSpec eventSpec = new EventSpec(event, port, direction);
-    fsm.whitelist(eventSpec);
+    //EventSpec eventSpec = new EventSpec(event, port, direction);
+    configurePort(event, port, direction);
+    fsm.addAllowedEvent(event, port, direction);
     return this;
   }
 
   public <P extends  PortType> TestCase conditionalDrop(
             KompicsEvent event, Port<P> port, TestKit.Direction direction) {
-    EventSpec eventSpec = new EventSpec(event, port, direction);
-    fsm.conditionalDrop(eventSpec);
+    //EventSpec eventSpec = new EventSpec(event, port, direction);
+    configurePort(event, port, direction);
+    fsm.addDroppedEvent(event, port, direction);
+    return this;
+  }
+
+  public <E extends KompicsEvent> TestCase addComparator(Class<E> eventType, Comparator<E> comparator) {
+    fsm.addComparator(eventType, comparator);
     return this;
   }
 

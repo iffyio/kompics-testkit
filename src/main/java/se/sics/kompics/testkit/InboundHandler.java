@@ -3,6 +3,7 @@ package se.sics.kompics.testkit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import se.sics.kompics.*;
+import se.sics.kompics.testkit.fsm.EventSpec;
 
 import java.util.ArrayList;
 import java.util.Collection;
