@@ -9,8 +9,8 @@ import se.sics.kompics.network.netty.NettyNetwork;
 import se.sics.kompics.testkit.fd.*;
 import se.sics.kompics.timer.ScheduleTimeout;
 import se.sics.kompics.timer.Timer;
-import se.sics.kompics.testkit.TestCase;
-import se.sics.kompics.testkit.TestKit;
+
+import java.util.Comparator;
 
 public class EPFDTest {
   private TestKit.Direction outgoing = TestKit.Direction.OUTGOING;
@@ -32,6 +32,8 @@ public class EPFDTest {
   @Test
   public void mockNetworkAndTimer() {
 
+    tc.addComparator(ScheduleTimeout.class, new ScheduleTimeoutComparator()).
+       body();
     // Expect initial SCHED TIMEOUT
     tc.expect(st, epfd.getNegative(Timer.class), outgoing);
 
@@ -44,7 +46,7 @@ public class EPFDTest {
     expect(ping, epfd.getNegative(Network.class), outgoing).
     expect(st, epfd.getNegative(Timer.class), outgoing);
 
-    tc.repeat(30).
+    tc.repeat(30).body().
         // Send Timeout, Reply with Suspect, then PING, then SCHEDTIMEOUT
         trigger(timeout, epfd.getNegative(Timer.class)).
         expect(suspect, epfd.getPositive(EPFDPort.class), outgoing).
@@ -57,10 +59,10 @@ public class EPFDTest {
         expect(restore, epfd.getPositive(EPFDPort.class), outgoing).
         expect(ping, epfd.getNegative(Network.class), outgoing).
         expect(st, epfd.getNegative(Timer.class), outgoing).
-    endRepeat();
+    end();
 
     //Send Pong, Timeout, Reply with PING, then SCHEDTIMEOUT
-    tc.repeat(20).
+    tc.repeat(20).body().
         disallow(restore, epfd.getPositive(EPFDPort.class), outgoing).
         disallow(suspect, epfd.getPositive(EPFDPort.class), outgoing).
             //body().
@@ -68,7 +70,7 @@ public class EPFDTest {
         trigger(timeout, epfd.getNegative(Timer.class)).
         expect(ping, epfd.getNegative(Network.class), outgoing).
         expect(st, epfd.getNegative(Timer.class), outgoing).
-    endRepeat();
+    end();
 
     tc.check();
   }
@@ -102,7 +104,7 @@ public class EPFDTest {
             expect(suspect, epfd.getPositive(EPFDPort.class), outgoing). // resuspect
             expect(ping, epfd.getNegative(Network.class), outgoing).
             expect(st, epfd.getNegative(Timer.class), outgoing);
-    tc.endRepeat();
+    tc.end();
 
     // expectUntil restore?
 /*    tc.expect(pong, epfd.getNegative(Network.class), incoming);
@@ -122,6 +124,13 @@ public class EPFDTest {
     st.setTimeoutEvent(timeout);
   }
 
+  private class ScheduleTimeoutComparator implements Comparator<ScheduleTimeout> {
+
+    @Override
+    public int compare(ScheduleTimeout o1, ScheduleTimeout o2) {
+      return 0;
+    }
+  }
   public static void main(String... a) {
     new EPFDTest().runTest();
   }
