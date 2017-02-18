@@ -16,8 +16,7 @@ public class EventSpec<E extends KompicsEvent> {
   private Comparator<E> comparator;
   private ProxyHandler handler;
 
-  // // TODO: 2/17/17 make package private 
-  public EventSpec(E event, Port<? extends PortType> port,
+  EventSpec(E event, Port<? extends PortType> port,
                    TestKit.Direction direction, Comparator<E> comparator) {
     this(event, port, direction);
     this.comparator = comparator;
@@ -47,6 +46,10 @@ public class EventSpec<E extends KompicsEvent> {
     this.handler = handler;
   }
 
+  void setComparator(Comparator<E> comparator) {
+    this.comparator = comparator;
+  }
+
   public void handle() {
     handler.doHandle(event);
   }
@@ -70,14 +73,13 @@ public class EventSpec<E extends KompicsEvent> {
 
   @Override
   public int hashCode() {
+    // event is excluded since user defines it's equality
     int result = 31 * port.hashCode();
     result = 31 * result + direction.hashCode();
     return result;
   }
 
   public String toString() {
-    //return direction + " event " + event + " on port " + port;
-    //return direction + " " + event.getClass().getSimpleName();
     return direction + " " + event;
   }
 }

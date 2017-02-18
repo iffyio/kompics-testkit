@@ -142,24 +142,6 @@ public class FSM {
     endRepeat();
   }
 
-  private void checkBalancedRepeatBlocks() {
-    if (!balancedRepeat.isEmpty()) {
-      throw new IllegalStateException("unmatched end for loop");
-    }
-  }
-
-  private void assertInBody() {
-    if (currentBlock != null && currentBlock.inHeaderMode) {
-      throw new IllegalStateException("Not in body mode");
-    }
-  }
-
-  private void assertInHeader() {
-    if (!currentBlock.inHeaderMode) {
-      throw new IllegalStateException("Not in header mode");
-    }
-  }
-
   public <E extends KompicsEvent> void addComparator(
           Class<E> eventType, Comparator<E> comparator) {
     assertInHeader();
@@ -178,82 +160,55 @@ public class FSM {
     currentStateIndex++;
   }
 
-  // // TODO: 2/17/17 switch to eventSpec?
-  private class Trigger {
-    private final KompicsEvent event;
-    private final Port<? extends PortType> port;
-
-    Trigger(KompicsEvent event, Port<? extends PortType> port) {
-      this.event = event;
-      this.port = port;
-    }
-
-    void doTrigger() {
-      port.doTrigger(event, 0, port.getOwner());
-    }
-    public String toString() {
-      return event.toString();
-    }
-  }
-
-  private class Block {
-    boolean inHeaderMode = true;
-    final Repeat repeat;
-    final Block previousBlock;
-    Environment env;
-
-    Block(Repeat repeat, Block previousBlock) {
-      this.repeat = repeat;
-      this.previousBlock = previousBlock;
-
-      if (previousBlock == null) {
-        env = new Environment(null);
-      } else {
-        env = new Environment(previousBlock.env);
-      }
-    }
-  }
-
-
-  private class ComparatorMap {
-    Map<Class<? extends KompicsEvent>, Comparator<? extends KompicsEvent>> comparators = new HashMap<>();
-
-    @SuppressWarnings("unchecked")
-    public <E extends KompicsEvent> Comparator<E> get(Class<E> eventType) {
-      return (Comparator<E>) comparators.get(eventType);
-    }
-
-    public <E extends KompicsEvent> void put(Class<E> eventType, Comparator<E> comparator) {
-      comparators.put(eventType, comparator);
-    }
-  }
-
-
   private void run() {
     runStartState();
-    currentStateIndex = 0;
 
+    currentStateIndex = 0;
     while (currentStateIndex < FINAL_STATE && currentStateIndex != ERROR_STATE) {
       if (!(startOfLoop() || endOfLoop() || triggerAction())) {
+        // expecting an event
+
         //// TODO: 2/17/17 remove this
-        EventSpec e = expectedEvents.get(currentStateIndex);
-        logger.warn("{}: Expect\t{}", currentStateIndex, e);
-        EventSpec eventSpec = removeEventFromQueue();
-        StateTable.Action action = table.lookUp(currentStateIndex, eventSpec);
-        if (action.handleEvent()) {
-          eventSpec.handle();
-        }
-        logger.warn("{}: Matched ({}) with Action = {}",
-                currentStateIndex, eventSpec, action);
-        currentStateIndex = action.nextIndex;
-        if (currentStateIndex == ERROR_STATE) {
-          errorMessage = String.format(
-                  "Received unexpected message <%s> while expecting <%s>", eventSpec, e);
+        EventSpec expected = expectedEvents.get(currentStateIndex);
+        logger.warn("{}: Expect\t{}", currentStateIndex, expected);
+
+        EventSpec received = removeEventFromQueue();
+        setComparatorForEvent(received);
+
+        StateTable.Action action = table.lookUp(currentStateIndex, received);
+
+        if (!errorTransition(expected, received, action)) {
+
+          logger.warn("{}: Matched ({}) with Action = {}",
+                  currentStateIndex, received, action);
+
+          if (action.handleEvent()) {
+            received.handle();
+          }
+
+          currentStateIndex = action.nextIndex;
         }
       }
     }
 
     runFinalState();
+  }
+
+  private boolean errorTransition(
+          EventSpec expected, EventSpec received, StateTable.Action action) {
+    if (action != null && action.nextIndex != ERROR_STATE) {
+      return false;
+    }
+    currentStateIndex = ERROR_STATE;
+    errorMessage = String.format(
+            "Received %s message <%s> while expecting <%s>",
+            (action == null? "unexpected" : "unwanted"), received, expected);
+    return true;
+  }
+
+  @SuppressWarnings("unchecked")
+  private void setComparatorForEvent(EventSpec eventSpec) {
+    eventSpec.setComparator(comparators.get(eventSpec.getEvent().getClass()));
   }
 
   private boolean triggerAction() {
@@ -307,8 +262,75 @@ public class FSM {
             "FAILED -> " + errorMessage : "PASS");
   }
 
+  private void checkBalancedRepeatBlocks() {
+    if (!balancedRepeat.isEmpty()) {
+      throw new IllegalStateException("unmatched end for loop");
+    }
+  }
+
+  private void assertInBody() {
+    if (currentBlock != null && currentBlock.inHeaderMode) {
+      throw new IllegalStateException("Not in body mode");
+    }
+  }
+
+  private void assertInHeader() {
+    if (!currentBlock.inHeaderMode) {
+      throw new IllegalStateException("Not in header mode");
+    }
+  }
+
   private EventSpec removeEventFromQueue() {
     return eventQueue.poll();
   }
 
+  // // TODO: 2/17/17 switch to eventSpec?
+  private class Trigger {
+    private final KompicsEvent event;
+    private final Port<? extends PortType> port;
+
+    Trigger(KompicsEvent event, Port<? extends PortType> port) {
+      this.event = event;
+      this.port = port;
+    }
+
+    void doTrigger() {
+      port.doTrigger(event, 0, port.getOwner());
+    }
+    public String toString() {
+      return event.toString();
+    }
+  }
+
+  private class Block {
+    boolean inHeaderMode = true;
+    final Repeat repeat;
+    final Block previousBlock;
+    Environment env;
+
+    Block(Repeat repeat, Block previousBlock) {
+      this.repeat = repeat;
+      this.previousBlock = previousBlock;
+
+      if (previousBlock == null) {
+        env = new Environment(null);
+      } else {
+        env = new Environment(previousBlock.env);
+      }
+    }
+  }
+
+
+  private class ComparatorMap {
+    Map<Class<? extends KompicsEvent>, Comparator<? extends KompicsEvent>> comparators = new HashMap<>();
+
+    @SuppressWarnings("unchecked")
+    public <E extends KompicsEvent> Comparator<E> get(Class<E> eventType) {
+      return (Comparator<E>) comparators.get(eventType);
+    }
+
+    public <E extends KompicsEvent> void put(Class<E> eventType, Comparator<E> comparator) {
+      comparators.put(eventType, comparator);
+    }
+  }
 }

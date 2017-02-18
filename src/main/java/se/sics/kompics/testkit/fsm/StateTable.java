@@ -2,69 +2,59 @@ package se.sics.kompics.testkit.fsm;
 
 import se.sics.kompics.Kompics;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 class StateTable {
 
-  private Map<Integer, List<Action>> table = new HashMap<>();
+  private Map<Integer, Map<EventSpec, Action>> table = new HashMap<>();
 
 
   void addStateClause(int stateIndex, EventSpec eventSpec, int nextState, Environment env) {
-    List<Action> entry = getOrCreateStateEntry(stateIndex, env);
-    entry.add(new Action(eventSpec, true, nextState));
+    Map<EventSpec, Action> entry = getOrCreateStateEntry(stateIndex, env);
+    Action action = new Action(eventSpec, true, nextState);
+    entry.put(eventSpec, action);
   }
 
+  // lookup action quicker
   Action lookUp(int stateIndex, EventSpec eventSpec) {
-    List<Action> actions = table.get(stateIndex);
-    assert actions != null;
+    Map<EventSpec, Action> entry = table.get(stateIndex);
+    assert entry != null;
 
-    for (Action a : actions) {
-      if (a.matches(eventSpec)) {
-        return a;
-      }
-    }
 
-    Kompics.logger.info("spec = {}", eventSpec);
-    for (Action a : actions)
-      Kompics.logger.info("{}", a);
-
-    return new Action(null, false, -1);
+    return entry.get(eventSpec);
   }
 
   void printTable(int final_state) {
     for (int i = 0; i <= final_state; i++) {
-      List<Action> as = table.get(i);
-      if (as != null) {
+      Map<EventSpec, Action> entry = table.get(i);
+      if (entry != null) {
         System.out.println(i);
-        for (Action a : as) {
+        for (Action a : entry.values()) {
           System.out.println("\t\t" + a);
         }
       }
     }
   }
 
-  private List<Action> getOrCreateStateEntry(int stateIndex, Environment env) {
-    List<Action> row = table.get(stateIndex);
+  private Map<EventSpec, Action> getOrCreateStateEntry(int stateIndex, Environment env) {
+    Map<EventSpec, Action> row = table.get(stateIndex);
 
     if (row != null) {
       return row;
     }
 
-    row = new ArrayList<>();
+    row = new HashMap<>();
     table.put(stateIndex, row);
     for (EventSpec e : env.getDisallowedEvents()) {
-      row.add(new Action(e, false, FSM.ERROR_STATE));
+      row.put(e, new Action(e, false, FSM.ERROR_STATE));
     }
 
     for (EventSpec e : env.getAllowedEvents()) {
-      row.add(new Action(e, true, stateIndex));
+      row.put(e, new Action(e, true, stateIndex));
     }
 
     for (EventSpec e : env.getDroppedEvents()) {
-      row.add(new Action(e, false, FSM.ERROR_STATE));
+      row.put(e, new Action(e, false, FSM.ERROR_STATE));
     }
 
     return row;
@@ -80,12 +70,26 @@ class StateTable {
       this.nextIndex = nextIndex;
     }
 
-    public boolean handleEvent() {
+    boolean handleEvent() {
       return handle;
     }
 
     boolean matches(EventSpec eventSpec) {
       return this.eventSpec.equals(eventSpec);
+    }
+
+    // actions are equal if they are for the same event
+    public boolean equals(Object obj) {
+      if (obj == null || !(obj instanceof Action)) {
+        return false;
+      }
+
+      Action other = (Action) obj;
+      return this.eventSpec.equals(other.eventSpec);
+    }
+
+    public int hashCode() {
+      return 31 * eventSpec.hashCode();
     }
 
     public String toString() {
