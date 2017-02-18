@@ -67,7 +67,7 @@ public class EventSpec<E extends KompicsEvent> {
 
     return port.equals(other.getPort()) &&
            direction.equals(other.getDirection()) &&
-           comparator == null? event.equals(other) :
+           comparator == null? event.equals(e) :
             comparator.compare(event, (E) e) == 0;
   }
 
