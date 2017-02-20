@@ -12,6 +12,7 @@ import java.util.List;
 class InboundHandler extends ProxyHandler {
   private static final Logger logger = LoggerFactory.getLogger(InboundHandler.class);
 
+  // // TODO: 2/20/17 remove sourcePorts if not useful
   private List<Port<? extends PortType>> sourcePorts;
   private Port<? extends PortType> destPort;
 

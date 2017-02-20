@@ -2,6 +2,10 @@ package se.sics.kompics.testkit;
 
 import org.junit.Test;
 import se.sics.kompics.*;
+import se.sics.kompics.testkit.fsm.FSM;
+
+import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertNotSame;
 
 public class PingerPongerTest {
 
@@ -24,8 +28,9 @@ public class PingerPongerTest {
       repeat(1).body().
           trigger(new Pong(new Ping()), ponger.getPositive(PingPongPort.class).getPair()).
           expect(new Pong(new Ping()), pinger.getNegative(PingPongPort.class), incoming).
-      end().
-    check();
+      end();
+
+    assertEquals(tc.check(), tc.getFinalState());
   }
 
   @Test

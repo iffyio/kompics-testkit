@@ -15,13 +15,13 @@ import java.util.Stack;
 public class FSM {
   private static final Logger logger = LoggerFactory.getLogger(FSM.class);
 
-  static final int ERROR_STATE = -1;
+  public static final int ERROR_STATE = -1;
   private int FINAL_STATE;
-  private String errorMessage = "";
+  private boolean STARTED = false;
+  private String ERROR_MESSAGE = "";
 
   private final EventQueue eventQueue;
   private final ComponentCore proxyComponent;
-  private boolean start = false;
   private final Stack<Block> balancedRepeat = new Stack<>();
 
   private Map<Integer, Repeat> loops = new HashMap<>();
@@ -70,6 +70,9 @@ public class FSM {
     return new EventSpec<E>((E) event, port, direction, c);
   }
 
+  public int getFinalState() {
+    return STARTED? FINAL_STATE : currentStateIndex;
+  }
 
   public void repeat(int times) {
     assertInBody();
@@ -127,14 +130,15 @@ public class FSM {
   }
 
 
-  public void start() {
-    if (!start) {
-      start = true;
+  public int start() {
+    if (!STARTED) {
+      STARTED = true;
       addFinalState();
       checkBalancedRepeatBlocks();
       table.printTable(FINAL_STATE);
       run();
     }
+    return currentStateIndex;
   }
 
   private void addFinalState() {
@@ -200,7 +204,7 @@ public class FSM {
       return false;
     }
     currentStateIndex = ERROR_STATE;
-    errorMessage = String.format(
+    ERROR_MESSAGE = String.format(
             "Received %s message <%s> while expecting <%s>",
             (action == null? "unexpected" : "unwanted"), received, expected);
     return true;
@@ -259,7 +263,7 @@ public class FSM {
 
   private void runFinalState() {
     logger.warn("Done!({})", currentStateIndex == ERROR_STATE?
-            "FAILED -> " + errorMessage : "PASS");
+            "FAILED -> " + ERROR_MESSAGE : "PASS");
   }
 
   private void checkBalancedRepeatBlocks() {

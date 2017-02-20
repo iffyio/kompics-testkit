@@ -1,12 +1,16 @@
 package se.sics.kompics.testkit;
 
 import org.junit.Test;
+
+import static junit.framework.Assert.assertEquals;
+import static org.junit.Assert.assertNotSame;
 import se.sics.kompics.Component;
 import se.sics.kompics.Init;
 import se.sics.kompics.network.Network;
 import se.sics.kompics.network.netty.NettyInit;
 import se.sics.kompics.network.netty.NettyNetwork;
 import se.sics.kompics.testkit.fd.*;
+import se.sics.kompics.testkit.fsm.FSM;
 import se.sics.kompics.timer.ScheduleTimeout;
 import se.sics.kompics.timer.Timer;
 
@@ -72,7 +76,7 @@ public class EPFDTest {
         expect(st, epfd.getNegative(Timer.class), outgoing).
     end();
 
-    tc.check();
+    assertEquals(tc.check(), tc.getFinalState());
   }
 
   private void mockTimerOnly() {
@@ -111,7 +115,7 @@ public class EPFDTest {
     tc.expect(restore, epfd.getPositive(EPFDPort.class), outgoing);*/
 
 
-    tc.check();
+    assertEquals(tc.check(), tc.getFinalState());
   }
 
   private void triggerTimeoutExpectPingAndSchedTimeout() {

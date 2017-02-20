@@ -2,8 +2,9 @@ package se.sics.kompics.testkit;
 
 import org.junit.Test;
 import se.sics.kompics.*;
-
 import java.util.Comparator;
+
+import static junit.framework.Assert.assertEquals;
 
 public class BasicTest {
 
@@ -48,8 +49,9 @@ public class BasicTest {
         expect(new Ping(8), pinger.getNegative(PingPongPort.class), outgoing).
         expect(new Pong(9), pinger.getNegative(PingPongPort.class), incoming).
         trigger(new Pong(15), ponger.getPositive(PingPongPort.class).getPair()).
-      end().
-    check();
+      end();
+
+    assertEquals(tc.check(), tc.getFinalState());
   }
 
   private class PingComparator implements Comparator<Ping> {
@@ -93,7 +95,7 @@ public class BasicTest {
     Handler<Pong> pongHandler = new Handler<Pong>() {
       @Override
       public void handle(Pong pong) {
-        Kompics.logger.error("pinger: Received Pong! {}", pong);
+        //Kompics.logger.error("pinger: Received Pong! {}", pong);
         if (pong.count % 2 == 0)
           trigger(new Ping(pong.count), ppPort);
       }
@@ -102,7 +104,7 @@ public class BasicTest {
     Handler<Start> startHandler = new Handler<Start>() {
       @Override
       public void handle(Start event) {
-        Kompics.logger.info("pinger {}: ", getComponentCore().getComponent().id());
+        //Kompics.logger.info("pinger {}: ", getComponentCore().getComponent().id());
         trigger(new Ping(1), ppPort);
       }
     };
@@ -119,7 +121,7 @@ public class BasicTest {
     Handler<Ping> pingHandler = new Handler<Ping>() {
       @Override
       public void handle(Ping ping) {
-        System.out.println("Ponger: received " + ping);
+        //System.out.println("Ponger: received " + ping);
         trigger(new Pong(ping.count + 1), pingPongPort);
       }
     };

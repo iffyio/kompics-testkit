@@ -163,14 +163,18 @@ public class TestCase {
     return this;
   }
 
+  public int getFinalState() {
+    return fsm.getFinalState();
+  }
 
-  public void check() {
+  public int check() {
     if (checked) {
       throw new IllegalStateException("test has previously been run");
     } else {
       checked = true;
-      fsm.start();
+      int errorCode = fsm.start();
       scheduler.shutdown();
+      return errorCode;
     }
   }
 }
