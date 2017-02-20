@@ -1,76 +1,100 @@
 package se.sics.kompics.testkit.fsm;
 
+import se.sics.kompics.Kompics;
 
-import se.sics.kompics.testkit.EventSpec;
-
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 
 class StateTable {
 
-  private Set<EventSpec> blacklist; // events that transition to error state
-  private Set<EventSpec> whitelist; // events that self-transition
-  private Set<EventSpec> conditionalDrop;
+  private Map<Integer, Map<EventSpec, Action>> table = new HashMap<>();
 
-  StateTable(StateTable previousTable) {
-    if (previousTable == null) {
-      initTables();
-    } else {
-      this.blacklist = new HashSet<>(previousTable.getBlacklist());
-      this.whitelist = new HashSet<>(previousTable.getWhitelist());
-      this.conditionalDrop = new HashSet<>(previousTable.getConditionalDrop());
+
+  void addStateClause(int stateIndex, EventSpec eventSpec, int nextState, Environment env) {
+    Map<EventSpec, Action> entry = getOrCreateStateEntry(stateIndex, env);
+    Action action = new Action(eventSpec, true, nextState);
+    entry.put(eventSpec, action);
+  }
+
+  // lookup action quicker
+  Action lookUp(int stateIndex, EventSpec eventSpec) {
+    Map<EventSpec, Action> entry = table.get(stateIndex);
+    assert entry != null;
+
+
+    return entry.get(eventSpec);
+  }
+
+  void printTable(int final_state) {
+    for (int i = 0; i <= final_state; i++) {
+      Map<EventSpec, Action> entry = table.get(i);
+      if (entry != null) {
+        System.out.println(i);
+        for (Action a : entry.values()) {
+          System.out.println("\t\t" + a);
+        }
+      }
     }
   }
 
-  private void initTables() {
-    blacklist = new HashSet<>();
-    whitelist = new HashSet<>();
-    conditionalDrop = new HashSet<>();
-  }
+  private Map<EventSpec, Action> getOrCreateStateEntry(int stateIndex, Environment env) {
+    Map<EventSpec, Action> row = table.get(stateIndex);
 
-  void blacklist(EventSpec eventSpec) {
-    if (blacklist.add(eventSpec)) {
-      whitelist.remove(eventSpec);
-      conditionalDrop.remove(eventSpec);
+    if (row != null) {
+      return row;
     }
-  }
 
-  void whitelist(EventSpec eventSpec) {
-    if (whitelist.add(eventSpec)) {
-      blacklist.remove(eventSpec);
-      conditionalDrop.remove(eventSpec);
+    row = new HashMap<>();
+    table.put(stateIndex, row);
+    for (EventSpec e : env.getDisallowedEvents()) {
+      row.put(e, new Action(e, false, FSM.ERROR_STATE));
     }
-  }
 
-  void conditionallyDrop(EventSpec eventSpec) {
-    if (conditionalDrop.add(eventSpec)) {
-      blacklist.remove(eventSpec);
-      whitelist.remove(eventSpec);
+    for (EventSpec e : env.getAllowedEvents()) {
+      row.put(e, new Action(e, true, stateIndex));
     }
+
+    for (EventSpec e : env.getDroppedEvents()) {
+      row.put(e, new Action(e, false, FSM.ERROR_STATE));
+    }
+
+    return row;
   }
 
-  boolean isBlacklisted(EventSpec eventSpec) {
-    return blacklist.contains(eventSpec);
-  }
+  class Action {
+    final EventSpec eventSpec;
+    final boolean handle;
+    final int nextIndex;
+    Action(EventSpec eventSpec, boolean handle, int nextIndex) {
+      this.eventSpec = eventSpec;
+      this.handle = handle;
+      this.nextIndex = nextIndex;
+    }
 
-  boolean isWhitelisted(EventSpec eventSpec) {
-    return whitelist.contains(eventSpec);
-  }
+    boolean handleEvent() {
+      return handle;
+    }
 
-  boolean isConditionallyDropped(EventSpec eventSpec) {
-    return conditionalDrop.contains(eventSpec);
-  }
+    boolean matches(EventSpec eventSpec) {
+      return this.eventSpec.equals(eventSpec);
+    }
 
-  private Set<EventSpec> getBlacklist() {
-    return blacklist;
-  }
+    // actions are equal if they are for the same event
+    public boolean equals(Object obj) {
+      if (obj == null || !(obj instanceof Action)) {
+        return false;
+      }
 
-  private Set<EventSpec> getWhitelist() {
-    return whitelist;
-  }
+      Action other = (Action) obj;
+      return this.eventSpec.equals(other.eventSpec);
+    }
 
-  private Set<EventSpec> getConditionalDrop() {
-    return conditionalDrop;
+    public int hashCode() {
+      return 31 * eventSpec.hashCode();
+    }
+
+    public String toString() {
+      return "( " + eventSpec + " ) " + (handle? "handle " : "drop ") + nextIndex;
+    }
   }
 
 }

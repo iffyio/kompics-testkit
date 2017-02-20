@@ -17,5 +17,6 @@ public abstract class ProxyHandler extends Handler {
     this.portStruct = portStruct;
   }
 
-  abstract void doHandle(KompicsEvent event);
+  // // TODO: 2/17/17 make this package private
+  public abstract void doHandle(KompicsEvent event);
 }

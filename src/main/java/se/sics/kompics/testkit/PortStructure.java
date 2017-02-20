@@ -60,7 +60,7 @@ class PortStructure<P extends PortType> {
     Class<? extends KompicsEvent> eventType = event.getClass();
     if (hasEquivalentHandler(eventType, TestKit.Direction.INCOMING)) {
       // already have a capable handler for this event
-      logger.warn("ignoring unnecessary incoming handler");
+/*      logger.warn("ignoring unnecessary incoming handler");*/
       return;
     }
 

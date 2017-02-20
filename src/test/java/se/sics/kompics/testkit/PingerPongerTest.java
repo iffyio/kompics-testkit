@@ -5,50 +5,40 @@ import se.sics.kompics.*;
 
 public class PingerPongerTest {
 
-  @Test
-  public void run() {
-    TestCase tc = TestKit.newTestCase(Pinger.class, Init.NONE);
-    Component pinger = tc.getComponentUnderTest();
-    Component pinger2 = tc.create(Pinger.class, Init.NONE);
-    Component ponger = tc.create(Ponger.class, Init.NONE);
-    Component ponger2 = tc.create(Ponger.class, Init.NONE);
-    TestKit.Direction incoming = TestKit.Direction.INCOMING;
-    TestKit.Direction outgoing = TestKit.Direction.OUTGOING;
+  private TestCase tc = TestKit.newTestCase(Pinger.class, Init.NONE);
+  private Component pinger = tc.getComponentUnderTest();
+  private Component pinger2 = tc.create(Pinger.class, Init.NONE);
+  private Component ponger = tc.create(Ponger.class, Init.NONE);
+  private Component ponger2 = tc.create(Ponger.class, Init.NONE);
+  private TestKit.Direction incoming = TestKit.Direction.INCOMING;
+  private TestKit.Direction outgoing = TestKit.Direction.OUTGOING;
 
-    tc.
+  @Test
+  public void basicScenario() {
+
+    tc.body().
       connect(pinger.getNegative(PingPongPort.class), ponger.getPositive(PingPongPort.class)).
 
       expect(new Ping(), pinger.getNegative(PingPongPort.class), outgoing).
       expect(new Pong(new Ping()), pinger.getNegative(PingPongPort.class), incoming).
-      //conditionalDrop(new Pong(new Ping()), pinger.getNegative(PingPongPort.class), incoming).
-      repeat(1).
+      repeat(1).body().
           trigger(new Pong(new Ping()), ponger.getPositive(PingPongPort.class).getPair()).
-/*            repeat(4).
-              trigger(new Pong(new Ping()), ponger.getPositive(PingPongPort.class).getPair()).
-              expect(new Pong(new Ping()), pinger.getNegative(PingPongPort.class), incoming).
-            endRepeat().*/
-            //repeat(3).endRepeat().
           expect(new Pong(new Ping()), pinger.getNegative(PingPongPort.class), incoming).
-      endRepeat().
-      check();
-    Kompics.logger.info("Done!");
+      end().
+    check();
   }
-  /*
-  does order/scope matter for conditionals
-  do response msgs work in other direction
-  support for direct.request
-  Failure detector scenario
-   */
 
-  private void testCase1(TestCase tc, Component pinger, Component ponger,
-                         TestKit.Direction incoming, TestKit.Direction outgoing) {
+  @Test
+  public void scratchTest(){
     tc.
+      body().
       connect(pinger.getNegative(PingPongPort.class), ponger.getPositive(PingPongPort.class)).
-      expect(new Ping(), pinger.getNegative(PingPongPort.class), outgoing).
+      //expect(new Ping(), pinger.getNegative(PingPongPort.class), outgoing).
       repeat(1).
+        body().
         trigger(new Pong(new Ping()), ponger.getPositive(PingPongPort.class).getPair()).
         expect(new Pong(new Ping()), pinger.getNegative(PingPongPort.class), incoming).
-      endRepeat().
+      end().
     check();
   }
 
@@ -127,10 +117,7 @@ public class PingerPongerTest {
   static class Pong implements KompicsEvent{}*/
   static class Ping extends Request {
   public boolean equals(Object o) {
-    if (o == null || !(o instanceof Ping)) {
-      return false;
-    }
-    return true;
+    return !(o == null || !(o instanceof Ping));
   }
   public int hashCode() {
     return this.getClass().hashCode();
@@ -139,10 +126,7 @@ public class PingerPongerTest {
   static class Pong extends Response {
     Pong(Request request) { super(request); }
     public boolean equals(Object o) {
-      if (o == null || !(o instanceof Pong)) {
-        return false;
-      }
-      return true;
+      return !(o == null || !(o instanceof Pong));
     }
 
     public int hashCode() {

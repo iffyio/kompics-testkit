@@ -3,6 +3,7 @@ package se.sics.kompics.testkit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import se.sics.kompics.*;
+import se.sics.kompics.testkit.fsm.EventSpec;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -16,7 +17,7 @@ class OutBoundHandler extends ProxyHandler {
 
   OutBoundHandler(
           Proxy proxy, PortStructure portStruct,
-          Class<? extends KompicsEvent> eventType, Port sourcePort,
+          Class<? extends KompicsEvent> eventType, Port<? extends PortType> sourcePort,
           Collection<? extends Port<? extends PortType>> destPorts) {
     super(proxy, portStruct, eventType);
     this.sourcePort = sourcePort;
@@ -25,8 +26,8 @@ class OutBoundHandler extends ProxyHandler {
 
   @Override
   public void handle(KompicsEvent event) {
-    //logger.warn("received event: {}", event.getClass().getSimpleName());
-    //logger.warn("connected ports: {}", destPorts.size());
+/*    logger.warn("received event: {}", event);
+    logger.warn("connected ports: {}", destPorts.size());*/
 
     if (event instanceof Request) {
       Request request = (Request) event;

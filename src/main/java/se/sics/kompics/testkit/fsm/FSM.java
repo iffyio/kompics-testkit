@@ -1,67 +1,129 @@
 package se.sics.kompics.testkit.fsm;
 
-import se.sics.kompics.ComponentCore;
-import se.sics.kompics.testkit.EventSpec;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import se.sics.kompics.*;
 import se.sics.kompics.testkit.Proxy;
+import se.sics.kompics.testkit.TestKit;
 
-import java.util.*;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Stack;
+
 
 public class FSM {
+  private static final Logger logger = LoggerFactory.getLogger(FSM.class);
+
+  static final int ERROR_STATE = -1;
+  private int FINAL_STATE;
+  private String errorMessage = "";
+
   private final EventQueue eventQueue;
-  private final List<State> states = new ArrayList<>();
-  private final Proxy proxy;
   private final ComponentCore proxyComponent;
   private boolean start = false;
-  private final Stack<Loop> balancedRepeat = new Stack<>();
-  private StateTable currentTable;
+  private final Stack<Block> balancedRepeat = new Stack<>();
 
-  // running fsm
+  private Map<Integer, Repeat> loops = new HashMap<>();
+  private Map<Integer, Repeat> end = new HashMap<>();
+  private Map<Integer, Trigger> triggeredEvents = new HashMap<>();
+  private Map<Integer, EventSpec> expectedEvents = new HashMap<>();
+
+  private ComparatorMap comparators = new ComparatorMap();
+  private StateTable table = new StateTable();
+
+  private Block currentBlock;
+
   private int currentStateIndex = 0;
-  private State currentState = null;
 
   public FSM(Proxy proxy) {
-    this.proxy = proxy;
     this.eventQueue = proxy.getEventQueue();
     this.proxyComponent =  proxy.getComponentCore();
 
-    addStartState();
+    initializeFSM();
   }
 
-  private void addStartState() {
-    repeat(1); // set initial state table
-    addStateToFSM(new StartState(proxyComponent));
+  private void initializeFSM() {
+    repeat(1);
   }
 
-  public void addStateToFSM(State state) {
-    state.setFsm(this);
-    state.setStateTable(currentTable);
-    states.add(state);
+
+  public <P extends  PortType, E extends KompicsEvent> void addDisallowedEvent(
+          KompicsEvent event, Port<P> port, TestKit.Direction direction) {
+    currentBlock.env.addDisallowedMessage(newEventSpec(event, port, direction));
   }
 
-  public void blacklist(EventSpec eventSpec) {
-    currentTable.blacklist(eventSpec);
+  public <P extends  PortType> void addAllowedEvent(
+          KompicsEvent event, Port<P> port, TestKit.Direction direction) {
+    currentBlock.env.addAllowedMessage(newEventSpec(event, port, direction));
   }
 
-  public void whitelist(EventSpec eventSpec) {
-    currentTable.whitelist(eventSpec);
+  public <P extends  PortType> void addDroppedEvent(
+          KompicsEvent event, Port<P> port, TestKit.Direction direction) {
+    currentBlock.env.addDroppedMessage(newEventSpec(event, port, direction));
   }
 
-  public void conditionalDrop(EventSpec eventSpec) {
-    currentTable.conditionallyDrop(eventSpec);
+  @SuppressWarnings("unchecked")
+  private  <P extends  PortType, E extends KompicsEvent> EventSpec newEventSpec(
+          KompicsEvent event, Port<P> port, TestKit.Direction direction) {
+    Comparator<E> c = (Comparator<E>) comparators.get(event.getClass());
+    return new EventSpec<E>((E) event, port, direction, c);
   }
 
-  public void repeat(int count) {
-    if (count <= 0) {
-      throw new IllegalArgumentException("only positive count allowed for repeat");
+
+  public void repeat(int times) {
+    assertInBody();
+
+    if (times <= 0) {
+      throw new IllegalArgumentException("only positive value allowed for repeat");
     }
 
-    // replace current with new stateTable
-    currentTable = new StateTable(currentTable);
+    Repeat repeat = new Repeat(times, currentStateIndex);
 
-    Loop loopStart = new Loop(count, states.size());
+    currentBlock = new Block(repeat, currentBlock);
+    balancedRepeat.push(currentBlock);
 
-    addStateToFSM(loopStart);
-    balancedRepeat.push(loopStart);
+    loops.put(currentStateIndex, repeat);
+    currentStateIndex++;
+  }
+
+  public void body() {
+    assertInHeader();
+    currentBlock.inHeaderMode = false;
+  }
+
+  public void addTrigger(KompicsEvent event, Port<? extends PortType> port) {
+    assertInBody();
+    triggeredEvents.put(currentStateIndex, new Trigger(event, port));
+    currentStateIndex++;
+  }
+
+  public void endRepeat() {
+    assertInBody();
+
+    if (balancedRepeat.isEmpty()) {
+      throw new IllegalStateException("matching repeat not found for end");
+    } else if (currentRepeatBlockIsEmpty()) {
+      throw new IllegalStateException("empty repeat blocks are not allowed");
+    }
+
+    Repeat loopHead = currentBlock.repeat;
+    end.put(currentStateIndex, loopHead);
+
+    restorePreviousBlock();
+    currentStateIndex++;
+  }
+
+  private void restorePreviousBlock() {
+    if (!balancedRepeat.isEmpty()) { // false only for initial block
+      currentBlock = balancedRepeat.pop().previousBlock;
+    }
+  }
+
+  private boolean currentRepeatBlockIsEmpty() {
+    // compare current index with startOfLoop index
+    return  balancedRepeat.isEmpty() ||
+            balancedRepeat.peek().repeat.getIndex() == currentStateIndex - 1;
   }
 
 
@@ -70,13 +132,134 @@ public class FSM {
       start = true;
       addFinalState();
       checkBalancedRepeatBlocks();
+      table.printTable(FINAL_STATE);
       run();
     }
   }
 
   private void addFinalState() {
-    addStateToFSM(new FinalState());
+    FINAL_STATE = currentStateIndex;
     endRepeat();
+  }
+
+  public <E extends KompicsEvent> void addComparator(
+          Class<E> eventType, Comparator<E> comparator) {
+    assertInHeader();
+    if (currentBlock.previousBlock != null) { // not main repeat block
+      throw new IllegalStateException("Comparators are only allowed in the main header");
+    }
+    comparators.put(eventType, comparator);
+  }
+
+  public <P extends PortType> void expectMessage(KompicsEvent event, Port<P> port, TestKit.Direction direction) {
+    assertInBody();
+    EventSpec eventSpec = newEventSpec(event, port, direction);
+    int nextState = currentStateIndex + 1;
+    table.addStateClause(currentStateIndex, eventSpec, nextState, currentBlock.env);
+    expectedEvents.put(currentStateIndex, eventSpec);
+    currentStateIndex++;
+  }
+
+  private void run() {
+    runStartState();
+
+    currentStateIndex = 0;
+    while (currentStateIndex < FINAL_STATE && currentStateIndex != ERROR_STATE) {
+      if (!(startOfLoop() || endOfLoop() || triggerAction())) {
+        // expecting an event
+
+        //// TODO: 2/17/17 remove this
+        EventSpec expected = expectedEvents.get(currentStateIndex);
+        logger.warn("{}: Expect\t{}", currentStateIndex, expected);
+
+        EventSpec received = removeEventFromQueue();
+        setComparatorForEvent(received);
+
+        StateTable.Action action = table.lookUp(currentStateIndex, received);
+
+        if (!errorTransition(expected, received, action)) {
+
+          logger.warn("{}: Matched ({}) with Action = {}",
+                  currentStateIndex, received, action);
+
+          if (action.handleEvent()) {
+            received.handle();
+          }
+
+          currentStateIndex = action.nextIndex;
+        }
+      }
+    }
+
+    runFinalState();
+  }
+
+  private boolean errorTransition(
+          EventSpec expected, EventSpec received, StateTable.Action action) {
+    if (action != null && action.nextIndex != ERROR_STATE) {
+      return false;
+    }
+    currentStateIndex = ERROR_STATE;
+    errorMessage = String.format(
+            "Received %s message <%s> while expecting <%s>",
+            (action == null? "unexpected" : "unwanted"), received, expected);
+    return true;
+  }
+
+  @SuppressWarnings("unchecked")
+  private void setComparatorForEvent(EventSpec eventSpec) {
+    eventSpec.setComparator(comparators.get(eventSpec.getEvent().getClass()));
+  }
+
+  private boolean triggerAction() {
+    Trigger trigger = triggeredEvents.get(currentStateIndex);
+
+    if (trigger == null) {
+      return false;
+    }
+
+    logger.warn("{}: triggerAction({})\t", currentStateIndex, trigger);
+    trigger.doTrigger();
+    currentStateIndex++;
+    return true;
+  }
+
+  private boolean startOfLoop() {
+    Repeat loop = loops.get(currentStateIndex);
+    if (loop == null) {
+      return false;
+    } else {
+      loop.initialize();
+      logger.warn("{}: repeat({})\t", currentStateIndex, loop.getCurrentCount());
+      currentStateIndex++;
+      return true;
+    }
+  }
+
+  private boolean endOfLoop() {
+    Repeat loop = end.get(currentStateIndex);
+    if (loop == null) {
+      return false;
+    }
+
+    logger.warn("{}: end({})\t", currentStateIndex, loop.times);
+    loop.iterationComplete();
+    if (loop.hasMoreIterations()) {
+      currentStateIndex = loop.indexOfFirstState();
+    } else {
+      currentStateIndex++;
+    }
+    return true;
+  }
+
+  private void runStartState() {
+    logger.warn("Sending Start to component...");
+    proxyComponent.getControl().doTrigger(Start.event, 0, proxyComponent);
+  }
+
+  private void runFinalState() {
+    logger.warn("Done!({})", currentStateIndex == ERROR_STATE?
+            "FAILED -> " + errorMessage : "PASS");
   }
 
   private void checkBalancedRepeatBlocks() {
@@ -85,85 +268,69 @@ public class FSM {
     }
   }
 
-  private void run() {
-    while (currentStateIndex < states.size()) {
-      currentState = states.get(currentStateIndex);
-
-      if (!(startLoopWasRun() || endLoopWasRun())) { // current state is regular
-        // run self and error transitions
-        boolean completedWithoutError = currentState.run();
-        if (completedWithoutError) {
-          currentStateIndex++; // go to next state
-        } else {
-          // run error state
-          break;
-        }
-      }
+  private void assertInBody() {
+    if (currentBlock != null && currentBlock.inHeaderMode) {
+      throw new IllegalStateException("Not in body mode");
     }
   }
 
-
-  private boolean startLoopWasRun() {
-    boolean startLoopRan = false;
-    if (currentState instanceof Loop) {
-      startLoopRan = true;
-      currentTable = currentState.getStateTable();
-      ((Loop) currentState).initialize();
-      currentStateIndex++;
-    }
-    return startLoopRan;
-  }
-
-  private boolean endLoopWasRun() {
-    boolean endLoopRan = false;
-    if (currentState instanceof EndLoop) {
-      endLoopRan = true;
-
-      EndLoop loopEnd = (EndLoop) currentState;
-      loopEnd.signalIterationComplete();
-
-      if (loopEnd.hasMoreIterations()) {
-        currentStateIndex = loopEnd.indexOfFirstState();
-      } else {
-        currentStateIndex++;
-      }
-    }
-    return endLoopRan;
-  }
-
-  public void endRepeat() {
-    if (balancedRepeat.isEmpty()) {
-      throw new IllegalStateException("matching loop not found for end");
-    } else if (currentRepeatBlockIsEmpty()) {
-      throw new IllegalStateException("empty repeat blocks are not allowed");
-    }
-
-    Loop loopStart = balancedRepeat.pop();
-    assert loopStart.getStateTable() == currentTable;
-
-    EndLoop loopEnd = new EndLoop(loopStart);
-    addStateToFSM(loopEnd);
-
-    restorePreviousStateTable();
-
-  }
-
-  private void restorePreviousStateTable() {
-    if (!balancedRepeat.isEmpty()) { // false only for start state
-      currentTable = balancedRepeat.peek().getStateTable();
+  private void assertInHeader() {
+    if (!currentBlock.inHeaderMode) {
+      throw new IllegalStateException("Not in header mode");
     }
   }
 
-  private boolean currentRepeatBlockIsEmpty() {
-    // compare current index with loopstart index
-    return  balancedRepeat.isEmpty() ||
-            balancedRepeat.peek().getIndex() == states.size() - 1;
-  }
-
-  EventSpec peekEventQueue() {
-    return eventQueue.peek();
-  }
-  EventSpec removeEventFromQueue() {
+  private EventSpec removeEventFromQueue() {
     return eventQueue.poll();
+  }
+
+  // // TODO: 2/17/17 switch to eventSpec?
+  private class Trigger {
+    private final KompicsEvent event;
+    private final Port<? extends PortType> port;
+
+    Trigger(KompicsEvent event, Port<? extends PortType> port) {
+      this.event = event;
+      this.port = port;
+    }
+
+    void doTrigger() {
+      port.doTrigger(event, 0, port.getOwner());
+    }
+    public String toString() {
+      return event.toString();
+    }
+  }
+
+  private class Block {
+    boolean inHeaderMode = true;
+    final Repeat repeat;
+    final Block previousBlock;
+    Environment env;
+
+    Block(Repeat repeat, Block previousBlock) {
+      this.repeat = repeat;
+      this.previousBlock = previousBlock;
+
+      if (previousBlock == null) {
+        env = new Environment(null);
+      } else {
+        env = new Environment(previousBlock.env);
+      }
+    }
+  }
+
+
+  private class ComparatorMap {
+    Map<Class<? extends KompicsEvent>, Comparator<? extends KompicsEvent>> comparators = new HashMap<>();
+
+    @SuppressWarnings("unchecked")
+    public <E extends KompicsEvent> Comparator<E> get(Class<E> eventType) {
+      return (Comparator<E>) comparators.get(eventType);
+    }
+
+    public <E extends KompicsEvent> void put(Class<E> eventType, Comparator<E> comparator) {
+      comparators.put(eventType, comparator);
+    }
   }
 }
