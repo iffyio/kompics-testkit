@@ -58,11 +58,7 @@ public class BasicTest {
 
     @Override
     public int compare(Ping p1, Ping p2) {
-      if (p1.count == p2.count) {
-        return 0;
-      } else {
-        return -1;
-      }
+      return p1.count - p2.count;
     }
 
     @Override

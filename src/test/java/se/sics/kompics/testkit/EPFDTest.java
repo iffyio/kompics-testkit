@@ -3,14 +3,12 @@ package se.sics.kompics.testkit;
 import org.junit.Test;
 
 import static junit.framework.Assert.assertEquals;
-import static org.junit.Assert.assertNotSame;
 import se.sics.kompics.Component;
 import se.sics.kompics.Init;
 import se.sics.kompics.network.Network;
 import se.sics.kompics.network.netty.NettyInit;
 import se.sics.kompics.network.netty.NettyNetwork;
 import se.sics.kompics.testkit.fd.*;
-import se.sics.kompics.testkit.fsm.FSM;
 import se.sics.kompics.timer.ScheduleTimeout;
 import se.sics.kompics.timer.Timer;
 
@@ -66,10 +64,10 @@ public class EPFDTest {
     end();
 
     //Send Pong, Timeout, Reply with PING, then SCHEDTIMEOUT
-    tc.repeat(20).body().
+    tc.repeat(20).
         disallow(restore, epfd.getPositive(EPFDPort.class), outgoing).
         disallow(suspect, epfd.getPositive(EPFDPort.class), outgoing).
-            //body().
+        body().
         trigger(pong, epfd.getNegative(Network.class)).
         trigger(timeout, epfd.getNegative(Timer.class)).
         expect(ping, epfd.getNegative(Network.class), outgoing).
@@ -79,16 +77,20 @@ public class EPFDTest {
     assertEquals(tc.check(), tc.getFinalState());
   }
 
-  private void mockTimerOnly() {
+  @Test
+  public void mockTimerOnly() {
     // Connect EPFD, Ponger
     Component networkPonger = tc.create(NettyNetwork.class, new NettyInit(pongerAddr));
     Component networkEPFD = tc.create(NettyNetwork.class, new NettyInit(epfdAddr));
     tc.connect(epfd.getNegative(Network.class), networkEPFD.getPositive(Network.class));
     tc.connect(ponger.getNegative(Network.class), networkPonger.getPositive(Network.class));
 
+    tc.addComparator(ScheduleTimeout.class, new ScheduleTimeoutComparator()).
+       disallow(restore, epfd.getPositive(EPFDPort.class), outgoing).
+       body();
+
     // Expect initial SCHED TIMEOUT
     tc.expect(st, epfd.getNegative(Timer.class), outgoing);
-    tc.disallow(restore, epfd.getPositive(EPFDPort.class), outgoing);
 
     // SEND Watch P
     Watch watch = new Watch(pongerAddr);
@@ -102,8 +104,9 @@ public class EPFDTest {
     triggerTimeoutExpectPingAndSchedTimeout();
 
     // drop Pongs within scope, then timeout and suspect
-    tc.repeat(100);
-            tc.conditionalDrop(pong, epfd.getNegative(Network.class), incoming).
+    tc.repeat(100).
+            conditionalDrop(pong, epfd.getNegative(Network.class), incoming).
+            body().
             trigger(timeout, epfd.getNegative(Timer.class)).
             expect(suspect, epfd.getPositive(EPFDPort.class), outgoing). // resuspect
             expect(ping, epfd.getNegative(Network.class), outgoing).

@@ -1,11 +1,8 @@
 package se.sics.kompics.testkit;
 
 import org.junit.Test;
-import se.sics.kompics.*;
-import se.sics.kompics.testkit.fsm.FSM;
-
 import static junit.framework.Assert.assertEquals;
-import static junit.framework.Assert.assertNotSame;
+import se.sics.kompics.*;
 
 public class PingerPongerTest {
 
@@ -38,27 +35,13 @@ public class PingerPongerTest {
     tc.
       body().
       connect(pinger.getNegative(PingPongPort.class), ponger.getPositive(PingPongPort.class)).
-      //expect(new Ping(), pinger.getNegative(PingPongPort.class), outgoing).
       repeat(1).
         body().
         trigger(new Pong(new Ping()), ponger.getPositive(PingPongPort.class).getPair()).
         expect(new Pong(new Ping()), pinger.getNegative(PingPongPort.class), incoming).
-      end().
-    check();
-  }
+      end();
 
-  // COMPONENTS
-
-  public static class Parent extends ComponentDefinition {
-    Component pinger = create(Pinger.class, Init.NONE);
-    Component pinger2 = create(Pinger.class, Init.NONE);
-    Component ponger = create(Ponger.class, Init.NONE);
-    {
-      connect(pinger.getNegative(PingPongPort.class),
-              ponger.getPositive(PingPongPort.class));
-      connect(pinger.getNegative(PingPongPort.class).getPair(),
-              pinger2.getNegative(PingPongPort.class));
-    }
+    assertEquals(tc.getFinalState(), tc.check());
   }
 
   public static class Pinger extends ComponentDefinition {
@@ -99,8 +82,8 @@ public class PingerPongerTest {
       @Override
       public void handle(Ping ping) {
         //Kompics.logger.info("Ponger: received {}", ping);
-        trigger(new Pong(ping), pingPongPort);
-        //answer(event, new Pong());
+        Pong pong = new Pong(RequestResponseTest.cloneRequest(ping));
+        trigger(pong, pingPongPort);
       }
     };
 
@@ -113,13 +96,9 @@ public class PingerPongerTest {
     {
       request(Ping.class);
       indication(Pong.class);
-      //indication(SuperPong.class);
     }
   }
 
-/*  static class Ping implements KompicsEvent{}
-  static class SuperPong extends Pong{}
-  static class Pong implements KompicsEvent{}*/
   static class Ping extends Request {
   public boolean equals(Object o) {
     return !(o == null || !(o instanceof Ping));
