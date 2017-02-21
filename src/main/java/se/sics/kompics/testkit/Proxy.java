@@ -7,14 +7,19 @@ import se.sics.kompics.testkit.scheduler.CallingThreadScheduler;
 public class Proxy extends ComponentDefinition{
 
   private final EventQueue eventQueue = new EventQueue();
-  private final ComponentDefinition cut;
+  private ComponentDefinition cut;
+  Class<? extends ComponentDefinition> cutClass;
 
   <T extends ComponentDefinition>
   Proxy(Class<T> cutClass, Init<T> initEvent) {
     // // TODO: 2/8/17 nosuchmethodexception with initEvent when Init.NONE
     //cut = create(cutClass, initEvent).getComponent();
-    cut = create(cutClass, Init.NONE).getComponent();
+    this.cutClass = cutClass;
     getComponentCore().setScheduler(new CallingThreadScheduler());
+  }
+
+  void createComponentUnderTest() {
+    cut = create(cutClass, Init.NONE).getComponent();
   }
 
   ComponentDefinition getCut() {
@@ -26,11 +31,16 @@ public class Proxy extends ComponentDefinition{
   }
 
   <T extends ComponentDefinition> Component createNewSetupComponent(Class<T> cClass, Init<T> initEvent) {
-    return create(cClass, initEvent);
+    Component x = create(cClass, initEvent);
+    x.getComponent().getComponentCore().setScheduler(null);
+    Kompics.logger.warn("created: {}, state is {}", x, x.state());
+    return x;
   }
 
   <T extends ComponentDefinition> Component createNewSetupComponent(Class<T> cClass, Init.None initEvent) {
-    return create(cClass, initEvent);
+    Component x = create(cClass, initEvent);
+    x.getComponent().getComponentCore().setScheduler(null);
+    return x;
   }
   <P extends PortType> Negative<P> provideProxy(Class<P> portType) {
     return provides(portType);
@@ -42,9 +52,7 @@ public class Proxy extends ComponentDefinition{
 
   private Handler<Start> startHandler = new Handler<Start>() {
     @Override
-    public void handle(Start event) {
-      Kompics.logger.info("Proxy component started");
-    }
+    public void handle(Start event) { }
   };
 
   {

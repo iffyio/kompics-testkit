@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import se.sics.kompics.*;
 import se.sics.kompics.testkit.Proxy;
+import se.sics.kompics.testkit.TestCase;
 import se.sics.kompics.testkit.TestKit;
 
 import java.util.Comparator;
@@ -15,7 +16,8 @@ import java.util.Stack;
 public class FSM {
   private static final Logger logger = LoggerFactory.getLogger(FSM.class);
 
-  public static final int ERROR_STATE = -1;
+  private final TestCase testCase;
+  static final int ERROR_STATE = -1;
   private int FINAL_STATE;
   private boolean STARTED = false;
   private String ERROR_MESSAGE = "";
@@ -33,12 +35,12 @@ public class FSM {
   private StateTable table = new StateTable();
 
   private Block currentBlock;
-
   private int currentStateIndex = 0;
 
-  public FSM(Proxy proxy) {
+  public FSM(Proxy proxy, TestCase testCase) {
     this.eventQueue = proxy.getEventQueue();
     this.proxyComponent =  proxy.getComponentCore();
+    this.testCase = testCase;
 
     initializeFSM();
   }
@@ -50,16 +52,19 @@ public class FSM {
 
   public <P extends  PortType, E extends KompicsEvent> void addDisallowedEvent(
           KompicsEvent event, Port<P> port, TestKit.Direction direction) {
+    assertInHeader();
     currentBlock.env.addDisallowedMessage(newEventSpec(event, port, direction));
   }
 
   public <P extends  PortType> void addAllowedEvent(
           KompicsEvent event, Port<P> port, TestKit.Direction direction) {
+    assertInHeader();
     currentBlock.env.addAllowedMessage(newEventSpec(event, port, direction));
   }
 
   public <P extends  PortType> void addDroppedEvent(
           KompicsEvent event, Port<P> port, TestKit.Direction direction) {
+    assertInHeader();
     currentBlock.env.addDroppedMessage(newEventSpec(event, port, direction));
   }
 
@@ -257,8 +262,10 @@ public class FSM {
   }
 
   private void runStartState() {
-    logger.warn("Sending Start to component...");
-    proxyComponent.getControl().doTrigger(Start.event, 0, proxyComponent);
+    logger.warn("Sending Start to {} children component(s)", testCase.getChildren().size());
+    for (Component child : testCase.getChildren()) {
+      child.getControl().doTrigger(Start.event, 0, proxyComponent);
+    }
   }
 
   private void runFinalState() {

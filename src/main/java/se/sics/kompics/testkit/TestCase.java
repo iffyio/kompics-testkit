@@ -4,43 +4,68 @@ import se.sics.kompics.*;
 import se.sics.kompics.scheduler.ThreadPoolScheduler;
 import se.sics.kompics.testkit.fsm.FSM;
 
+import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashSet;
 
 
 public class TestCase {
   private final Proxy proxy;
   private final ComponentCore proxyComponent;
-  private final ComponentDefinition cut;
   private final PortConfig portConfig;
+  private ComponentDefinition cut;
   private FSM fsm;
-  private ThreadPoolScheduler scheduler;
+  private Scheduler scheduler;
   private boolean checked;
+
+  private Collection<Component> children = new HashSet<>();
 
   <T extends ComponentDefinition> TestCase(
           Class<T> cutClass, Init<T> initEvent) {
     proxy = new Proxy(cutClass, initEvent);
     proxyComponent = proxy.getComponentCore();
-    cut = proxy.getCut();
     portConfig = new PortConfig(proxy);
-    fsm = new FSM(proxy);
+    init();
+  }
+
+  private void init() {
+    fsm = new FSM(proxy, this);
+
+    // default scheduler
     scheduler = new ThreadPoolScheduler(1);
     Kompics.setScheduler(scheduler);
+
+    // // TODO: 2/20/17 set worker id
+    proxyComponent.getControl().doTrigger(Start.event, 0, proxyComponent);
+    assert proxyComponent.state() == Component.State.ACTIVE;
+
+    proxy.createComponentUnderTest();
+    cut = proxy.getCut();
+    children.add(cut.getComponentCore());
   }
+
+  public Collection<Component> getChildren() { return children; }
 
   public Component getComponentUnderTest() {
     return cut.getComponentCore();
   }
 
+  // // TODO: 2/20/17 refactor create
   public <T extends ComponentDefinition> Component create(
           Class<T> cutClass, Init<T> initEvent) {
-    return proxy.createNewSetupComponent(cutClass, initEvent);
+    Component c = proxy.createNewSetupComponent(cutClass, initEvent);
+    children.add(c);
+    return c;
   }
 
   // // TODO: 2/8/17 create with init, config
   public <T extends ComponentDefinition> Component create(
           Class<T> cutClass, Init.None initEvent) {
-    return proxy.createNewSetupComponent(cutClass, initEvent);
+    Component c = proxy.createNewSetupComponent(cutClass, initEvent);
+    children.add(c);
+    return c;
   }
+
 
   // // TODO: 2/8/17 connect with channel, channelSelector
   public <P extends PortType> TestCase connect( Negative<P> negative, Positive<P> positive) {

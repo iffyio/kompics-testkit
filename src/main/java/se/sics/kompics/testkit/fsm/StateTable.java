@@ -54,7 +54,7 @@ class StateTable {
     }
 
     for (EventSpec e : env.getDroppedEvents()) {
-      row.put(e, new Action(e, false, FSM.ERROR_STATE));
+      row.put(e, new Action(e, false, stateIndex));
     }
 
     return row;
