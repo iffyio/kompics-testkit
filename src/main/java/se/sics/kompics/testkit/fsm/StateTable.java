@@ -1,27 +1,70 @@
 package se.sics.kompics.testkit.fsm;
 
-import se.sics.kompics.Kompics;
+import se.sics.kompics.KompicsEvent;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
 
 class StateTable {
 
   private Map<Integer, Map<EventSpec, Action>> table = new HashMap<>();
+  private Map<Integer, EventSpec> eventSpecs = new HashMap<>();
+  private Map<Integer, PredicateSpec> predicateSpecs = new HashMap<>();
 
-
-  void addStateClause(int stateIndex, EventSpec eventSpec, int nextState, Environment env) {
-    Map<EventSpec, Action> entry = getOrCreateStateEntry(stateIndex, env);
-    Action action = new Action(eventSpec, true, nextState);
+  void registerExpectedEvent(int state, EventSpec eventSpec, Environment env) {
+    int nextState = state + 1;
+    Map<EventSpec, Action> entry = entryForState(state, env);
+    Action action = new Action(eventSpec, Action.HANDLE, nextState);
     entry.put(eventSpec, action);
+    eventSpecs.put(state, eventSpec);
   }
 
-  // lookup action quicker
-  Action lookUp(int stateIndex, EventSpec eventSpec) {
-    Map<EventSpec, Action> entry = table.get(stateIndex);
+  void registerExpectedEvent(
+          int state, PredicateSpec predSpec, Environment env) {
+    createStateEntryIfNotExists(state, env);
+    predicateSpecs.put(state, predSpec);
+  }
+
+  void printExpectedStateAt(int state) {
+    FSM.logger.warn("{}: Expect\t{}", state,
+            (predicateWasRegisteredForState(state)?
+               predicateSpecs.get(state) : eventSpecs.get(state)));
+  }
+
+  Spec getExpectedSpecAt(int state) {
+    return predicateWasRegisteredForState(state)?
+             predicateSpecs.get(state) : eventSpecs.get(state);
+  }
+
+  Action lookup(int state, EventSpec receivedSpec) {
+    Map<EventSpec, Action> entry = table.get(state);
     assert entry != null;
 
+    if (predicateWasRegisteredForState(state)) {
+      Action action = predicateLookup(state, receivedSpec);
+      if (action != null) {
+        return action;
+      }
+    }
 
-    return entry.get(eventSpec);
+    return entry.get(receivedSpec);
+  }
+
+  private boolean predicateWasRegisteredForState(int state) {
+    return predicateSpecs.containsKey(state);
+  }
+
+  @SuppressWarnings("unchecked")
+  private Action predicateLookup(int state, EventSpec eventSpec) {
+    PredicateSpec predSpec = predicateSpecs.get(state);
+    KompicsEvent receivedEvent = eventSpec.getEvent();
+
+    if (predSpec != null && predSpec.getPredicate().apply(receivedEvent)) {
+      int nextState = state + 1;
+      return new Action(eventSpec, true, nextState);
+    }
+
+    return null;
   }
 
   void printTable(int final_state) {
@@ -32,38 +75,48 @@ class StateTable {
         for (Action a : entry.values()) {
           System.out.println("\t\t" + a);
         }
+        if (predicateWasRegisteredForState(i)) {
+          System.out.printf("\t\t%s handle %d\n", predicateSpecs.get(i), i+1);
+        }
       }
     }
   }
 
-  private Map<EventSpec, Action> getOrCreateStateEntry(int stateIndex, Environment env) {
-    Map<EventSpec, Action> row = table.get(stateIndex);
+  private Map<EventSpec, Action> entryForState(int state, Environment env) {
+    createStateEntryIfNotExists(state, env);
+    return table.get(state);
+  }
 
-    if (row != null) {
-      return row;
+  private void createStateEntryIfNotExists(int state, Environment env) {
+    Map<EventSpec, Action> entry = table.get(state);
+
+    if (entry != null) {
+      return;
     }
 
-    row = new HashMap<>();
-    table.put(stateIndex, row);
+    entry = new HashMap<>();
+    table.put(state, entry);
     for (EventSpec e : env.getDisallowedEvents()) {
-      row.put(e, new Action(e, false, FSM.ERROR_STATE));
+      entry.put(e, new Action(e, Action.HANDLE, FSM.ERROR_STATE));
     }
 
     for (EventSpec e : env.getAllowedEvents()) {
-      row.put(e, new Action(e, true, stateIndex));
+      entry.put(e, new Action(e, Action.HANDLE, state));
     }
 
     for (EventSpec e : env.getDroppedEvents()) {
-      row.put(e, new Action(e, false, stateIndex));
+      entry.put(e, new Action(e, Action.DROP, state));
     }
-
-    return row;
   }
 
-  class Action {
+  static class Action {
+    static boolean HANDLE = true;
+    static boolean DROP = false;
+
     final EventSpec eventSpec;
     final boolean handle;
     final int nextIndex;
+
     Action(EventSpec eventSpec, boolean handle, int nextIndex) {
       this.eventSpec = eventSpec;
       this.handle = handle;
@@ -72,10 +125,6 @@ class StateTable {
 
     boolean handleEvent() {
       return handle;
-    }
-
-    boolean matches(EventSpec eventSpec) {
-      return this.eventSpec.equals(eventSpec);
     }
 
     // actions are equal if they are for the same event

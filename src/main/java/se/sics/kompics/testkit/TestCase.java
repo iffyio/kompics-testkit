@@ -1,5 +1,6 @@
 package se.sics.kompics.testkit;
 
+import com.google.common.base.Predicate;
 import se.sics.kompics.*;
 import se.sics.kompics.scheduler.ThreadPoolScheduler;
 import se.sics.kompics.testkit.fsm.FSM;
@@ -104,26 +105,30 @@ public class TestCase {
   public <P extends  PortType> TestCase expect(
           KompicsEvent event, Port<P> port, TestKit.Direction direction) {
 
-    //EventSpec eventSpec = new EventSpec(event, port, direction);
-    configurePort(event, port, direction);
-    //fsm.addStateToFSM(new ExpectState(eventSpec));
-    //fsm.addExpect(new ExpectState(eventSpec));
+    configurePort(event.getClass(), port, direction);
     fsm.expectMessage(event, port, direction);
     return this;
   }
 
-  public <P extends  PortType> void configurePort(
-          KompicsEvent event, Port<P> port, TestKit.Direction direction) {
+  public <P extends  PortType, E extends KompicsEvent> TestCase expect(
+          Class<E> eventType, Predicate<E> pred, Port<P> port, TestKit.Direction direction) {
+    configurePort(eventType, port, direction);
+    fsm.expectMessage(eventType, pred, port, direction);
+    return this;
+  }
 
-    if (port.getOwner() != proxyComponent) {
+  public <P extends  PortType> void configurePort(
+          Class<? extends KompicsEvent> eventType, Port<P> port, TestKit.Direction direction) {
+
+    if (port.getOwner() != proxyComponent || port.getPair().getOwner() != cut.getComponentCore()) {
       // // TODO: 2/8/17 support inside ports as well
-      throw new UnsupportedOperationException("Watching messages are supported only for the component being tested");
+      throw new UnsupportedOperationException("Watching messages are allowed on the tested component's ports " + port);
     }
     PortStructure<P> portStruct = portConfig.get(port);
 
     if (portStruct == null) {
       if (direction == TestKit.Direction.INCOMING) {
-        throw new IllegalStateException("Can not watch incoming message on an unconnected port");
+        throw new IllegalStateException("Can not watch incoming message on an unconnected port " + port);
       } else {
         portStruct = portConfig.create(port);
       }
@@ -131,10 +136,10 @@ public class TestCase {
 
     if (direction == TestKit.Direction.OUTGOING) {
       // register outgoing handler
-      portStruct.addOutgoingHandler(event);
+      portStruct.addOutgoingHandler(eventType);
     } else if (direction == TestKit.Direction.INCOMING){
       // register incoming handler
-      portStruct.addIncomingHandler(event);
+      portStruct.addIncomingHandler(eventType);
     }
   }
 
@@ -164,21 +169,21 @@ public class TestCase {
 
   public <P extends  PortType> TestCase disallow(
             KompicsEvent event, Port<P> port, TestKit.Direction direction) {
-    configurePort(event, port, direction);
+    configurePort(event.getClass(), port, direction);
     fsm.addDisallowedEvent(event, port, direction);
     return this;
   }
 
   public <P extends  PortType> TestCase allow(
             KompicsEvent event, Port<P> port, TestKit.Direction direction) {
-    configurePort(event, port, direction);
+    configurePort(event.getClass(), port, direction);
     fsm.addAllowedEvent(event, port, direction);
     return this;
   }
 
   public <P extends  PortType> TestCase conditionalDrop(
             KompicsEvent event, Port<P> port, TestKit.Direction direction) {
-    configurePort(event, port, direction);
+    configurePort(event.getClass(), port, direction);
     fsm.addDroppedEvent(event, port, direction);
     return this;
   }

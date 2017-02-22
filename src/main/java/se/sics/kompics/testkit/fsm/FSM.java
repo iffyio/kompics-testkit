@@ -1,5 +1,6 @@
 package se.sics.kompics.testkit.fsm;
 
+import com.google.common.base.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import se.sics.kompics.*;
@@ -14,7 +15,7 @@ import java.util.Stack;
 
 
 public class FSM {
-  private static final Logger logger = LoggerFactory.getLogger(FSM.class);
+  static final Logger logger = LoggerFactory.getLogger(FSM.class);
 
   private final TestCase testCase;
   static final int ERROR_STATE = -1;
@@ -29,7 +30,6 @@ public class FSM {
   private Map<Integer, Repeat> loops = new HashMap<>();
   private Map<Integer, Repeat> end = new HashMap<>();
   private Map<Integer, Trigger> triggeredEvents = new HashMap<>();
-  private Map<Integer, EventSpec> expectedEvents = new HashMap<>();
 
   private ComparatorMap comparators = new ComparatorMap();
   private StateTable table = new StateTable();
@@ -131,6 +131,7 @@ public class FSM {
   private boolean currentRepeatBlockIsEmpty() {
     // compare current index with startOfLoop index
     return  balancedRepeat.isEmpty() ||
+            // no state was added since start of loop
             balancedRepeat.peek().repeat.getIndex() == currentStateIndex - 1;
   }
 
@@ -163,9 +164,15 @@ public class FSM {
   public <P extends PortType> void expectMessage(KompicsEvent event, Port<P> port, TestKit.Direction direction) {
     assertInBody();
     EventSpec eventSpec = newEventSpec(event, port, direction);
-    int nextState = currentStateIndex + 1;
-    table.addStateClause(currentStateIndex, eventSpec, nextState, currentBlock.env);
-    expectedEvents.put(currentStateIndex, eventSpec);
+    table.registerExpectedEvent(currentStateIndex, eventSpec, currentBlock.env);
+    currentStateIndex++;
+  }
+
+  public <P extends PortType, E extends KompicsEvent> void expectMessage(
+          Class<E> eventType, Predicate<E> pred, Port<P> port, TestKit.Direction direction) {
+    assertInBody();
+    PredicateSpec predicateSpec = new PredicateSpec(eventType, pred, port, direction);
+    table.registerExpectedEvent(currentStateIndex, predicateSpec, currentBlock.env);
     currentStateIndex++;
   }
 
@@ -176,17 +183,15 @@ public class FSM {
     while (currentStateIndex < FINAL_STATE && currentStateIndex != ERROR_STATE) {
       if (!(startOfLoop() || endOfLoop() || triggerAction())) {
         // expecting an event
-
-        //// TODO: 2/17/17 remove this
-        EventSpec expected = expectedEvents.get(currentStateIndex);
-        logger.warn("{}: Expect\t{}", currentStateIndex, expected);
+        table.printExpectedStateAt(currentStateIndex);
+        Spec expected = table.getExpectedSpecAt(currentStateIndex);
 
         EventSpec received = removeEventFromQueue();
         setComparatorForEvent(received);
 
-        StateTable.Action action = table.lookUp(currentStateIndex, received);
+        StateTable.Action action = table.lookup(currentStateIndex, received);
 
-        if (!errorTransition(expected, received, action)) {
+        if (!transitionedToErrorState(expected, received, action)) {
 
           logger.warn("{}: Matched ({}) with Action = {}",
                   currentStateIndex, received, action);
@@ -203,8 +208,8 @@ public class FSM {
     runFinalState();
   }
 
-  private boolean errorTransition(
-          EventSpec expected, EventSpec received, StateTable.Action action) {
+  private boolean transitionedToErrorState(
+          Spec expected, EventSpec received, StateTable.Action action) {
     if (action != null && action.nextIndex != ERROR_STATE) {
       return false;
     }

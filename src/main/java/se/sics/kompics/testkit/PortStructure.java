@@ -56,8 +56,7 @@ class PortStructure<P extends PortType> {
     portToChannel.put(other, channel);
   }
 
-  void addIncomingHandler(KompicsEvent event) {
-    Class<? extends KompicsEvent> eventType = event.getClass();
+  void addIncomingHandler(Class<? extends KompicsEvent> eventType) {
     if (hasEquivalentHandler(eventType, TestKit.Direction.INCOMING)) {
       // already have a capable handler for this event
 /*      logger.warn("ignoring unnecessary incoming handler");*/
@@ -69,11 +68,10 @@ class PortStructure<P extends PortType> {
     inPort.doSubscribe(inboundHandler);
   }
 
-  void addOutgoingHandler(KompicsEvent event) {
-    Class<? extends KompicsEvent> eventType = event.getClass();
+  void addOutgoingHandler(Class<? extends KompicsEvent> eventType) {
     if (hasEquivalentHandler(eventType, TestKit.Direction.OUTGOING)) {
       // already have a capable handler for this event
-      logger.warn("ignoring unnecessary outgoing handler");
+/*      logger.warn("ignoring unnecessary outgoing handler");*/
       return;
     }
 

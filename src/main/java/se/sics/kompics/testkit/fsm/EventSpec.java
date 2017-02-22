@@ -8,7 +8,7 @@ import se.sics.kompics.testkit.TestKit;
 
 import java.util.Comparator;
 
-public class EventSpec<E extends KompicsEvent> {
+public class EventSpec<E extends KompicsEvent> implements Spec{
 
   private final E event;
   private final Port<? extends PortType> port;
