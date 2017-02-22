@@ -3,8 +3,8 @@ package se.sics.kompics.testkit.fsm;
 import se.sics.kompics.KompicsEvent;
 import se.sics.kompics.Port;
 import se.sics.kompics.PortType;
+import se.sics.kompics.testkit.Direction;
 import se.sics.kompics.testkit.ProxyHandler;
-import se.sics.kompics.testkit.TestKit;
 
 import java.util.Comparator;
 
@@ -12,19 +12,19 @@ public class EventSpec<E extends KompicsEvent> implements Spec{
 
   private final E event;
   private final Port<? extends PortType> port;
-  private final TestKit.Direction direction;
+  private final Direction direction;
   private Comparator<E> comparator;
   private ProxyHandler handler;
 
   EventSpec(E event, Port<? extends PortType> port,
-                   TestKit.Direction direction, Comparator<E> comparator) {
+            Direction direction, Comparator<E> comparator) {
     this(event, port, direction);
     this.comparator = comparator;
   }
 
   // // TODO: 2/17/17 remove constructor if not needed
   public EventSpec(E event, Port<? extends PortType> port,
-            TestKit.Direction direction) {
+            Direction direction) {
     this.event = event;
     this.port = port;
     this.direction = direction;
@@ -38,7 +38,7 @@ public class EventSpec<E extends KompicsEvent> implements Spec{
     return port;
   }
 
-  public TestKit.Direction getDirection() {
+  public Direction getDirection() {
     return direction;
   }
 

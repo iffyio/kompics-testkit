@@ -34,7 +34,7 @@ class OutBoundHandler extends ProxyHandler {
       request.pushPathElement(proxy.getComponentCore());
     }
 
-    EventSpec eventSpec = new EventSpec(event, sourcePort, TestKit.Direction.OUTGOING);
+    EventSpec eventSpec = new EventSpec(event, sourcePort, Direction.OUTGOING);
     eventSpec.setHandler(this);
     eventQueue.offer(eventSpec);
   }

@@ -4,9 +4,9 @@ import com.google.common.base.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import se.sics.kompics.*;
+import se.sics.kompics.testkit.Direction;
 import se.sics.kompics.testkit.Proxy;
 import se.sics.kompics.testkit.TestCase;
-import se.sics.kompics.testkit.TestKit;
 
 import java.util.Comparator;
 import java.util.HashMap;
@@ -30,12 +30,13 @@ public class FSM {
   private Map<Integer, Repeat> loops = new HashMap<>();
   private Map<Integer, Repeat> end = new HashMap<>();
   private Map<Integer, Trigger> triggeredEvents = new HashMap<>();
+  private Map<Integer, Predicate<? extends ComponentDefinition>> assertPredicates = new HashMap<>();
 
   private ComparatorMap comparators = new ComparatorMap();
   private StateTable table = new StateTable();
 
   private Block currentBlock;
-  private int currentStateIndex = 0;
+  private int currentState = 0;
 
   public FSM(Proxy proxy, TestCase testCase) {
     this.eventQueue = proxy.getEventQueue();
@@ -51,32 +52,32 @@ public class FSM {
 
 
   public <P extends  PortType, E extends KompicsEvent> void addDisallowedEvent(
-          KompicsEvent event, Port<P> port, TestKit.Direction direction) {
+          KompicsEvent event, Port<P> port, Direction direction) {
     assertInHeader();
     currentBlock.env.addDisallowedMessage(newEventSpec(event, port, direction));
   }
 
   public <P extends  PortType> void addAllowedEvent(
-          KompicsEvent event, Port<P> port, TestKit.Direction direction) {
+          KompicsEvent event, Port<P> port, Direction direction) {
     assertInHeader();
     currentBlock.env.addAllowedMessage(newEventSpec(event, port, direction));
   }
 
   public <P extends  PortType> void addDroppedEvent(
-          KompicsEvent event, Port<P> port, TestKit.Direction direction) {
+          KompicsEvent event, Port<P> port, Direction direction) {
     assertInHeader();
     currentBlock.env.addDroppedMessage(newEventSpec(event, port, direction));
   }
 
   @SuppressWarnings("unchecked")
   private  <P extends  PortType, E extends KompicsEvent> EventSpec newEventSpec(
-          KompicsEvent event, Port<P> port, TestKit.Direction direction) {
+          KompicsEvent event, Port<P> port, Direction direction) {
     Comparator<E> c = (Comparator<E>) comparators.get(event.getClass());
     return new EventSpec<E>((E) event, port, direction, c);
   }
 
   public int getFinalState() {
-    return STARTED? FINAL_STATE : currentStateIndex;
+    return STARTED? FINAL_STATE : currentState;
   }
 
   public void repeat(int times) {
@@ -86,13 +87,13 @@ public class FSM {
       throw new IllegalArgumentException("only positive value allowed for repeat");
     }
 
-    Repeat repeat = new Repeat(times, currentStateIndex);
+    Repeat repeat = new Repeat(times, currentState);
 
     currentBlock = new Block(repeat, currentBlock);
     balancedRepeat.push(currentBlock);
 
-    loops.put(currentStateIndex, repeat);
-    currentStateIndex++;
+    loops.put(currentState, repeat);
+    currentState++;
   }
 
   public void body() {
@@ -102,8 +103,8 @@ public class FSM {
 
   public void addTrigger(KompicsEvent event, Port<? extends PortType> port) {
     assertInBody();
-    triggeredEvents.put(currentStateIndex, new Trigger(event, port));
-    currentStateIndex++;
+    triggeredEvents.put(currentState, new Trigger(event, port));
+    currentState++;
   }
 
   public void endRepeat() {
@@ -116,10 +117,10 @@ public class FSM {
     }
 
     Repeat loopHead = currentBlock.repeat;
-    end.put(currentStateIndex, loopHead);
+    end.put(currentState, loopHead);
 
     restorePreviousBlock();
-    currentStateIndex++;
+    currentState++;
   }
 
   private void restorePreviousBlock() {
@@ -132,7 +133,7 @@ public class FSM {
     // compare current index with startOfLoop index
     return  balancedRepeat.isEmpty() ||
             // no state was added since start of loop
-            balancedRepeat.peek().repeat.getIndex() == currentStateIndex - 1;
+            balancedRepeat.peek().repeat.getIndex() == currentState - 1;
   }
 
 
@@ -144,11 +145,10 @@ public class FSM {
       table.printTable(FINAL_STATE);
       run();
     }
-    return currentStateIndex;
+    return currentState;
   }
 
-  private void addFinalState() {
-    FINAL_STATE = currentStateIndex;
+  private void addFinalState() { FINAL_STATE = currentState;
     endRepeat();
   }
 
@@ -161,46 +161,51 @@ public class FSM {
     comparators.put(eventType, comparator);
   }
 
-  public <P extends PortType> void expectMessage(KompicsEvent event, Port<P> port, TestKit.Direction direction) {
+  public void addAssertComponent(Predicate<? extends ComponentDefinition> assertPred) {
+    assertPredicates.put(currentState, assertPred);
+    currentState++;
+  }
+
+  public <P extends PortType> void expectMessage(KompicsEvent event, Port<P> port, Direction direction) {
     assertInBody();
     EventSpec eventSpec = newEventSpec(event, port, direction);
-    table.registerExpectedEvent(currentStateIndex, eventSpec, currentBlock.env);
-    currentStateIndex++;
+    table.registerExpectedEvent(currentState, eventSpec, currentBlock.env);
+    currentState++;
   }
 
   public <P extends PortType, E extends KompicsEvent> void expectMessage(
-          Class<E> eventType, Predicate<E> pred, Port<P> port, TestKit.Direction direction) {
+          Class<E> eventType, Predicate<E> pred, Port<P> port, Direction direction) {
     assertInBody();
     PredicateSpec predicateSpec = new PredicateSpec(eventType, pred, port, direction);
-    table.registerExpectedEvent(currentStateIndex, predicateSpec, currentBlock.env);
-    currentStateIndex++;
+    table.registerExpectedEvent(currentState, predicateSpec, currentBlock.env);
+    currentState++;
   }
 
   private void run() {
     runStartState();
 
-    currentStateIndex = 0;
-    while (currentStateIndex < FINAL_STATE && currentStateIndex != ERROR_STATE) {
-      if (!(startOfLoop() || endOfLoop() || triggerAction())) {
+    currentState = 0;
+    while (currentState < FINAL_STATE && currentState != ERROR_STATE) {
+      if (!(startOfLoop() || endOfLoop() || triggeredAnEvent() || assertedComponent())) {
         // expecting an event
-        table.printExpectedStateAt(currentStateIndex);
-        Spec expected = table.getExpectedSpecAt(currentStateIndex);
+        table.printExpectedEventAt(currentState);
+        Spec expected = table.getExpectedSpecAt(currentState);
 
         EventSpec received = removeEventFromQueue();
         setComparatorForEvent(received);
 
-        StateTable.Action action = table.lookup(currentStateIndex, received);
+        StateTable.Action action = table.lookup(currentState, received);
 
         if (!transitionedToErrorState(expected, received, action)) {
 
           logger.warn("{}: Matched ({}) with Action = {}",
-                  currentStateIndex, received, action);
+                  currentState, received, action);
 
           if (action.handleEvent()) {
             received.handle();
           }
 
-          currentStateIndex = action.nextIndex;
+          currentState = action.nextIndex;
         }
       }
     }
@@ -213,10 +218,31 @@ public class FSM {
     if (action != null && action.nextIndex != ERROR_STATE) {
       return false;
     }
-    currentStateIndex = ERROR_STATE;
+
+    gotoErrorState();
     ERROR_MESSAGE = String.format(
             "Received %s message <%s> while expecting <%s>",
             (action == null? "unexpected" : "unwanted"), received, expected);
+    return true;
+  }
+
+  private boolean assertedComponent() {
+    Predicate assertPred = assertPredicates.get(currentState);
+    if (assertPred == null) {
+      return false;
+    }
+
+    logger.warn("{}: Asserting Component", currentState);
+    ComponentDefinition definitionUnderTest = testCase.getDefinitionUnderTest();
+    //// TODO: 2/22/17 generify assertPred properly
+    boolean successful = assertPred.apply(definitionUnderTest);
+
+    if (!successful) {
+      gotoErrorState();
+    } else {
+      currentState++;
+    }
+
     return true;
   }
 
@@ -225,56 +251,56 @@ public class FSM {
     eventSpec.setComparator(comparators.get(eventSpec.getEvent().getClass()));
   }
 
-  private boolean triggerAction() {
-    Trigger trigger = triggeredEvents.get(currentStateIndex);
+  private boolean triggeredAnEvent() {
+    Trigger trigger = triggeredEvents.get(currentState);
 
     if (trigger == null) {
       return false;
     }
 
-    logger.warn("{}: triggerAction({})\t", currentStateIndex, trigger);
+    logger.warn("{}: triggeredAnEvent({})\t", currentState, trigger);
     trigger.doTrigger();
-    currentStateIndex++;
+    currentState++;
     return true;
   }
 
   private boolean startOfLoop() {
-    Repeat loop = loops.get(currentStateIndex);
+    Repeat loop = loops.get(currentState);
     if (loop == null) {
       return false;
     } else {
       loop.initialize();
-      logger.warn("{}: repeat({})\t", currentStateIndex, loop.getCurrentCount());
-      currentStateIndex++;
+      logger.warn("{}: repeat({})\t", currentState, loop.getCurrentCount());
+      currentState++;
       return true;
     }
   }
 
   private boolean endOfLoop() {
-    Repeat loop = end.get(currentStateIndex);
+    Repeat loop = end.get(currentState);
     if (loop == null) {
       return false;
     }
 
-    logger.warn("{}: end({})\t", currentStateIndex, loop.times);
+    logger.warn("{}: end({})\t", currentState, loop.times);
     loop.iterationComplete();
     if (loop.hasMoreIterations()) {
-      currentStateIndex = loop.indexOfFirstState();
+      currentState = loop.indexOfFirstState();
     } else {
-      currentStateIndex++;
+      currentState++;
     }
     return true;
   }
 
   private void runStartState() {
-    logger.warn("Sending Start to {} children component(s)", testCase.getChildren().size());
-    for (Component child : testCase.getChildren()) {
+    logger.warn("Sending Start to {} participant component(s)", testCase.getParticipatingComponents().size());
+    for (Component child : testCase.getParticipatingComponents()) {
       child.getControl().doTrigger(Start.event, 0, proxyComponent);
     }
   }
 
   private void runFinalState() {
-    logger.warn("Done!({})", currentStateIndex == ERROR_STATE?
+    logger.warn("Done!({})", currentState == ERROR_STATE?
             "FAILED -> " + ERROR_MESSAGE : "PASS");
   }
 
@@ -294,6 +320,10 @@ public class FSM {
     if (!currentBlock.inHeaderMode) {
       throw new IllegalStateException("Not in header mode");
     }
+  }
+
+  private void gotoErrorState() {
+    currentState = ERROR_STATE;
   }
 
   private EventSpec removeEventFromQueue() {

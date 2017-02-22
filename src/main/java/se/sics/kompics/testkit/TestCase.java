@@ -19,7 +19,7 @@ public class TestCase {
   private Scheduler scheduler;
   private boolean checked;
 
-  private Collection<Component> children = new HashSet<>();
+  private Collection<Component> participatingComponents = new HashSet<>();
 
   <T extends ComponentDefinition> TestCase(
           Class<T> cutClass, Init<T> initEvent) {
@@ -42,10 +42,14 @@ public class TestCase {
 
     proxy.createComponentUnderTest();
     cut = proxy.getCut();
-    children.add(cut.getComponentCore());
+    participatingComponents.add(cut.getComponentCore());
   }
 
-  public Collection<Component> getChildren() { return children; }
+  public Collection<Component> getParticipatingComponents() { return participatingComponents; }
+
+  public ComponentDefinition getDefinitionUnderTest() {
+    return cut;
+  }
 
   public Component getComponentUnderTest() {
     return cut.getComponentCore();
@@ -55,7 +59,7 @@ public class TestCase {
   public <T extends ComponentDefinition> Component create(
           Class<T> cutClass, Init<T> initEvent) {
     Component c = proxy.createNewSetupComponent(cutClass, initEvent);
-    children.add(c);
+    participatingComponents.add(c);
     return c;
   }
 
@@ -63,7 +67,7 @@ public class TestCase {
   public <T extends ComponentDefinition> Component create(
           Class<T> cutClass, Init.None initEvent) {
     Component c = proxy.createNewSetupComponent(cutClass, initEvent);
-    children.add(c);
+    participatingComponents.add(c);
     return c;
   }
 
@@ -100,10 +104,13 @@ public class TestCase {
     portStruct.addConnectedPort(other, Channel.TWO_WAY);
   }
 
-
+  public TestCase assertComponentState(Predicate<? extends ComponentDefinition> assertPred) {
+    fsm.addAssertComponent(assertPred);
+    return this;
+  }
 
   public <P extends  PortType> TestCase expect(
-          KompicsEvent event, Port<P> port, TestKit.Direction direction) {
+          KompicsEvent event, Port<P> port, Direction direction) {
 
     configurePort(event.getClass(), port, direction);
     fsm.expectMessage(event, port, direction);
@@ -111,14 +118,14 @@ public class TestCase {
   }
 
   public <P extends  PortType, E extends KompicsEvent> TestCase expect(
-          Class<E> eventType, Predicate<E> pred, Port<P> port, TestKit.Direction direction) {
+          Class<E> eventType, Predicate<E> pred, Port<P> port, Direction direction) {
     configurePort(eventType, port, direction);
     fsm.expectMessage(eventType, pred, port, direction);
     return this;
   }
 
-  public <P extends  PortType> void configurePort(
-          Class<? extends KompicsEvent> eventType, Port<P> port, TestKit.Direction direction) {
+  private <P extends  PortType> void configurePort(
+          Class<? extends KompicsEvent> eventType, Port<P> port, Direction direction) {
 
     if (port.getOwner() != proxyComponent || port.getPair().getOwner() != cut.getComponentCore()) {
       // // TODO: 2/8/17 support inside ports as well
@@ -127,17 +134,17 @@ public class TestCase {
     PortStructure<P> portStruct = portConfig.get(port);
 
     if (portStruct == null) {
-      if (direction == TestKit.Direction.INCOMING) {
+      if (direction == Direction.INCOMING) {
         throw new IllegalStateException("Can not watch incoming message on an unconnected port " + port);
       } else {
         portStruct = portConfig.create(port);
       }
     }
 
-    if (direction == TestKit.Direction.OUTGOING) {
+    if (direction == Direction.OUTGOING) {
       // register outgoing handler
       portStruct.addOutgoingHandler(eventType);
-    } else if (direction == TestKit.Direction.INCOMING){
+    } else if (direction == Direction.INCOMING){
       // register incoming handler
       portStruct.addIncomingHandler(eventType);
     }
@@ -168,21 +175,21 @@ public class TestCase {
   }
 
   public <P extends  PortType> TestCase disallow(
-            KompicsEvent event, Port<P> port, TestKit.Direction direction) {
+            KompicsEvent event, Port<P> port, Direction direction) {
     configurePort(event.getClass(), port, direction);
     fsm.addDisallowedEvent(event, port, direction);
     return this;
   }
 
   public <P extends  PortType> TestCase allow(
-            KompicsEvent event, Port<P> port, TestKit.Direction direction) {
+            KompicsEvent event, Port<P> port, Direction direction) {
     configurePort(event.getClass(), port, direction);
     fsm.addAllowedEvent(event, port, direction);
     return this;
   }
 
   public <P extends  PortType> TestCase conditionalDrop(
-            KompicsEvent event, Port<P> port, TestKit.Direction direction) {
+            KompicsEvent event, Port<P> port, Direction direction) {
     configurePort(event.getClass(), port, direction);
     fsm.addDroppedEvent(event, port, direction);
     return this;

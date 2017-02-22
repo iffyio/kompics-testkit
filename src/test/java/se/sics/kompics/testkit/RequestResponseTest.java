@@ -17,8 +17,8 @@ public class RequestResponseTest {
   private Component ponger;
   private Component ponger2;
 
-  private TestKit.Direction incoming = TestKit.Direction.INCOMING;
-  private TestKit.Direction outgoing = TestKit.Direction.OUTGOING;
+  private Direction incoming = Direction.INCOMING;
+  private Direction outgoing = Direction.OUTGOING;
 
   @Test
   public void componentSendsRequest() {

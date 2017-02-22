@@ -15,8 +15,8 @@ import se.sics.kompics.timer.Timer;
 import java.util.Comparator;
 
 public class EPFDTest {
-  private TestKit.Direction outgoing = TestKit.Direction.OUTGOING;
-  private TestKit.Direction incoming = TestKit.Direction.INCOMING;
+  private Direction outgoing = Direction.OUTGOING;
+  private Direction incoming = Direction.INCOMING;
   private ScheduleTimeout st = new ScheduleTimeout(500);
   private EPFD.PingTimeout timeout = new EPFD.PingTimeout(st);
 

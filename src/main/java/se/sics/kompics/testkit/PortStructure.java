@@ -57,7 +57,7 @@ class PortStructure<P extends PortType> {
   }
 
   void addIncomingHandler(Class<? extends KompicsEvent> eventType) {
-    if (hasEquivalentHandler(eventType, TestKit.Direction.INCOMING)) {
+    if (hasEquivalentHandler(eventType, Direction.INCOMING)) {
       // already have a capable handler for this event
 /*      logger.warn("ignoring unnecessary incoming handler");*/
       return;
@@ -69,7 +69,7 @@ class PortStructure<P extends PortType> {
   }
 
   void addOutgoingHandler(Class<? extends KompicsEvent> eventType) {
-    if (hasEquivalentHandler(eventType, TestKit.Direction.OUTGOING)) {
+    if (hasEquivalentHandler(eventType, Direction.OUTGOING)) {
       // already have a capable handler for this event
 /*      logger.warn("ignoring unnecessary outgoing handler");*/
       return;
@@ -87,8 +87,8 @@ class PortStructure<P extends PortType> {
   }
 
   private boolean hasEquivalentHandler(
-          Class<? extends KompicsEvent> eventType, TestKit.Direction direction) {
-    Collection<? extends Handler> handlers = direction == TestKit.Direction.INCOMING?
+          Class<? extends KompicsEvent> eventType, Direction direction) {
+    Collection<? extends Handler> handlers = direction == Direction.INCOMING?
             inboundHandlers : outBoundHandlers;
     for (Handler h : handlers) {
       if (h.getEventType().isAssignableFrom(eventType)) {

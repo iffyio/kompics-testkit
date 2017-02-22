@@ -25,7 +25,7 @@ class StateTable {
     predicateSpecs.put(state, predSpec);
   }
 
-  void printExpectedStateAt(int state) {
+  void printExpectedEventAt(int state) {
     FSM.logger.warn("{}: Expect\t{}", state,
             (predicateWasRegisteredForState(state)?
                predicateSpecs.get(state) : eventSpecs.get(state)));

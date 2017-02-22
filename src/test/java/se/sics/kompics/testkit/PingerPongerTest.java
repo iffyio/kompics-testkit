@@ -11,8 +11,8 @@ public class PingerPongerTest {
   private Component pinger2 = tc.create(Pinger.class, Init.NONE);
   private Component ponger = tc.create(Ponger.class, Init.NONE);
   private Component ponger2 = tc.create(Ponger.class, Init.NONE);
-  private TestKit.Direction incoming = TestKit.Direction.INCOMING;
-  private TestKit.Direction outgoing = TestKit.Direction.OUTGOING;
+  private Direction incoming = Direction.INCOMING;
+  private Direction outgoing = Direction.OUTGOING;
 
   @Test
   public void basicScenario() {

@@ -38,7 +38,7 @@ class InboundHandler extends ProxyHandler {
       Request request = (Request) event;
       request.pushPathElement(proxy.getComponentCore());
     }
-    EventSpec eventSpec = new EventSpec(event, destPort, TestKit.Direction.INCOMING);
+    EventSpec eventSpec = new EventSpec(event, destPort, Direction.INCOMING);
     eventSpec.setHandler(this);
     eventQueue.offer(eventSpec);
   }
