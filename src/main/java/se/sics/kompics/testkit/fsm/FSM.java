@@ -6,26 +6,24 @@ import org.slf4j.LoggerFactory;
 import se.sics.kompics.*;
 import se.sics.kompics.testkit.Direction;
 import se.sics.kompics.testkit.Proxy;
-import se.sics.kompics.testkit.TestCase;
+import se.sics.kompics.testkit.TestContext;
 
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Stack;
+import java.util.*;
 
 
 public class FSM {
   static final Logger logger = LoggerFactory.getLogger(FSM.class);
 
-  private final TestCase testCase;
+  private final TestContext testContext;
   static final int ERROR_STATE = -1;
   private int FINAL_STATE;
   private boolean STARTED = false;
   private String ERROR_MESSAGE = "";
 
-  private final EventQueue eventQueue;
   private final ComponentCore proxyComponent;
+  private Collection<Component> participants = new HashSet<>();
   private final Stack<Block> balancedRepeat = new Stack<>();
+  private final EventQueue eventQueue;
 
   private Map<Integer, Repeat> loops = new HashMap<>();
   private Map<Integer, Repeat> end = new HashMap<>();
@@ -38,10 +36,10 @@ public class FSM {
   private Block currentBlock;
   private int currentState = 0;
 
-  public FSM(Proxy proxy, TestCase testCase) {
+  public FSM(Proxy proxy, TestContext testContext) {
     this.eventQueue = proxy.getEventQueue();
     this.proxyComponent =  proxy.getComponentCore();
-    this.testCase = testCase;
+    this.testContext = testContext;
 
     initializeFSM();
   }
@@ -50,8 +48,11 @@ public class FSM {
     repeat(1);
   }
 
+  public void addParticipatingComponents(Component c) {
+    participants.add(c);
+  }
 
-  public <P extends  PortType, E extends KompicsEvent> void addDisallowedEvent(
+  public <P extends  PortType> void addDisallowedEvent(
           KompicsEvent event, Port<P> port, Direction direction) {
     assertInHeader();
     currentBlock.env.addDisallowedMessage(newEventSpec(event, port, direction));
@@ -69,11 +70,10 @@ public class FSM {
     currentBlock.env.addDroppedMessage(newEventSpec(event, port, direction));
   }
 
-  @SuppressWarnings("unchecked")
   private  <P extends  PortType, E extends KompicsEvent> EventSpec newEventSpec(
           KompicsEvent event, Port<P> port, Direction direction) {
     Comparator<E> c = (Comparator<E>) comparators.get(event.getClass());
-    return new EventSpec<E>((E) event, port, direction, c);
+    return new EventSpec<>((E) event, port, direction, c);
   }
 
   public int getFinalState() {
@@ -233,7 +233,7 @@ public class FSM {
     }
 
     logger.warn("{}: Asserting Component", currentState);
-    ComponentDefinition definitionUnderTest = testCase.getDefinitionUnderTest();
+    ComponentDefinition definitionUnderTest = testContext.getDefinitionUnderTest();
     //// TODO: 2/22/17 generify assertPred properly
     boolean successful = assertPred.apply(definitionUnderTest);
 
@@ -293,8 +293,8 @@ public class FSM {
   }
 
   private void runStartState() {
-    logger.warn("Sending Start to {} participant component(s)", testCase.getParticipatingComponents().size());
-    for (Component child : testCase.getParticipatingComponents()) {
+    logger.warn("Sending Start to {} participant component(s)", participants.size());
+    for (Component child : participants) {
       child.getControl().doTrigger(Start.event, 0, proxyComponent);
     }
   }

@@ -7,40 +7,38 @@ import se.sics.kompics.testkit.scheduler.CallingThreadScheduler;
 public class Proxy extends ComponentDefinition{
 
   private final EventQueue eventQueue = new EventQueue();
-  private ComponentDefinition cut;
-  Class<? extends ComponentDefinition> cutClass;
+  //private ComponentDefinition cut;
 
   <T extends ComponentDefinition>
-  Proxy(Class<T> cutClass, Init<T> initEvent) {
-    // // TODO: 2/8/17 nosuchmethodexception with initEvent when Init.NONE
-    //cut = create(cutClass, initEvent).getComponent();
-    this.cutClass = cutClass;
+  Proxy() {
     getComponentCore().setScheduler(new CallingThreadScheduler());
   }
 
-  void createComponentUnderTest() {
-    cut = create(cutClass, Init.NONE).getComponent();
+  <T extends ComponentDefinition> ComponentDefinition createComponentUnderTest(
+          Class<T> definition, Init<T> initEvent) {
+    return create(definition, initEvent).getComponent();
   }
 
-  ComponentDefinition getCut() {
-    return cut;
+  <T extends ComponentDefinition> ComponentDefinition createComponentUnderTest(
+          Class<T> definition, Init.None initEvent) {
+     return create(definition, initEvent).getComponent();
   }
 
   public EventQueue getEventQueue() {
     return eventQueue;
   }
 
-  <T extends ComponentDefinition> Component createNewSetupComponent(Class<T> cClass, Init<T> initEvent) {
-    Component x = create(cClass, initEvent);
-    x.getComponent().getComponentCore().setScheduler(null);
-    Kompics.logger.warn("created: {}, state is {}", x, x.state());
-    return x;
+  <T extends ComponentDefinition> Component createSetupComponent(Class<T> cClass, Init<T> initEvent) {
+    Component c = create(cClass, initEvent);
+    // only proxy is scheduled on calling thread
+    c.getComponent().getComponentCore().setScheduler(null);
+    return c;
   }
 
-  <T extends ComponentDefinition> Component createNewSetupComponent(Class<T> cClass, Init.None initEvent) {
-    Component x = create(cClass, initEvent);
-    x.getComponent().getComponentCore().setScheduler(null);
-    return x;
+  <T extends ComponentDefinition> Component createSetupComponent(Class<T> cClass, Init.None initEvent) {
+    Component c = create(cClass, initEvent);
+    c.getComponent().getComponentCore().setScheduler(null);
+    return c;
   }
   <P extends PortType> Negative<P> provideProxy(Class<P> portType) {
     return provides(portType);
