@@ -31,13 +31,12 @@ class InboundHandler extends ProxyHandler {
     if (event instanceof Response) {
       Response response = (Response) event;
       assert response.getTopPathElementFirst().getComponent() == destPort.getPair().getOwner();
-    }
-
-    if (event instanceof Request) {
+    } else if (event instanceof Request) {
       Request request = (Request) event;
       request.pushPathElement(proxy.getComponentCore());
     }
-    EventSpec eventSpec = new EventSpec(event, destPort, Direction.INCOMING);
+
+    EventSpec eventSpec = new EventSpec<>(event, destPort, Direction.INCOMING);
     eventSpec.setHandler(this);
     eventQueue.offer(eventSpec);
   }

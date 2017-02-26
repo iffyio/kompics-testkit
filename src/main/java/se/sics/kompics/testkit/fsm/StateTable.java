@@ -54,7 +54,7 @@ class StateTable {
     return predicateSpecs.containsKey(state);
   }
 
-  @SuppressWarnings("unchecked")
+  //@SuppressWarnings("unchecked")
   private Action predicateLookup(int state, EventSpec eventSpec) {
     PredicateSpec predSpec = predicateSpecs.get(state);
     KompicsEvent receivedEvent = eventSpec.getEvent();

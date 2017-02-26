@@ -8,16 +8,16 @@ public class Testkit {
 
   private Testkit() {}
 
-  public static <T extends ComponentDefinition> TestContext newTestContext(
+  public static <T extends ComponentDefinition> TestContext<T> newTestContext(
          Class<T> definition, Init<T> initEvent) {
     checkNotNull(definition, initEvent);
-    return new TestContext(definition, initEvent);
+    return new TestContext<>(definition, initEvent);
   }
 
-  public static <T extends ComponentDefinition> TestContext newTestContext(
+  public static <T extends ComponentDefinition> TestContext<T> newTestContext(
           Class<T> definition, Init.None initEvent) {
     checkNotNull(definition, initEvent);
-    return new TestContext(definition, initEvent);
+    return new TestContext<>(definition, initEvent);
   }
 
   static void checkNotNull(Object... objects) {

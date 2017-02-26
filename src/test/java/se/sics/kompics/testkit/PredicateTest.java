@@ -9,7 +9,7 @@ import static junit.framework.Assert.assertEquals;
 
 public class PredicateTest {
 
-  private TestCase tc = TestKit.newTestCase(Pinger.class, Init.NONE);
+  private TestContext<Pinger> tc = Testkit.newTestContext(Pinger.class, Init.NONE);
   private Component pinger = tc.getComponentUnderTest();
   private Component ponger = tc.create(Ponger.class, Init.NONE);
   private Direction incoming = Direction.INCOMING;
@@ -35,7 +35,7 @@ public class PredicateTest {
         repeat(1).
           disallow(new Pong(5), pingerNegative, incoming).
           disallow(new Pong(15), pingerNegative, incoming).
-          conditionalDrop(new Pong(60), pingerNegative, incoming).
+            drop(new Pong(60), pingerNegative, incoming).
           body().
               repeat(1).
                 allow(new Pong(5), pingerNegative, incoming).

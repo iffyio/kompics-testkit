@@ -8,7 +8,7 @@ import static junit.framework.Assert.assertEquals;
 
 public class AssertComponentTest {
 
-  private TestCase tc = TestKit.newTestCase(Pinger.class, Init.NONE);
+  private TestContext<Pinger> tc = Testkit.newTestContext(Pinger.class, Init.NONE);
   private Component pinger = tc.getComponentUnderTest();
   private Component ponger = tc.create(Ponger.class, Init.NONE);
   private Direction incoming = Direction.INCOMING;
@@ -25,7 +25,6 @@ public class AssertComponentTest {
         assertComponentState(expectedPings).
         expect(pong, pinger.getNegative(PingPongPort.class), incoming).
         assertComponentState(expectedPongs).
-        //assertComponentState(pongerPredicate).
        end();
 
     assertEquals(tc.check(), tc.getFinalState());

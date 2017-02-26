@@ -1,6 +1,5 @@
 package se.sics.kompics.testkit;
 
-import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import se.sics.kompics.*;
 import se.sics.kompics.scheduler.ThreadPoolScheduler;
@@ -9,12 +8,12 @@ import se.sics.kompics.testkit.fsm.FSM;
 import java.util.Comparator;
 
 
-public class TestContext {
+public class TestContext<T extends ComponentDefinition> {
   private final Proxy proxy;
   private final ComponentCore proxyComponent;
   private final PortConfig portConfig;
-  private ComponentDefinition cut;
-  private FSM fsm;
+  private T cut;
+  private FSM<T> fsm;
   private Scheduler scheduler;
   private boolean checked;
 
@@ -25,18 +24,18 @@ public class TestContext {
     portConfig = new PortConfig(proxy);
   }
 
-  <T extends ComponentDefinition> TestContext(Class<T> definition, Init<T> initEvent) {
+  TestContext(Class<T> definition, Init<T> initEvent) {
     this();
     init();
     cut = proxy.createComponentUnderTest(definition, initEvent);
-    fsm.addParticipatingComponents(cut.getComponentCore());
+    initFSM();
   }
 
-  <T extends ComponentDefinition> TestContext(Class<T> definition, Init.None initEvent) {
+  TestContext(Class<T> definition, Init.None initEvent) {
     this();
     init();
     cut = proxy.createComponentUnderTest(definition, initEvent);
-    fsm.addParticipatingComponents(cut.getComponentCore());
+    initFSM();
   }
 
   public <T extends ComponentDefinition> Component create(
@@ -56,20 +55,20 @@ public class TestContext {
   }
 
   // // TODO: 2/8/17 connect with channelSelector
-  public <P extends PortType> TestContext connect(Negative<P> negative, Positive<P> positive) {
+  public <P extends PortType> TestContext<T> connect(Negative<P> negative, Positive<P> positive) {
     return connect(positive, negative);
   }
 
-  public <P extends PortType> TestContext connect(Positive<P> positive, Negative<P> negative) {
+  public <P extends PortType> TestContext<T> connect(Positive<P> positive, Negative<P> negative) {
     return connect(positive, negative, Channel.TWO_WAY);
   }
 
-  <P extends PortType> TestContext connect(
+  <P extends PortType> TestContext<T> connect(
           Negative<P> negative, Positive<P> positive, ChannelFactory factory) {
     return connect(positive, negative, factory);
   }
 
-  <P extends PortType> TestContext connect(
+  <P extends PortType> TestContext<T> connect(
           Positive<P> positive, Negative<P> negative, ChannelFactory factory) {
     Testkit.checkNotNull(positive, negative, factory);
 
@@ -94,22 +93,22 @@ public class TestContext {
   }
 
 
-  public TestContext repeat(int times) {
+  public TestContext<T> repeat(int times) {
     fsm.repeat(times);
     return this;
   }
 
-  public TestContext end() {
+  public TestContext<T> end() {
     fsm.endRepeat();
     return this;
   }
 
-  public TestContext body() {
+  public TestContext<T> body() {
     fsm.body();
     return this;
   }
 
-  public <P extends  PortType> TestContext expect(
+  public <P extends  PortType> TestContext<T> expect(
           KompicsEvent event, Port<P> port, Direction direction) {
     Testkit.checkNotNull(event, port, direction);
     configurePort(event.getClass(), port, direction);
@@ -117,7 +116,7 @@ public class TestContext {
     return this;
   }
 
-  public <P extends  PortType, E extends KompicsEvent> TestContext expect(
+  public <P extends  PortType, E extends KompicsEvent> TestContext<T> expect(
           Class<E> eventType, Predicate<E> pred, Port<P> port, Direction direction) {
     Testkit.checkNotNull(eventType, port, direction);
     configurePort(eventType, port, direction);
@@ -126,7 +125,7 @@ public class TestContext {
   }
 
 
-  public <P extends PortType> TestContext trigger(
+  public <P extends PortType> TestContext<T> trigger(
           KompicsEvent event, Port<P> port) {
     Testkit.checkNotNull(event, port);
     if (port.getOwner() == cut.getComponentCore()) {
@@ -136,7 +135,7 @@ public class TestContext {
     return this;
   }
 
-  public <P extends  PortType> TestContext disallow(
+  public <P extends  PortType> TestContext<T> disallow(
             KompicsEvent event, Port<P> port, Direction direction) {
     Testkit.checkNotNull(event, port, direction);
     configurePort(event.getClass(), port, direction);
@@ -144,7 +143,7 @@ public class TestContext {
     return this;
   }
 
-  public <P extends  PortType> TestContext allow(
+  public <P extends  PortType> TestContext<T> allow(
             KompicsEvent event, Port<P> port, Direction direction) {
     Testkit.checkNotNull(event, port, direction);
     configurePort(event.getClass(), port, direction);
@@ -152,7 +151,7 @@ public class TestContext {
     return this;
   }
 
-  public <P extends  PortType> TestContext drop(
+  public <P extends  PortType> TestContext<T> drop(
             KompicsEvent event, Port<P> port, Direction direction) {
     Testkit.checkNotNull(event, port, direction);
     configurePort(event.getClass(), port, direction);
@@ -160,7 +159,7 @@ public class TestContext {
     return this;
   }
 
-  public <E extends KompicsEvent> TestContext addComparator(
+  public <E extends KompicsEvent> TestContext<T> addComparator(
           Class<E> eventType, Comparator<E> comparator) {
     Testkit.checkNotNull(eventType, comparator);
     fsm.addComparator(eventType, comparator);
@@ -171,13 +170,9 @@ public class TestContext {
     return cut.getComponentCore();
   }
 
-  public ComponentDefinition getDefinitionUnderTest() {
-    return cut;
-  }
-
   // capture component type to verify predicate
-  public TestContext assertComponentState(
-          Predicate<? extends ComponentDefinition> assertPred) {
+  public TestContext<T> assertComponentState(
+          Predicate<T> assertPred) {
     Testkit.checkNotNull(assertPred);
     fsm.addAssertComponent(assertPred);
     return this;
@@ -199,8 +194,8 @@ public class TestContext {
   }
 
   // PRIVATE
-  private <T extends ComponentDefinition> void init() {
-    fsm = new FSM(proxy, this);
+  private void init() {
+    //fsm = new FSM<>(proxy, cut, this);
 
     // default scheduler
     scheduler = new ThreadPoolScheduler(1);
@@ -210,6 +205,11 @@ public class TestContext {
     proxyComponent.getControl().doTrigger(Start.event, 0, proxyComponent);
     assert proxyComponent.state() == Component.State.ACTIVE;
 
+  }
+
+  private void initFSM() {
+    fsm = new FSM<>(proxy, cut);
+    fsm.addParticipatingComponents(cut.getComponentCore());
   }
 
   private <P extends PortType> void registerConnectedPort(

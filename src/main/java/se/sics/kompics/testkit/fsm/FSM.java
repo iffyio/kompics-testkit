@@ -11,10 +11,10 @@ import se.sics.kompics.testkit.TestContext;
 import java.util.*;
 
 
-public class FSM {
+public class FSM<T extends ComponentDefinition> {
   static final Logger logger = LoggerFactory.getLogger(FSM.class);
 
-  private final TestContext testContext;
+  private final T definitionUnderTest;
   static final int ERROR_STATE = -1;
   private int FINAL_STATE;
   private boolean STARTED = false;
@@ -28,7 +28,7 @@ public class FSM {
   private Map<Integer, Repeat> loops = new HashMap<>();
   private Map<Integer, Repeat> end = new HashMap<>();
   private Map<Integer, Trigger> triggeredEvents = new HashMap<>();
-  private Map<Integer, Predicate<? extends ComponentDefinition>> assertPredicates = new HashMap<>();
+  private Map<Integer, Predicate<T>> assertPredicates = new HashMap<>();
 
   private ComparatorMap comparators = new ComparatorMap();
   private StateTable table = new StateTable();
@@ -36,10 +36,10 @@ public class FSM {
   private Block currentBlock;
   private int currentState = 0;
 
-  public FSM(Proxy proxy, TestContext testContext) {
+  public FSM(Proxy proxy, T definition) {
     this.eventQueue = proxy.getEventQueue();
     this.proxyComponent =  proxy.getComponentCore();
-    this.testContext = testContext;
+    definitionUnderTest = definition;
 
     initializeFSM();
   }
@@ -161,7 +161,7 @@ public class FSM {
     comparators.put(eventType, comparator);
   }
 
-  public void addAssertComponent(Predicate<? extends ComponentDefinition> assertPred) {
+  public void addAssertComponent(Predicate<T> assertPred) {
     assertPredicates.put(currentState, assertPred);
     currentState++;
   }
@@ -227,13 +227,12 @@ public class FSM {
   }
 
   private boolean assertedComponent() {
-    Predicate assertPred = assertPredicates.get(currentState);
+    Predicate<T> assertPred = assertPredicates.get(currentState);
     if (assertPred == null) {
       return false;
     }
 
     logger.warn("{}: Asserting Component", currentState);
-    ComponentDefinition definitionUnderTest = testContext.getDefinitionUnderTest();
     //// TODO: 2/22/17 generify assertPred properly
     boolean successful = assertPred.apply(definitionUnderTest);
 
@@ -246,7 +245,7 @@ public class FSM {
     return true;
   }
 
-  @SuppressWarnings("unchecked")
+  //@SuppressWarnings("unchecked")
   private void setComparatorForEvent(EventSpec eventSpec) {
     eventSpec.setComparator(comparators.get(eventSpec.getEvent().getClass()));
   }

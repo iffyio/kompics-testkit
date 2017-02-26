@@ -11,7 +11,7 @@ public class RequestResponseTest {
   private static boolean replyAfterNPongs = false;
   private static int numberOfRequiredPongs = 2;
 
-  private TestCase tc;
+  private TestContext tc;
   private Component pinger;
   private Component pinger2;
   private Component ponger;
@@ -23,7 +23,7 @@ public class RequestResponseTest {
   @Test
   public void componentSendsRequest() {
     replyAfterNPongs = true;
-    tc = TestKit.newTestCase(Pinger.class, Init.NONE);
+    tc = Testkit.newTestContext(Pinger.class, Init.NONE);
     pinger = tc.getComponentUnderTest();
     pinger2 = tc.create(Pinger.class, Init.NONE);
     ponger = tc.create(Ponger.class, Init.NONE);
@@ -51,7 +51,7 @@ public class RequestResponseTest {
   public void componentSendsResponse() {
     replyAfterNPongs = false;
 
-    tc = TestKit.newTestCase(Ponger.class, Init.NONE);
+    tc = Testkit.newTestContext(Ponger.class, Init.NONE);
     ponger = tc.getComponentUnderTest();
     ponger2 = tc.create(Ponger.class, Init.NONE);
     pinger = tc.create(Pinger.class, Init.NONE);

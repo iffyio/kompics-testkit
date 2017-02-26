@@ -6,7 +6,7 @@ import se.sics.kompics.*;
 
 public class PingerPongerTest {
 
-  private TestCase tc = TestKit.newTestCase(Pinger.class, Init.NONE);
+  private TestContext<Pinger> tc = Testkit.newTestContext(Pinger.class, Init.NONE);
   private Component pinger = tc.getComponentUnderTest();
   private Component pinger2 = tc.create(Pinger.class, Init.NONE);
   private Component ponger = tc.create(Ponger.class, Init.NONE);

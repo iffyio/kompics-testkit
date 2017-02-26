@@ -27,7 +27,7 @@ public class EPFDTest {
   private Suspect suspect = new Suspect(pongerAddr);
   private Restore restore = new Restore(pongerAddr);
 
-  private TestCase tc = TestKit.newTestCase(EPFD.class, Init.NONE);
+  private TestContext<EPFD> tc = Testkit.newTestContext(EPFD.class, Init.NONE);
   private Component ponger = tc.create(Ponger.class, Init.NONE);
   private Component epfd = tc.getComponentUnderTest();
 
@@ -105,7 +105,7 @@ public class EPFDTest {
 
     // drop Pongs within scope, then timeout and suspect
     tc.repeat(100).
-            conditionalDrop(pong, epfd.getNegative(Network.class), incoming).
+            drop(pong, epfd.getNegative(Network.class), incoming).
             body().
             trigger(timeout, epfd.getNegative(Timer.class)).
             expect(suspect, epfd.getPositive(EPFDPort.class), outgoing). // resuspect
