@@ -41,7 +41,7 @@ public class TestContext {
 
   public <T extends ComponentDefinition> Component create(
           Class<T> definition, Init<T> initEvent) {
-    checkNotNull(definition, initEvent);
+    Testkit.checkNotNull(definition, initEvent);
     Component c = proxy.createSetupComponent(definition, initEvent);
     fsm.addParticipatingComponents(c);
     return c;
@@ -49,13 +49,13 @@ public class TestContext {
 
   public <T extends ComponentDefinition> Component create(
           Class<T> definition, Init.None initEvent) {
-    checkNotNull(definition, initEvent);
+    Testkit.checkNotNull(definition, initEvent);
     Component c = proxy.createSetupComponent(definition, initEvent);
     fsm.addParticipatingComponents(c);
     return c;
   }
 
-  // // TODO: 2/8/17 connect with channel, channelSelector
+  // // TODO: 2/8/17 connect with channelSelector
   public <P extends PortType> TestContext connect(Negative<P> negative, Positive<P> positive) {
     return connect(positive, negative);
   }
@@ -71,7 +71,7 @@ public class TestContext {
 
   <P extends PortType> TestContext connect(
           Positive<P> positive, Negative<P> negative, ChannelFactory factory) {
-    checkNotNull(positive, negative, factory);
+    Testkit.checkNotNull(positive, negative, factory);
 
     boolean cutOwnsPositive = positive.getPair().getOwner() == cut.getComponentCore();
     boolean cutOwnsNegative = negative.getPair().getOwner() == cut.getComponentCore();
@@ -111,7 +111,7 @@ public class TestContext {
 
   public <P extends  PortType> TestContext expect(
           KompicsEvent event, Port<P> port, Direction direction) {
-    checkNotNull(event, port, direction);
+    Testkit.checkNotNull(event, port, direction);
     configurePort(event.getClass(), port, direction);
     fsm.expectMessage(event, port, direction);
     return this;
@@ -119,7 +119,7 @@ public class TestContext {
 
   public <P extends  PortType, E extends KompicsEvent> TestContext expect(
           Class<E> eventType, Predicate<E> pred, Port<P> port, Direction direction) {
-    checkNotNull(eventType, port, direction);
+    Testkit.checkNotNull(eventType, port, direction);
     configurePort(eventType, port, direction);
     fsm.expectMessage(eventType, pred, port, direction);
     return this;
@@ -128,7 +128,7 @@ public class TestContext {
 
   public <P extends PortType> TestContext trigger(
           KompicsEvent event, Port<P> port) {
-    checkNotNull(event, port);
+    Testkit.checkNotNull(event, port);
     if (port.getOwner() == cut.getComponentCore()) {
       throw new IllegalStateException("Triggers are not allowed on component being tested");
     }
@@ -138,7 +138,7 @@ public class TestContext {
 
   public <P extends  PortType> TestContext disallow(
             KompicsEvent event, Port<P> port, Direction direction) {
-    checkNotNull(event, port, direction);
+    Testkit.checkNotNull(event, port, direction);
     configurePort(event.getClass(), port, direction);
     fsm.addDisallowedEvent(event, port, direction);
     return this;
@@ -146,7 +146,7 @@ public class TestContext {
 
   public <P extends  PortType> TestContext allow(
             KompicsEvent event, Port<P> port, Direction direction) {
-    checkNotNull(event, port, direction);
+    Testkit.checkNotNull(event, port, direction);
     configurePort(event.getClass(), port, direction);
     fsm.addAllowedEvent(event, port, direction);
     return this;
@@ -154,7 +154,7 @@ public class TestContext {
 
   public <P extends  PortType> TestContext drop(
             KompicsEvent event, Port<P> port, Direction direction) {
-    checkNotNull(event, port, direction);
+    Testkit.checkNotNull(event, port, direction);
     configurePort(event.getClass(), port, direction);
     fsm.addDroppedEvent(event, port, direction);
     return this;
@@ -162,7 +162,7 @@ public class TestContext {
 
   public <E extends KompicsEvent> TestContext addComparator(
           Class<E> eventType, Comparator<E> comparator) {
-    checkNotNull(eventType, comparator);
+    Testkit.checkNotNull(eventType, comparator);
     fsm.addComparator(eventType, comparator);
     return this;
   }
@@ -178,7 +178,7 @@ public class TestContext {
   // capture component type to verify predicate
   public TestContext assertComponentState(
           Predicate<? extends ComponentDefinition> assertPred) {
-    checkNotNull(assertPred);
+    Testkit.checkNotNull(assertPred);
     fsm.addAssertComponent(assertPred);
     return this;
   }
@@ -221,7 +221,6 @@ public class TestContext {
   private <P extends  PortType> void configurePort(
           Class<? extends KompicsEvent> eventType, Port<P> port, Direction direction) {
     if (port.getOwner() != proxyComponent || port.getPair().getOwner() != cut.getComponentCore()) {
-      // // TODO: 2/8/17 support inside ports as well
       throw new UnsupportedOperationException("Watching messages are allowed on the tested component's ports " + port);
     }
     PortStructure<P> portStruct = portConfig.get(port);
@@ -240,12 +239,6 @@ public class TestContext {
     } else if (direction == Direction.INCOMING){
       // register incoming handler
       portStruct.addIncomingHandler(eventType);
-    }
-  }
-
-  private void checkNotNull(Object... objects) {
-    for (Object o : objects) {
-      Preconditions.checkNotNull(o);
     }
   }
 }

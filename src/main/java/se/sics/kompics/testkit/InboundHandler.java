@@ -28,7 +28,6 @@ class InboundHandler extends ProxyHandler {
   @Override
   public void handle(KompicsEvent event) {
     //logger.warn("received event: {}", event);
-    // // TODO: 2/21/17 uncomment assertion
     if (event instanceof Response) {
       Response response = (Response) event;
       assert response.getTopPathElementFirst().getComponent() == destPort.getPair().getOwner();
