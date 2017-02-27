@@ -99,4 +99,8 @@ class PortStructure<P extends PortType> {
     return false;
   }
 
+  boolean isMockedPort() {
+    return isMockedPort;
+  }
+
 }

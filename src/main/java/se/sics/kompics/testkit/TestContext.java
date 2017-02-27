@@ -226,17 +226,16 @@ public class TestContext<T extends ComponentDefinition> {
     PortStructure<P> portStruct = portConfig.get(port);
 
     if (portStruct == null) {
-      if (direction == Direction.INCOMING) {
-        throw new IllegalStateException("Can not watch incoming message on an unconnected port " + port);
-      } else {
         portStruct = portConfig.create(port);
-      }
     }
 
     if (direction == Direction.OUTGOING) {
       // register outgoing handler
       portStruct.addOutgoingHandler(eventType);
     } else if (direction == Direction.INCOMING){
+      if (portStruct.isMockedPort()) {
+        throw new IllegalStateException("Cannot watch incoming message on an unconnected port " + port);
+      }
       // register incoming handler
       portStruct.addIncomingHandler(eventType);
     }
