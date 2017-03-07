@@ -1,30 +1,52 @@
 package se.sics.kompics.testkit.fsm;
 
+import se.sics.kompics.testkit.LoopInit;
+
 class Repeat {
 
   // // TODO: 2/17/17 make this private
-  final int times, index;
+  final int times, stateIndex;
   private int currentCount;
+  private LoopInit loopInit, iterationInit;
 
-  Repeat(int times, int index) {
+  Repeat(int times, int stateIndex) {
     this.times = times;
-    this.index = index;
+    this.stateIndex = stateIndex;
+  }
+
+  Repeat(int times, int stateIndex, LoopInit loopInit) {
+    this(times, stateIndex);
+    this.loopInit = loopInit;
   }
 
   void initialize() {
     currentCount = times;
+
+    if (loopInit != null) {
+      loopInit.init();
+    }
+
+    runIterationInit();
+  }
+
+  void setIterationInit(LoopInit iterationInit) {
+    this.iterationInit = iterationInit;
   }
 
   int getCurrentCount() {
     return currentCount;
   }
 
-  int getIndex() {
-    return index;
+  int getStateIndex() {
+    return stateIndex;
   }
 
   void iterationComplete() {
     currentCount--;
+
+    if (hasMoreIterations()) {
+      runIterationInit();
+    }
   }
 
   boolean hasMoreIterations() {
@@ -32,6 +54,12 @@ class Repeat {
   }
 
   int indexOfFirstState() {
-    return index + 1;
+    return stateIndex + 1;
+  }
+
+  private void runIterationInit() {
+    if (iterationInit != null) {
+      iterationInit.init();
+    }
   }
 }

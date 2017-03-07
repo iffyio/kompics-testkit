@@ -98,6 +98,17 @@ public class TestContext<T extends ComponentDefinition> {
     return this;
   }
 
+  public TestContext<T> repeat(int times, LoopInit init) {
+    fsm.repeat(times, init);
+    return this;
+  }
+
+  public TestContext<T> onEachIteration(LoopInit iterationInit) {
+    Testkit.checkNotNull(iterationInit);
+    fsm.setIterationInit(iterationInit);
+    return this;
+  }
+
   public TestContext<T> end() {
     fsm.endRepeat();
     return this;

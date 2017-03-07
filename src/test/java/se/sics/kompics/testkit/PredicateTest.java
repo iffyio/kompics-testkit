@@ -26,6 +26,7 @@ public class PredicateTest {
       addComparator(Ping.class, new PingComparator()).
       disallow(new Pong(1), pingerNegative, incoming).
       allow(new Pong(3), pingerNegative, incoming).
+
       body().
         expect(new Ping(1), pingerNegative, outgoing).
         expect(Pong.class, pongPredicate(2), pingerNegative, incoming).
@@ -33,14 +34,17 @@ public class PredicateTest {
         expect(new Pong(3), pingerNegative, incoming).
 
         repeat(1).
+
           disallow(new Pong(5), pingerNegative, incoming).
           disallow(new Pong(15), pingerNegative, incoming).
-            drop(new Pong(60), pingerNegative, incoming).
+          drop(new Pong(60), pingerNegative, incoming).
+
           body().
               repeat(1).
                 allow(new Pong(5), pingerNegative, incoming).
                 allow(new Pong(15), pingerNegative, incoming).
                 body().
+
                 trigger(new Pong(5), pongerPositive.getPair()).
                 trigger(new Pong(6), pongerPositive.getPair()).
                 expect(Pong.class, pongPredicate(6), pingerNegative, incoming).
@@ -93,11 +97,7 @@ public class PredicateTest {
 
     @Override
     public int compare(Pong p1, Pong p2) {
-      if (p1.count == p2.count) {
-        return 0;
-      } else {
-        return -1;
-      }
+      return p1.count - p2.count;
     }
 
     @Override
@@ -166,6 +166,7 @@ public class PredicateTest {
       return "Ping " + count;
     }
   }
+
   public static class Pong implements KompicsEvent{
     int count = 0;
     Pong(int count) {

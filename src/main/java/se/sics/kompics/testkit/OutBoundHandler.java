@@ -42,7 +42,7 @@ class OutBoundHandler extends ProxyHandler {
   @Override
   public void doHandle(KompicsEvent event) {
     if (event instanceof Response) {
-      deliverToSingleChannel(event);
+      deliverToSingleChannel((Response) event);
     } else {
       deliverToAllConnectedPorts(event);
     }
@@ -54,16 +54,15 @@ class OutBoundHandler extends ProxyHandler {
     }
   }
 
-  private void deliverToSingleChannel(KompicsEvent event) {
-    Response response = (Response) event;
+  private void deliverToSingleChannel(Response response) {
     RequestPathElement pe = response.getTopPathElement();
     if (pe != null && pe.isChannel()) {
       ChannelCore<?> caller = pe.getChannel();
-      // // TODO: 2/21/17 getIsPositive does not belong in Kompics core
-      if (((PortCore)sourcePort).getIsPositive()) {
-        caller.forwardToNegative(event, 0);
+      // // TODO: 2/21/17 isPositivePort does not belong in Kompics core
+      if (((PortCore)sourcePort).isPositivePort()) {
+        caller.forwardToNegative(response, 0);
       } else {
-        caller.forwardToPositive(event, 0);
+        caller.forwardToPositive(response, 0);
       }
     }
   }

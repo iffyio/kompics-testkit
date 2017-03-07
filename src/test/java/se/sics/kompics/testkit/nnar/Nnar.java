@@ -27,7 +27,7 @@ public class Nnar extends ComponentDefinition{
   private Register register;
   private int acks = 0;
   private Integer writeval = null;
-  private int rid = 0;
+  public int rid = 0;
   private Map<TAddress, Register> readlist = new HashMap<>();
   private Integer readval = null;
   private boolean reading = false;

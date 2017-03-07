@@ -1,5 +1,6 @@
 package se.sics.kompics.testkit;
 
+import com.google.common.base.Predicate;
 import org.junit.Test;
 import se.sics.kompics.Component;
 import se.sics.kompics.network.Network;
@@ -26,7 +27,19 @@ public class NnarTest {
   private String[] names = {"p", "q", "r", "s"};
 
   {
+    init();
+  }
+
+  private void init() {
     setAddresses();
+
+    tc = Testkit.newTestContext(Nnar.class, new Nnar.Init(pAddr));
+    p = tc.getComponentUnderTest();
+    setup(pAddr, p);
+
+/*    q = createURBComponent(qAddr);
+    r = createURBComponent(rAddr);
+    s = createURBComponent(sAddr);*/
   }
 
   private void setAddresses() {
@@ -53,20 +66,11 @@ public class NnarTest {
     sAddr = addresses[3];*/
   }
 
+  private ReadRequest rr1 = readRequest(pAddr, pAddr, 1);
+  private Register reg0 = new Register(0, 0, 0);
 
   @Test
-  public void run() {
-    tc = Testkit.newTestContext(Nnar.class, new Nnar.Init(pAddr));
-    p = tc.getComponentUnderTest();
-    setup(pAddr, p);
-
-/*    q = createURBComponent(qAddr);
-    r = createURBComponent(rAddr);
-    s = createURBComponent(sAddr);*/
-
-    ReadRequest rr1 = readRequest(pAddr, pAddr, 1);
-    Register reg0 = new Register(0, 0, 0);
-
+  public void terminationRead() {
     tc.addComparator(ReadRequest.class, new ReadRequestComparator()).
        addComparator(ReadValue.class, new ReadValueComparator()).
        addComparator(WriteRequest.class, new WriteRequestComparator()).
@@ -75,6 +79,9 @@ public class NnarTest {
 
       body().
       trigger(new Read(), p.getPositive(NnarPort.class)).
+
+      assertComponentState(ridWasIncremented).
+
       expect(rr1, p.getNegative(Network.class), outgoing).
       expect(rr1, p.getNegative(Network.class), incoming).
 
@@ -85,11 +92,28 @@ public class NnarTest {
       expect(writeRequest(pAddr, pAddr, 1, reg0), p.getNegative(Network.class), incoming).
 
       expect(ack(pAddr, pAddr, 1), p.getNegative(Network.class), outgoing).
-      expect(ack(pAddr, pAddr, 1), p.getNegative(Network.class), incoming).
+      expect(Ack.class, ack1Predicate, p.getNegative(Network.class), incoming).
+
       expect(new ReadReturn(0), p.getPositive(NnarPort.class), outgoing);
 
     assertEquals(tc.check(), tc.getFinalState());
   }
+
+  private Predicate<Nnar> ridWasIncremented = new Predicate<Nnar>() {
+    int rid = 0;
+    @Override
+    public boolean apply(Nnar nnar) {
+      rid++;
+      return nnar.rid == rid;
+    }
+  };
+
+  private Predicate<Ack> ack1Predicate = new Predicate<Ack>() {
+    @Override
+    public boolean apply(Ack ack) {
+      return ack.rid == 1;
+    }
+  };
 
   private class ReadReturnComparator implements Comparator<ReadReturn> {
 

@@ -5,8 +5,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import se.sics.kompics.*;
 import se.sics.kompics.testkit.Direction;
+import se.sics.kompics.testkit.LoopInit;
 import se.sics.kompics.testkit.Proxy;
-import se.sics.kompics.testkit.TestContext;
 
 import java.util.*;
 
@@ -81,19 +81,32 @@ public class FSM<T extends ComponentDefinition> {
   }
 
   public void repeat(int times) {
+    Repeat repeat = new Repeat(times, currentState);
+    addRepeat(repeat);
+  }
+
+  public void repeat(int times, LoopInit init) {
+    Repeat repeat = new Repeat(times, currentState, init);
+    addRepeat(repeat);
+  }
+
+  private void addRepeat(Repeat repeat) {
     assertInBody();
 
-    if (times <= 0) {
+    if (repeat.times <= 0) {
       throw new IllegalArgumentException("only positive value allowed for repeat");
     }
-
-    Repeat repeat = new Repeat(times, currentState);
 
     currentBlock = new Block(repeat, currentBlock);
     balancedRepeat.push(currentBlock);
 
     loops.put(currentState, repeat);
     currentState++;
+  }
+
+  public void setIterationInit(LoopInit iterationInit) {
+    assertInHeader();
+    currentBlock.repeat.setIterationInit(iterationInit);
   }
 
   public void body() {
@@ -130,10 +143,10 @@ public class FSM<T extends ComponentDefinition> {
   }
 
   private boolean currentRepeatBlockIsEmpty() {
-    // compare current index with startOfLoop index
+    // compare current stateIndex with startOfLoop stateIndex
     return  balancedRepeat.isEmpty() ||
             // no state was added since start of loop
-            balancedRepeat.peek().repeat.getIndex() == currentState - 1;
+            balancedRepeat.peek().repeat.getStateIndex() == currentState - 1;
   }
 
 
@@ -233,7 +246,6 @@ public class FSM<T extends ComponentDefinition> {
     }
 
     logger.warn("{}: Asserting Component", currentState);
-    //// TODO: 2/22/17 generify assertPred properly
     boolean successful = assertPred.apply(definitionUnderTest);
 
     if (!successful) {
@@ -269,7 +281,9 @@ public class FSM<T extends ComponentDefinition> {
       return false;
     } else {
       loop.initialize();
+
       logger.warn("{}: repeat({})\t", currentState, loop.getCurrentCount());
+
       currentState++;
       return true;
     }
@@ -282,12 +296,15 @@ public class FSM<T extends ComponentDefinition> {
     }
 
     logger.warn("{}: end({})\t", currentState, loop.times);
+
     loop.iterationComplete();
+
     if (loop.hasMoreIterations()) {
       currentState = loop.indexOfFirstState();
     } else {
       currentState++;
     }
+
     return true;
   }
 

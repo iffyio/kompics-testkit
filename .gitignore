@@ -6,4 +6,5 @@ src/main/java/se/sics/kompics/*.java
 src/main/java/se/sics/kompics/*/
 !src/main/java/se/sics/kompics/testkit/
 kompics-changelog.txt
+spam.txt
 

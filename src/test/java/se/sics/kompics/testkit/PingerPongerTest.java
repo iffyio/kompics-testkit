@@ -8,64 +8,63 @@ public class PingerPongerTest {
 
   private TestContext<Pinger> tc = Testkit.newTestContext(Pinger.class, Init.NONE);
   private Component pinger = tc.getComponentUnderTest();
-  private Component pinger2 = tc.create(Pinger.class, Init.NONE);
   private Component ponger = tc.create(Ponger.class, Init.NONE);
-  private Component ponger2 = tc.create(Ponger.class, Init.NONE);
   private Direction incoming = Direction.INCOMING;
   private Direction outgoing = Direction.OUTGOING;
 
+  private Ping ping = new Ping(0);
+  private Pong pong = new Pong(0);
+  private LoopInit resetPong = new LoopInit() {
+    @Override
+    public void init() {
+      pong.count = 0;
+      Ponger.counter = 0;
+    }
+  };
+
+  private LoopInit incrementCounters = new LoopInit() {
+    @Override
+    public void init() {
+      ping.count++;
+      pong.count++;
+    }
+  };
+
   @Test
-  public void basicScenario() {
+  public void iterationInitTest() {
 
     tc.body().
       connect(pinger.getNegative(PingPongPort.class), ponger.getPositive(PingPongPort.class)).
 
-      expect(new Ping(), pinger.getNegative(PingPongPort.class), outgoing).
-      expect(new Pong(new Ping()), pinger.getNegative(PingPongPort.class), incoming).
-      repeat(1).body().
-          trigger(new Pong(new Ping()), ponger.getPositive(PingPongPort.class).getPair()).
-          expect(new Pong(new Ping()), pinger.getNegative(PingPongPort.class), incoming).
+      repeat(3).
+      body().
+        repeat(3, resetPong).
+          onEachIteration(incrementCounters).
+        body().
+          expect(ping, pinger.getNegative(PingPongPort.class), outgoing).
+          expect(pong, pinger.getNegative(PingPongPort.class), incoming).
+        end().
       end();
 
     assertEquals(tc.check(), tc.getFinalState());
   }
 
-  @Test
-  public void scratchTest(){
-    tc.
-      body().
-      connect(pinger.getNegative(PingPongPort.class), ponger.getPositive(PingPongPort.class)).
-      repeat(1).
-        body().
-        trigger(new Pong(new Ping()), ponger.getPositive(PingPongPort.class).getPair()).
-        expect(new Pong(new Ping()), pinger.getNegative(PingPongPort.class), incoming).
-      end();
-
-    assertEquals(tc.getFinalState(), tc.check());
-  }
-
   public static class Pinger extends ComponentDefinition {
-    public Pinger() {}
+    static int counter = 0;
+
     Positive<PingPongPort> ppPort = requires(PingPongPort.class);
-    static int k = 0;
-    int i = 0;
+
     Handler<Pong> pongHandler = new Handler<Pong>() {
       @Override
       public void handle(Pong event) {
-        Kompics.logger.error("pinger: Received Pong! {}", event);
+        trigger(new Ping(++counter), ppPort);
       }
     };
 
     Handler<Start> startHandler = new Handler<Start>() {
       @Override
       public void handle(Start event) {
-        if (k++ <= 1) {
-          Kompics.logger.info("pinger {}: ", getComponentCore().getComponent().id());
-          Kompics.logger.info("parent {}: ", getComponentCore().getParent().getComponent().id());
-          trigger(new Ping(), ppPort);
-        } else {
-          Kompics.logger.info("pinger2 {}: ", getComponentCore().getComponent().id());
-        }
+          trigger(new Ping(++counter), ppPort);
       }
     };
 
@@ -76,13 +75,14 @@ public class PingerPongerTest {
   }
 
   public static class Ponger extends ComponentDefinition {
+    static int counter = 0;
+
     Negative<PingPongPort> pingPongPort = provides(PingPongPort.class);
 
     Handler<Ping> pingHandler = new Handler<Ping>() {
       @Override
       public void handle(Ping ping) {
-        //Kompics.logger.info("Ponger: received {}", ping);
-        Pong pong = new Pong(RequestResponseTest.cloneRequest(ping));
+        Pong pong = new Pong(++counter);
         trigger(pong, pingPongPort);
       }
     };
@@ -100,21 +100,37 @@ public class PingerPongerTest {
   }
 
   static class Ping extends Request {
-  public boolean equals(Object o) {
-    return !(o == null || !(o instanceof Ping));
-  }
-  public int hashCode() {
-    return this.getClass().hashCode();
-  }
-}
-  static class Pong extends Response {
-    Pong(Request request) { super(request); }
+    int count;
+    Ping(int count) { this.count = count; }
+
     public boolean equals(Object o) {
-      return !(o == null || !(o instanceof Pong));
+      return o instanceof Ping && ((Ping) o).count == count;
     }
 
     public int hashCode() {
-      return this.getClass().hashCode();
+      return count;
+    }
+
+    public String toString() {
+      return "" + count;
+    }
+  }
+
+  static class Pong implements KompicsEvent {
+
+    int count;
+    Pong(int count) { this.count = count; }
+
+    public boolean equals(Object o) {
+      return o instanceof Pong && ((Pong)o).count == count;
+    }
+
+    public int hashCode() {
+      return count;
+    }
+
+    public String toString() {
+      return "" + count;
     }
   }
 }
