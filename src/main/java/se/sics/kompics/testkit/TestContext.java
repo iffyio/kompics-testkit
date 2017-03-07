@@ -11,7 +11,7 @@ import java.util.Comparator;
 public class TestContext<T extends ComponentDefinition> {
   private final Proxy proxy;
   private final ComponentCore proxyComponent;
-  private final PortConfig portConfig;
+  private PortConfig portConfig;
   private T cut;
   private FSM<T> fsm;
   private Scheduler scheduler;
@@ -21,7 +21,7 @@ public class TestContext<T extends ComponentDefinition> {
   private TestContext() {
     proxy = new Proxy();
     proxyComponent = proxy.getComponentCore();
-    portConfig = new PortConfig(proxy);
+    //portConfig = new PortConfig(proxy);
   }
 
   TestContext(Class<T> definition, Init<T> initEvent) {
@@ -75,19 +75,20 @@ public class TestContext<T extends ComponentDefinition> {
     boolean cutOwnsPositive = positive.getPair().getOwner() == cut.getComponentCore();
     boolean cutOwnsNegative = negative.getPair().getOwner() == cut.getComponentCore();
 
-    // non monitoring ports => connect normally
+    // non monitored ports => connect normally
     if (!(cutOwnsPositive || cutOwnsNegative)) {
       factory.connect((PortCore<P>) positive, (PortCore<P>) negative);
-      return this;
+    } else {
+      proxy.connectPorts(positive, negative, factory);
     }
 
-    PortCore<P> proxyPort = (PortCore<P>) (cutOwnsPositive? positive : negative);
+/*    PortCore<P> proxyPort = (PortCore<P>) (cutOwnsPositive? positive : negative);
     PortCore<P> otherPort = (PortCore<P>) (cutOwnsPositive? negative : positive);
 
     registerConnectedPort(proxyPort == positive, proxyPort, otherPort, factory);
     if (cutOwnsPositive && cutOwnsNegative) {
       registerConnectedPort(otherPort == positive, otherPort, proxyPort, factory);
-    }
+    }*/
 
     return this;
   }
@@ -98,8 +99,9 @@ public class TestContext<T extends ComponentDefinition> {
     return this;
   }
 
-  public TestContext<T> repeat(int times, LoopInit init) {
-    fsm.repeat(times, init);
+  public TestContext<T> repeat(int times, LoopInit loopInit) {
+    Testkit.checkNotNull(loopInit);
+    fsm.repeat(times, loopInit);
     return this;
   }
 
@@ -206,8 +208,6 @@ public class TestContext<T extends ComponentDefinition> {
 
   // PRIVATE
   private void init() {
-    //fsm = new FSM<>(proxy, cut, this);
-
     // default scheduler
     scheduler = new ThreadPoolScheduler(1);
     Kompics.setScheduler(scheduler);
@@ -215,7 +215,6 @@ public class TestContext<T extends ComponentDefinition> {
     // // TODO: 2/20/17 set worker id
     proxyComponent.getControl().doTrigger(Start.event, 0, proxyComponent);
     assert proxyComponent.state() == Component.State.ACTIVE;
-
   }
 
   private void initFSM() {
@@ -225,8 +224,8 @@ public class TestContext<T extends ComponentDefinition> {
 
   private <P extends PortType> void registerConnectedPort(
           boolean isPositive, PortCore<P> port, PortCore<P> other, ChannelFactory factory) {
-    PortStructure<P> portStruct = portConfig.getOrCreate(port, isPositive);
-    portStruct.addConnectedPort(other, factory);
+/*    PortStructure<P> portStruct = portConfig.getOrCreate(port, isPositive);
+    portStruct.addConnectedPort(other, factory);*/
   }
 
   private <P extends  PortType> void configurePort(
@@ -234,7 +233,7 @@ public class TestContext<T extends ComponentDefinition> {
     if (port.getOwner() != proxyComponent || port.getPair().getOwner() != cut.getComponentCore()) {
       throw new UnsupportedOperationException("Watching messages are allowed on the tested component's ports " + port);
     }
-    PortStructure<P> portStruct = portConfig.get(port);
+/*    PortStructure<P> portStruct = portConfig.get(port);
 
     if (portStruct == null) {
         portStruct = portConfig.create(port);
@@ -249,6 +248,6 @@ public class TestContext<T extends ComponentDefinition> {
       }
       // register incoming handler
       portStruct.addIncomingHandler(eventType);
-    }
+    }*/
   }
 }

@@ -4,9 +4,13 @@ import se.sics.kompics.*;
 import se.sics.kompics.testkit.fsm.EventQueue;
 import se.sics.kompics.testkit.scheduler.CallingThreadScheduler;
 
+import java.util.Map;
+
 public class Proxy extends ComponentDefinition{
 
   private final EventQueue eventQueue = new EventQueue();
+  private PortConfig portConfig;
+  private Component cut;
 
   <T extends ComponentDefinition>
   Proxy() {
@@ -16,13 +20,21 @@ public class Proxy extends ComponentDefinition{
   @SuppressWarnings("unchecked")
   <T extends ComponentDefinition> T createComponentUnderTest(
           Class<T> definition, Init<T> initEvent) {
-    return (T) create(definition, initEvent).getComponent();
+    cut = create(definition, initEvent);
+    createPortConfig();
+    return (T) cut.getComponent();
   }
 
   @SuppressWarnings("unchecked")
   <T extends ComponentDefinition> T createComponentUnderTest(
           Class<T> definition, Init.None initEvent) {
-    return (T) create(definition, initEvent).getComponent();
+    cut = create(definition, initEvent);
+    createPortConfig();
+    return (T) cut.getComponent();
+  }
+
+  Component getComponentUnderTest() {
+    return cut;
   }
 
   public EventQueue getEventQueue() {
@@ -41,11 +53,11 @@ public class Proxy extends ComponentDefinition{
     return c;
   }
 
-  <P extends PortType> Negative<P> provideProxy(Class<P> portType) {
+  <P extends PortType> Negative<P> providePort(Class<P> portType) {
     return provides(portType);
   }
 
-  <P extends PortType> Positive<P> requireProxy(Class<P> portType) {
+  <P extends PortType> Positive<P> requirePort(Class<P> portType) {
     return requires(portType);
   }
 
@@ -62,4 +74,23 @@ public class Proxy extends ComponentDefinition{
   {
     subscribe(startHandler, control);
   }
+
+  private void createPortConfig() {
+    portConfig = new PortConfig(this);
+  }
+
+  public Map<Class<? extends PortType>, JavaPort<? extends PortType>> getCutPositivePorts() {
+    return ((JavaComponent) cut).positivePorts;
+  }
+
+  public Map<Class<? extends PortType>, JavaPort<? extends PortType>> getCutNegativePorts() {
+    return ((JavaComponent) cut).negativePorts;
+  }
+
+  public <P extends PortType> void connectPorts(Positive<P> positive,
+                                                Negative<P> negative,
+                                                ChannelFactory factory) {
+    portConfig.connectPorts(positive, negative, factory);
+  }
+
 }

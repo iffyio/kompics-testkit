@@ -5,24 +5,15 @@ import org.slf4j.LoggerFactory;
 import se.sics.kompics.*;
 import se.sics.kompics.testkit.fsm.EventSpec;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-
 class InboundHandler extends ProxyHandler {
   private static final Logger logger = LoggerFactory.getLogger(InboundHandler.class);
 
-  // // TODO: 2/20/17 remove sourcePorts if not useful
-  private List<Port<? extends PortType>> sourcePorts;
   private Port<? extends PortType> destPort;
 
-  InboundHandler(
-          Proxy proxy, PortStructure portStruct,
-          Class<? extends KompicsEvent> type, Collection<? extends Port<? extends PortType>> sourcePorts,
-          Port<? extends PortType> destPort) {
-    super(proxy, portStruct, type);
-    this.destPort = destPort;
-    this.sourcePorts = new ArrayList<>(sourcePorts);
+  InboundHandler(Proxy proxy, PortStructure portStruct,
+                 Class<? extends KompicsEvent> eventType) {
+    super(proxy, portStruct, eventType);
+    this.destPort = portStruct.getOutboundPort();
   }
 
   @Override

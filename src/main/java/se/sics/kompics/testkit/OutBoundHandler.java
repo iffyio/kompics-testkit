@@ -17,11 +17,11 @@ class OutBoundHandler extends ProxyHandler {
 
   OutBoundHandler(
           Proxy proxy, PortStructure portStruct,
-          Class<? extends KompicsEvent> eventType, Port<? extends PortType> sourcePort,
-          Collection<? extends Port<? extends PortType>> destPorts) {
+          Class<? extends KompicsEvent> eventType) {
+
     super(proxy, portStruct, eventType);
-    this.sourcePort = sourcePort;
-    this.destPorts = new ArrayList<>(destPorts);
+    this.sourcePort = portStruct.getOutboundPort();
+    this.destPorts = portStruct.getConnectedPorts();
   }
 
   @Override
