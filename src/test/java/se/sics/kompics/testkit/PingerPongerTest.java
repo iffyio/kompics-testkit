@@ -1,10 +1,9 @@
 package se.sics.kompics.testkit;
 
+import com.google.common.base.Predicate;
 import org.junit.Test;
 import static junit.framework.Assert.assertEquals;
 import se.sics.kompics.*;
-
-import java.util.*;
 
 public class PingerPongerTest {
 
@@ -53,39 +52,33 @@ public class PingerPongerTest {
   }
 
   @Test
-  public void defaultHandlerTest() {
-    List<Class<? extends KompicsEvent>> list = new ArrayList<>(Arrays.asList(
-            KompicsEvent.class,Ping.class, Ping.class, Pong.class, Sping.class, Spong.class
-    ));
-
-    Comparator<Class<? extends KompicsEvent>> classComparator = new Comparator<Class<? extends KompicsEvent>>() {
-      @Override
-      public int compare(Class<? extends KompicsEvent> e1, Class<? extends KompicsEvent> e2) {
-        if (e1 == e2) {
-          return 0;
-        } else if (e1.isAssignableFrom(e2)) {
-          return 1;
-        } else {
-          return -1;
+  public void defaultActionTest() {
+    tc.
+      setDefaultAction(Pong.class, new Predicate<Pong>() {
+        @Override
+        public boolean apply(Pong event) {
+          return true;
         }
-      }
-    };
+      }).
+      setDefaultAction(KompicsEvent.class, new Predicate<KompicsEvent>() {
+        @Override
+        public boolean apply(KompicsEvent event) {
+          return false;
+        }
+      }).
+      connect(pinger.getNegative(PingPongPort.class), ponger.getPositive(PingPongPort.class)).
+      body().
 
-    TreeSet<Class<? extends KompicsEvent>> ts = new TreeSet<Class<? extends KompicsEvent>>(classComparator);
-    for (Class<? extends KompicsEvent> c : list) ts.add(c);
+        repeat(3).
+        body().
+          repeat(30, resetPong).
+            onEachIteration(incrementCounters).
+          body().
+            expect(ping, pinger.getNegative(PingPongPort.class), outgoing).
+          end().
+        end();
 
-    for (Class<? extends KompicsEvent> c : ts)
-      Kompics.logger.warn("{}", c.getSimpleName());
-  }
-  class Sping extends Ping {
-    Sping(int count) {
-      super(count);
-    }
-  }
-  class Spong extends Pong {
-    Spong(int count) {
-      super(count);
-    }
+    assertEquals(tc.check(), tc.getFinalState());
   }
 
   public static class Pinger extends ComponentDefinition {

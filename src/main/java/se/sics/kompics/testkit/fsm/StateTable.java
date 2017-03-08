@@ -1,15 +1,35 @@
 package se.sics.kompics.testkit.fsm;
 
+import com.google.common.base.Predicate;
 import se.sics.kompics.KompicsEvent;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 class StateTable {
 
-  private Map<Integer, Map<EventSpec, Action>> table = new HashMap<>();
-  private Map<Integer, EventSpec> eventSpecs = new HashMap<>();
-  private Map<Integer, PredicateSpec> predicateSpecs = new HashMap<>();
+  private final Comparator<Class<? extends KompicsEvent>> eventComparator = new Comparator<Class<? extends KompicsEvent>>() {
+    @Override
+    public int compare(Class<? extends KompicsEvent> e1, Class<? extends KompicsEvent> e2) {
+      if (e1 == e2) {
+        return 0;
+      } else if (e1.isAssignableFrom(e2)) {
+        return 1;
+      } else {
+        return -1;
+      }
+    }
+  };
+
+  private final Map<Integer, Map<EventSpec, Action>> table = new HashMap<Integer, Map<EventSpec, Action>>();
+
+  private final Map<Integer, EventSpec> eventSpecs = new HashMap<Integer, EventSpec>();
+
+  private final Map<Integer, PredicateSpec> predicateSpecs = new HashMap<Integer, PredicateSpec>();
+
+  private final Map<Class<? extends KompicsEvent>, Predicate<? extends KompicsEvent>> defaultActions
+          = new TreeMap<Class<? extends KompicsEvent>, Predicate<? extends KompicsEvent>>(eventComparator);
+
+  private final TreeSet<Class<? extends KompicsEvent>> orderedTypes = new TreeSet<Class<? extends KompicsEvent>>();
 
   void registerExpectedEvent(int state, EventSpec eventSpec, Environment env) {
     int nextState = state + 1;
@@ -25,14 +45,18 @@ class StateTable {
     predicateSpecs.put(state, predSpec);
   }
 
+  <E extends KompicsEvent> void setDefaultAction(Class<E> eventType,
+                                                 Predicate<E> predicate) {
+    defaultActions.put(eventType, predicate);
+  }
+
   void printExpectedEventAt(int state) {
-    FSM.logger.warn("{}: Expect\t{}", state,
-            (predicateWasRegisteredForState(state)?
-               predicateSpecs.get(state) : eventSpecs.get(state)));
+    FSM.logger.warn("{}: Expect\t{}", state, (predicateWasRegisteredFor(state)?
+                                              predicateSpecs.get(state) : eventSpecs.get(state)));
   }
 
   Spec getExpectedSpecAt(int state) {
-    return predicateWasRegisteredForState(state)?
+    return predicateWasRegisteredFor(state)?
              predicateSpecs.get(state) : eventSpecs.get(state);
   }
 
@@ -40,17 +64,24 @@ class StateTable {
     Map<EventSpec, Action> entry = table.get(state);
     assert entry != null;
 
-    if (predicateWasRegisteredForState(state)) {
-      Action action = predicateLookup(state, receivedSpec);
-      if (action != null) {
-        return action;
-      }
+    Action action = null;
+
+    if (predicateWasRegisteredFor(state)) {
+      action = predicateLookup(state, receivedSpec);
     }
 
-    return entry.get(receivedSpec);
+    if (action == null) {
+      action = entry.get(receivedSpec);
+    }
+
+    if (action == null) {
+      action = defaultLookup(state, receivedSpec);
+    }
+
+    return action;
   }
 
-  private boolean predicateWasRegisteredForState(int state) {
+  private boolean predicateWasRegisteredFor(int state) {
     return predicateSpecs.containsKey(state);
   }
 
@@ -75,7 +106,7 @@ class StateTable {
         for (Action a : entry.values()) {
           System.out.println("\t\t" + a);
         }
-        if (predicateWasRegisteredForState(i)) {
+        if (predicateWasRegisteredFor(i)) {
           System.out.printf("\t\t%s handle %d\n", predicateSpecs.get(i), i+1);
         }
       }
@@ -108,6 +139,34 @@ class StateTable {
       entry.put(e, new Action(e, Action.DROP, state));
     }
   }
+
+
+  private Action defaultLookup(int state, EventSpec eventSpec) {
+
+    Class<? extends KompicsEvent> eventType = eventSpec.getEvent().getClass();
+
+    for (Class<? extends KompicsEvent> registeredType : defaultActions.keySet()) {
+      if (registeredType.isAssignableFrom(eventType)) {
+
+        if (eventShouldBeHandled(defaultActions.get(registeredType), eventSpec)) {
+          return new Action(eventSpec, Action.HANDLE, state);
+        } else {
+          return new Action(eventSpec, Action.DROP, -1);
+        }
+      }
+    }
+
+    return null;
+  }
+
+  private <E extends KompicsEvent> boolean eventShouldBeHandled(Predicate<E> predicate,
+                                                                EventSpec eventSpec) {
+    E event = (E) eventSpec.getEvent();
+    return predicate.apply(event);
+  }
+
+
+
 
   static class Action {
     static boolean HANDLE = true;

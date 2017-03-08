@@ -30,7 +30,7 @@ public class EventSpec<E extends KompicsEvent> implements Spec{
     this.direction = direction;
   }
 
-  public KompicsEvent getEvent() {
+  public E getEvent() {
     return event;
   }
 

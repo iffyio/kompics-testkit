@@ -169,6 +169,13 @@ public class TestContext<T extends ComponentDefinition> {
     return this;
   }
 
+  public <E extends KompicsEvent> TestContext<T> setDefaultAction(Class<E> eventType,
+                                                                  Predicate<E> predicate) {
+    Testkit.checkNotNull(eventType, predicate);
+    fsm.setDefaultAction(eventType, predicate);
+    return this;
+  }
+
   public Component getComponentUnderTest() {
     return cut.getComponentCore();
   }

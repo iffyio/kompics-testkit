@@ -138,11 +138,4 @@ public class EPFDTest {
       return 0;
     }
   }
-  public static void main(String... a) {
-    new EPFDTest().runTest();
-  }
-
-  private void runTest() {
-    mockNetworkAndTimer();
-  }
 }

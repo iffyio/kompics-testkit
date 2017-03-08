@@ -195,7 +195,7 @@ public class FSM<T extends ComponentDefinition> {
   public <E extends KompicsEvent> void setDefaultAction(Class<E> eventType,
                                                         Predicate<E> predicate) {
     checkInInitialHeader();
-    //table.setDefaultAction();
+    table.setDefaultAction(eventType, predicate);
   }
 
   private void run() {
