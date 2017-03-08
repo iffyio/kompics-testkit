@@ -22,12 +22,4 @@ public class Ping extends TMessage implements Serializable {
            getDestination().equals(other.getDestination()) &&
            getProtocol().equals(other.getProtocol());
   }
-
-  @Override
-  public int hashCode() {
-    int result = 31 * getSource().hashCode();
-    result += 31 * getDestination().hashCode();
-    result += 31 * getProtocol().hashCode();
-    return result;
-  }
 }

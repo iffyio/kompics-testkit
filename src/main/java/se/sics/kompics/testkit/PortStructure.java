@@ -82,10 +82,12 @@ class PortStructure {
                         ChannelFactory factory) {
     Channel<P> channel;
 
+    PortCore<P> proxyOutsidePort = (PortCore<P>) inboundPort.getPair();
+
     if (isProvidedPort) {
-      channel = factory.connect((PortCore<P>) outboundPort, connectedPort);
+      channel = factory.connect(proxyOutsidePort, connectedPort);
     } else {
-      channel = factory.connect(connectedPort, (PortCore<P>) outboundPort);
+      channel = factory.connect(connectedPort, proxyOutsidePort);
     }
 
     connectedPorts.add(connectedPort);
