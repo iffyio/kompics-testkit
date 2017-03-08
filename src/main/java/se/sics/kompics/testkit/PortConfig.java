@@ -2,7 +2,9 @@ package se.sics.kompics.testkit;
 
 import se.sics.kompics.*;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+
 
 class PortConfig {
   private final Map<Port<? extends PortType>, PortStructure> portStructs = new HashMap<>();
@@ -43,9 +45,9 @@ class PortConfig {
            !portClass.equals(ControlPort.class);
   }
 
-  public <P extends PortType> void connectPorts(Positive<P> positive,
-                                                Negative<P> negative,
-                                                ChannelFactory factory) {
+  public <P extends PortType> void doConnect(Positive<P> positive,
+                                             Negative<P> negative,
+                                             ChannelFactory factory) {
 
     boolean cutOwnsPositive = positive.getPair().getOwner() == proxy.getComponentUnderTest();
     boolean cutOwnsNegative = negative.getPair().getOwner() == proxy.getComponentUnderTest();
@@ -58,5 +60,10 @@ class PortConfig {
     if (cutOwnsPositive && cutOwnsNegative) {
       portStructs.get(otherPort).addConnectedPort(proxyPort, factory);
     }
+  }
+
+  boolean isConnectedPort(Port<? extends PortType> port) {
+    PortStructure portStruct = portStructs.get(port);
+    return !(portStruct == null || portStruct.getConnectedPorts().isEmpty());
   }
 }

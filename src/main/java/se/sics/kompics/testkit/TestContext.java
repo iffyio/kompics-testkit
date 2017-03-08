@@ -11,7 +11,6 @@ import java.util.Comparator;
 public class TestContext<T extends ComponentDefinition> {
   private final Proxy proxy;
   private final ComponentCore proxyComponent;
-  private PortConfig portConfig;
   private T cut;
   private FSM<T> fsm;
   private Scheduler scheduler;
@@ -21,7 +20,6 @@ public class TestContext<T extends ComponentDefinition> {
   private TestContext() {
     proxy = new Proxy();
     proxyComponent = proxy.getComponentCore();
-    //portConfig = new PortConfig(proxy);
   }
 
   TestContext(Class<T> definition, Init<T> initEvent) {
@@ -54,7 +52,6 @@ public class TestContext<T extends ComponentDefinition> {
     return c;
   }
 
-  // // TODO: 2/8/17 connect with channelSelector
   public <P extends PortType> TestContext<T> connect(Negative<P> negative, Positive<P> positive) {
     return connect(positive, negative);
   }
@@ -71,6 +68,7 @@ public class TestContext<T extends ComponentDefinition> {
   <P extends PortType> TestContext<T> connect(
           Positive<P> positive, Negative<P> negative, ChannelFactory factory) {
     Testkit.checkNotNull(positive, negative, factory);
+    fsm.checkInInitialHeader();
 
     boolean cutOwnsPositive = positive.getPair().getOwner() == cut.getComponentCore();
     boolean cutOwnsNegative = negative.getPair().getOwner() == cut.getComponentCore();
@@ -79,16 +77,8 @@ public class TestContext<T extends ComponentDefinition> {
     if (!(cutOwnsPositive || cutOwnsNegative)) {
       factory.connect((PortCore<P>) positive, (PortCore<P>) negative);
     } else {
-      proxy.connectPorts(positive, negative, factory);
+      proxy.doConnect(positive, negative, factory);
     }
-
-/*    PortCore<P> proxyPort = (PortCore<P>) (cutOwnsPositive? positive : negative);
-    PortCore<P> otherPort = (PortCore<P>) (cutOwnsPositive? negative : positive);
-
-    registerConnectedPort(proxyPort == positive, proxyPort, otherPort, factory);
-    if (cutOwnsPositive && cutOwnsNegative) {
-      registerConnectedPort(otherPort == positive, otherPort, proxyPort, factory);
-    }*/
 
     return this;
   }
@@ -124,7 +114,7 @@ public class TestContext<T extends ComponentDefinition> {
   public <P extends  PortType> TestContext<T> expect(
           KompicsEvent event, Port<P> port, Direction direction) {
     Testkit.checkNotNull(event, port, direction);
-    configurePort(event.getClass(), port, direction);
+    checkValidPort(port, direction);
     fsm.expectMessage(event, port, direction);
     return this;
   }
@@ -132,7 +122,7 @@ public class TestContext<T extends ComponentDefinition> {
   public <P extends  PortType, E extends KompicsEvent> TestContext<T> expect(
           Class<E> eventType, Predicate<E> pred, Port<P> port, Direction direction) {
     Testkit.checkNotNull(eventType, port, direction);
-    configurePort(eventType, port, direction);
+    checkValidPort(port, direction);
     fsm.expectMessage(eventType, pred, port, direction);
     return this;
   }
@@ -151,7 +141,7 @@ public class TestContext<T extends ComponentDefinition> {
   public <P extends  PortType> TestContext<T> disallow(
             KompicsEvent event, Port<P> port, Direction direction) {
     Testkit.checkNotNull(event, port, direction);
-    configurePort(event.getClass(), port, direction);
+    checkValidPort(port, direction);
     fsm.addDisallowedEvent(event, port, direction);
     return this;
   }
@@ -159,7 +149,7 @@ public class TestContext<T extends ComponentDefinition> {
   public <P extends  PortType> TestContext<T> allow(
             KompicsEvent event, Port<P> port, Direction direction) {
     Testkit.checkNotNull(event, port, direction);
-    configurePort(event.getClass(), port, direction);
+    checkValidPort(port, direction);
     fsm.addAllowedEvent(event, port, direction);
     return this;
   }
@@ -167,7 +157,7 @@ public class TestContext<T extends ComponentDefinition> {
   public <P extends  PortType> TestContext<T> drop(
             KompicsEvent event, Port<P> port, Direction direction) {
     Testkit.checkNotNull(event, port, direction);
-    configurePort(event.getClass(), port, direction);
+    checkValidPort(port, direction);
     fsm.addDroppedEvent(event, port, direction);
     return this;
   }
@@ -183,7 +173,6 @@ public class TestContext<T extends ComponentDefinition> {
     return cut.getComponentCore();
   }
 
-  // capture component type to verify predicate
   public TestContext<T> assertComponentState(
           Predicate<T> assertPred) {
     Testkit.checkNotNull(assertPred);
@@ -222,32 +211,15 @@ public class TestContext<T extends ComponentDefinition> {
     fsm.addParticipatingComponents(cut.getComponentCore());
   }
 
-  private <P extends PortType> void registerConnectedPort(
-          boolean isPositive, PortCore<P> port, PortCore<P> other, ChannelFactory factory) {
-/*    PortStructure<P> portStruct = portConfig.getOrCreate(port, isPositive);
-    portStruct.addConnectedPort(other, factory);*/
-  }
 
-  private <P extends  PortType> void configurePort(
-          Class<? extends KompicsEvent> eventType, Port<P> port, Direction direction) {
-    if (port.getOwner() != proxyComponent || port.getPair().getOwner() != cut.getComponentCore()) {
-      throw new UnsupportedOperationException("Watching messages are allowed on the tested component's ports " + port);
-    }
-/*    PortStructure<P> portStruct = portConfig.get(port);
-
-    if (portStruct == null) {
-        portStruct = portConfig.create(port);
+  private <P extends  PortType> void checkValidPort(
+          Port<P> port, Direction direction) {
+    if (port.getPair().getOwner() != cut.getComponentCore()) {
+      throw new UnsupportedOperationException("Watching messages are allowed only on the tested component's ports");
     }
 
-    if (direction == Direction.OUTGOING) {
-      // register outgoing handler
-      portStruct.addOutgoingHandler(eventType);
-    } else if (direction == Direction.INCOMING){
-      if (portStruct.isMockedPort()) {
-        throw new IllegalStateException("Cannot watch incoming message on an unconnected port " + port);
-      }
-      // register incoming handler
-      portStruct.addIncomingHandler(eventType);
-    }*/
+    if (direction == Direction.INCOMING && !proxy.isConnectedPort(port)) {
+      throw new IllegalStateException("Cannot watch incoming message on an unconnected port " + port);
+    }
   }
 }

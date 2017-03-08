@@ -54,19 +54,19 @@ public class FSM<T extends ComponentDefinition> {
 
   public <P extends  PortType> void addDisallowedEvent(
           KompicsEvent event, Port<P> port, Direction direction) {
-    assertInHeader();
+    checkInHeaderMode();
     currentBlock.env.addDisallowedMessage(newEventSpec(event, port, direction));
   }
 
   public <P extends  PortType> void addAllowedEvent(
           KompicsEvent event, Port<P> port, Direction direction) {
-    assertInHeader();
+    checkInHeaderMode();
     currentBlock.env.addAllowedMessage(newEventSpec(event, port, direction));
   }
 
   public <P extends  PortType> void addDroppedEvent(
           KompicsEvent event, Port<P> port, Direction direction) {
-    assertInHeader();
+    checkInHeaderMode();
     currentBlock.env.addDroppedMessage(newEventSpec(event, port, direction));
   }
 
@@ -91,7 +91,7 @@ public class FSM<T extends ComponentDefinition> {
   }
 
   private void addRepeat(Repeat repeat) {
-    assertInBody();
+    checkInBodyMode();
 
     if (repeat.times <= 0) {
       throw new IllegalArgumentException("only positive value allowed for repeat");
@@ -105,23 +105,23 @@ public class FSM<T extends ComponentDefinition> {
   }
 
   public void setIterationInit(LoopInit iterationInit) {
-    assertInHeader();
+    checkInHeaderMode();
     currentBlock.repeat.setIterationInit(iterationInit);
   }
 
   public void body() {
-    assertInHeader();
+    checkInHeaderMode();
     currentBlock.inHeaderMode = false;
   }
 
   public void addTrigger(KompicsEvent event, Port<? extends PortType> port) {
-    assertInBody();
+    checkInBodyMode();
     triggeredEvents.put(currentState, new Trigger(event, port));
     currentState++;
   }
 
   public void endRepeat() {
-    assertInBody();
+    checkInBodyMode();
 
     if (balancedRepeat.isEmpty()) {
       throw new IllegalStateException("matching repeat not found for end");
@@ -167,10 +167,7 @@ public class FSM<T extends ComponentDefinition> {
 
   public <E extends KompicsEvent> void addComparator(
           Class<E> eventType, Comparator<E> comparator) {
-    assertInHeader();
-    if (currentBlock.previousBlock != null) { // not main repeat block
-      throw new IllegalStateException("Comparators are only allowed in the main header");
-    }
+    checkInInitialHeader();
     comparators.put(eventType, comparator);
   }
 
@@ -179,8 +176,9 @@ public class FSM<T extends ComponentDefinition> {
     currentState++;
   }
 
-  public <P extends PortType> void expectMessage(KompicsEvent event, Port<P> port, Direction direction) {
-    assertInBody();
+  public <P extends PortType> void expectMessage(KompicsEvent event,
+                                                 Port<P> port, Direction direction) {
+    checkInBodyMode();
     EventSpec eventSpec = newEventSpec(event, port, direction);
     table.registerExpectedEvent(currentState, eventSpec, currentBlock.env);
     currentState++;
@@ -188,10 +186,16 @@ public class FSM<T extends ComponentDefinition> {
 
   public <P extends PortType, E extends KompicsEvent> void expectMessage(
           Class<E> eventType, Predicate<E> pred, Port<P> port, Direction direction) {
-    assertInBody();
+    checkInBodyMode();
     PredicateSpec predicateSpec = new PredicateSpec(eventType, pred, port, direction);
     table.registerExpectedEvent(currentState, predicateSpec, currentBlock.env);
     currentState++;
+  }
+
+  public <E extends KompicsEvent> void setDefaultAction(Class<E> eventType,
+                                                        Predicate<E> predicate) {
+    checkInInitialHeader();
+    //table.setDefaultAction();
   }
 
   private void run() {
@@ -326,13 +330,20 @@ public class FSM<T extends ComponentDefinition> {
     }
   }
 
-  private void assertInBody() {
+  public void checkInInitialHeader() {
+    checkInHeaderMode();
+    if (currentBlock == null || currentBlock.previousBlock != null) {
+      throw new IllegalStateException("Operation only supported in initial header");
+    }
+  }
+
+  private void checkInBodyMode() {
     if (currentBlock != null && currentBlock.inHeaderMode) {
       throw new IllegalStateException("Not in body mode");
     }
   }
 
-  private void assertInHeader() {
+  private void checkInHeaderMode() {
     if (!currentBlock.inHeaderMode) {
       throw new IllegalStateException("Not in header mode");
     }
@@ -381,7 +392,6 @@ public class FSM<T extends ComponentDefinition> {
       }
     }
   }
-
 
   private class ComparatorMap {
     Map<Class<? extends KompicsEvent>, Comparator<? extends KompicsEvent>> comparators = new HashMap<>();

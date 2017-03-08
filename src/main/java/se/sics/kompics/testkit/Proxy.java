@@ -12,7 +12,6 @@ public class Proxy extends ComponentDefinition{
   private PortConfig portConfig;
   private Component cut;
 
-  <T extends ComponentDefinition>
   Proxy() {
     getComponentCore().setScheduler(new CallingThreadScheduler());
   }
@@ -79,18 +78,22 @@ public class Proxy extends ComponentDefinition{
     portConfig = new PortConfig(this);
   }
 
-  public Map<Class<? extends PortType>, JavaPort<? extends PortType>> getCutPositivePorts() {
+  Map<Class<? extends PortType>, JavaPort<? extends PortType>> getCutPositivePorts() {
     return ((JavaComponent) cut).positivePorts;
   }
 
-  public Map<Class<? extends PortType>, JavaPort<? extends PortType>> getCutNegativePorts() {
+  Map<Class<? extends PortType>, JavaPort<? extends PortType>> getCutNegativePorts() {
     return ((JavaComponent) cut).negativePorts;
   }
 
-  public <P extends PortType> void connectPorts(Positive<P> positive,
-                                                Negative<P> negative,
-                                                ChannelFactory factory) {
-    portConfig.connectPorts(positive, negative, factory);
+  <P extends PortType> void doConnect(Positive<P> positive,
+                                      Negative<P> negative,
+                                      ChannelFactory factory) {
+    portConfig.doConnect(positive, negative, factory);
+  }
+
+  boolean isConnectedPort(Port<? extends PortType> port) {
+    return portConfig.isConnectedPort(port);
   }
 
 }
