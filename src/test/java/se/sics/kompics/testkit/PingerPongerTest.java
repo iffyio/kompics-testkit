@@ -7,6 +7,7 @@ import static junit.framework.Assert.assertEquals;
 
 import se.sics.kompics.Component;
 import se.sics.kompics.ComponentDefinition;
+import se.sics.kompics.Fault;
 import se.sics.kompics.Handler;
 import se.sics.kompics.Init;
 import se.sics.kompics.KompicsEvent;
@@ -93,6 +94,31 @@ public class PingerPongerTest {
     assertEquals(tc.check(), tc.getFinalState());
   }
 
+  private static int MAGIC_NUMBER = 7;
+  @Test
+  public void assertThrownTest() {
+    tc.
+      connect(pinger.getNegative(PingPongPort.class), ponger.getPositive(PingPongPort.class)).
+      body().
+
+      repeat(10).
+      body().
+        repeat(MAGIC_NUMBER - 1, resetPong).
+          onEachIteration(incrementCounters).
+        body().
+          expect(ping, pinger.getNegative(PingPongPort.class), OUTGOING).
+          expect(pong, pinger.getNegative(PingPongPort.class), INCOMING).
+        end().
+
+            // assert error thrown on nth pong
+        expect(ping, pinger.getNegative(PingPongPort.class), OUTGOING).
+        expect(pong, pinger.getNegative(PingPongPort.class), INCOMING).
+        assertThrown(IllegalStateException.class, Fault.ResolveAction.DESTROY).
+      end();
+
+    assertEquals(tc.check(), tc.getFinalState());
+  }
+
   public static class Pinger extends ComponentDefinition {
     static int counter = 0;
 
@@ -102,6 +128,9 @@ public class PingerPongerTest {
       @Override
       public void handle(Pong event) {
         trigger(new Ping(++counter), ppPort);
+        if (counter % MAGIC_NUMBER == 0) {
+          throw new IllegalStateException("multiple of " + MAGIC_NUMBER);
+        }
       }
     };
 

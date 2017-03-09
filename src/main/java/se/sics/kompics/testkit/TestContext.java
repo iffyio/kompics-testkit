@@ -8,6 +8,7 @@ import se.sics.kompics.ChannelFactory;
 import se.sics.kompics.Component;
 import se.sics.kompics.ComponentCore;
 import se.sics.kompics.ComponentDefinition;
+import se.sics.kompics.Fault;
 import se.sics.kompics.Init;
 import se.sics.kompics.Kompics;
 import se.sics.kompics.KompicsEvent;
@@ -26,7 +27,7 @@ import java.util.Comparator;
 
 
 public class TestContext<T extends ComponentDefinition> {
-  private final Proxy proxy;
+  private final Proxy<T> proxy;
   private final ComponentCore proxyComponent;
   private T cut;
   private FSM<T> fsm;
@@ -35,7 +36,7 @@ public class TestContext<T extends ComponentDefinition> {
 
 
   private TestContext() {
-    proxy = new Proxy();
+    proxy = new Proxy<T>();
     proxyComponent = proxy.getComponentCore();
   }
 
@@ -206,6 +207,20 @@ public class TestContext<T extends ComponentDefinition> {
     return this;
   }
 
+  public TestContext<T> assertThrown(
+          Class<? extends Throwable> exceptionType, Fault.ResolveAction resolveAction) {
+    Testkit.checkNotNull(exceptionType, resolveAction);
+    fsm.addAssertThrown(exceptionType, resolveAction);
+    return this;
+  }
+
+  public TestContext<T> assertThrown(
+          Predicate<Throwable> exceptionPredicate, Fault.ResolveAction resolveAction) {
+    Testkit.checkNotNull(exceptionPredicate, resolveAction);
+    fsm.addAssertThrown(exceptionPredicate, resolveAction);
+    return this;
+  }
+
   public int getFinalState() {
     return fsm.getFinalState();
   }
@@ -233,7 +248,7 @@ public class TestContext<T extends ComponentDefinition> {
   }
 
   private void initFSM() {
-    fsm = new FSM<>(proxy, cut);
+    fsm = proxy.getFsm();
     fsm.addParticipatingComponents(cut.getComponentCore());
   }
 

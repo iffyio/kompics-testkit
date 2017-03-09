@@ -16,12 +16,14 @@ import org.slf4j.LoggerFactory;
 import se.sics.kompics.Component;
 import se.sics.kompics.ComponentCore;
 import se.sics.kompics.ComponentDefinition;
+import se.sics.kompics.Fault;
 import se.sics.kompics.PortType;
 import se.sics.kompics.Port;
 import se.sics.kompics.KompicsEvent;
 import se.sics.kompics.Start;
 
 import se.sics.kompics.testkit.Action;
+import se.sics.kompics.testkit.AssertThrown;
 import se.sics.kompics.testkit.Direction;
 import se.sics.kompics.testkit.LoopInit;
 import se.sics.kompics.testkit.Proxy;
@@ -43,7 +45,8 @@ public class FSM<T extends ComponentDefinition> {
   private Map<Integer, Repeat> loops = new HashMap<Integer, Repeat>();
   private Map<Integer, Repeat> end = new HashMap<Integer, Repeat>();
   private Map<Integer, Trigger> triggeredEvents = new HashMap<Integer, Trigger>();
-  private Map<Integer, Predicate<T>> assertPredicates = new HashMap<Integer, Predicate<T>>();
+  private Map<Integer, Predicate<T>> componentPredicates = new HashMap<Integer, Predicate<T>>();
+  private Map<Integer, AssertThrown> assertThrows = new HashMap<Integer, AssertThrown>();
 
   private ComparatorMap comparators = new ComparatorMap();
   private StateTable table = new StateTable();
@@ -51,7 +54,7 @@ public class FSM<T extends ComponentDefinition> {
   private Block currentBlock;
   private int currentState = 0;
 
-  public FSM(Proxy proxy, T definition) {
+  public FSM(Proxy<T> proxy, T definition) {
     this.eventQueue = proxy.getEventQueue();
     this.proxyComponent =  proxy.getComponentCore();
     definitionUnderTest = definition;
@@ -187,7 +190,7 @@ public class FSM<T extends ComponentDefinition> {
   }
 
   public void addAssertComponent(Predicate<T> assertPred) {
-    assertPredicates.put(currentState, assertPred);
+    componentPredicates.put(currentState, assertPred);
     currentState++;
   }
 
@@ -213,13 +216,56 @@ public class FSM<T extends ComponentDefinition> {
     table.setDefaultAction(eventType, function);
   }
 
+  public void addAssertThrown(
+          Class<? extends Throwable> exceptionType, Fault.ResolveAction resolveAction) {
+    checkInBodyMode();
+    checkAssertThrownHasMatchingClause();
+    assertThrows.put(currentState, new AssertThrown(exceptionType, resolveAction));
+    currentState++;
+  }
+
+  public void addAssertThrown(
+          Predicate<Throwable> exceptionPredicate, Fault.ResolveAction resolveAction) {
+    checkInBodyMode();
+    checkAssertThrownHasMatchingClause();
+    assertThrows.put(currentState, new AssertThrown(exceptionPredicate, resolveAction));
+    currentState++;
+  }
+
+  public AssertThrown getNextAssertThrown() {
+    // method is called from outside thread when handling faults
+    int initialState = currentState;
+    //fsm thread may(not) have advanced to next state 'x' (assertThrown state)
+    //initialState must be x or (x - 1) if any
+
+    AssertThrown assertThrown = assertThrows.get(initialState);
+    if (assertThrown == null) { // try next state
+      assertThrown = assertThrows.get(initialState + 1);
+    }
+
+    return assertThrown;
+  }
+
+  private void checkAssertThrownHasMatchingClause() {
+    int previousState = currentState - 1;
+    if (table.getExpectedSpecAt(previousState) == null && !triggeredEvents.containsKey(previousState)) {
+      throw new IllegalStateException("assert thrown must be preceded by an expect or trigger");
+      /*
+      expect(...)
+      repeat()
+      assertThrow()
+      expect()
+      end
+       */
+    }
+  }
+
   private void run() {
     runStartState();
 
     currentState = 0;
     while (currentState < FINAL_STATE && currentState != ERROR_STATE) {
-      if (!(startOfLoop() || endOfLoop() || triggeredAnEvent() || assertedComponent())) {
-        // expecting an event
+      if (expectingAnEvent()) {
         table.printExpectedEventAt(currentState);
         Spec expected = table.getExpectedSpecAt(currentState);
 
@@ -245,21 +291,25 @@ public class FSM<T extends ComponentDefinition> {
     runFinalState();
   }
 
+  private boolean expectingAnEvent() {
+    return !(startOfLoop() || endOfLoop() || triggeredAnEvent()
+            || assertedComponent() || assertedExceptionThrown());
+  }
+
   private boolean transitionedToErrorState(
           Spec expected, EventSpec received, StateTable.Transition transition) {
     if (transition != null && transition.nextState != ERROR_STATE) {
       return false;
     }
 
-    gotoErrorState();
-    ERROR_MESSAGE =
-            String.format("Received %s message <%s> while expecting <%s>",
-            (transition == null? "unexpected" : "unwanted"), received, expected);
+    String errorMessage = String.format("Received %s message <%s> while expecting <%s>",
+                            (transition == null? "unexpected" : "unwanted"), received, expected);
+    gotoErrorState(errorMessage);
     return true;
   }
 
   private boolean assertedComponent() {
-    Predicate<T> assertPred = assertPredicates.get(currentState);
+    Predicate<T> assertPred = componentPredicates.get(currentState);
     if (assertPred == null) {
       return false;
     }
@@ -268,9 +318,32 @@ public class FSM<T extends ComponentDefinition> {
     boolean successful = assertPred.apply(definitionUnderTest);
 
     if (!successful) {
-      gotoErrorState();
+      gotoErrorState("Component assertion failed");
     } else {
       currentState++;
+    }
+
+    return true;
+  }
+
+  private boolean assertedExceptionThrown() {
+    AssertThrown assertThrown = this.assertThrows.get(currentState);
+    if (assertThrown == null) {
+      return false;
+    }
+
+    logger.warn("Expecting exception matching {}", assertThrown.strReprOfExpectedException());
+
+    boolean assertionWasSuccessful = assertThrown.isSuccessful();
+
+    String assertMessage = assertThrown.getMessage();
+    assertThrown.reset();
+
+    if (assertionWasSuccessful) {
+      logger.warn(assertMessage);
+      currentState++;
+    } else {
+      gotoErrorState(assertMessage);
     }
 
     return true;
@@ -364,8 +437,9 @@ public class FSM<T extends ComponentDefinition> {
     }
   }
 
-  private void gotoErrorState() {
+  private void gotoErrorState(String errorMessage) {
     currentState = ERROR_STATE;
+    ERROR_MESSAGE = errorMessage;
   }
 
   private EventSpec removeEventFromQueue() {

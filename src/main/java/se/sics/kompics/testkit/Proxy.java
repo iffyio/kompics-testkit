@@ -2,34 +2,46 @@ package se.sics.kompics.testkit;
 
 import se.sics.kompics.*;
 import se.sics.kompics.testkit.fsm.EventQueue;
+import se.sics.kompics.testkit.fsm.FSM;
 import se.sics.kompics.testkit.scheduler.CallingThreadScheduler;
 
 import java.util.Map;
 
-public class Proxy extends ComponentDefinition{
+public class Proxy<T extends ComponentDefinition> extends ComponentDefinition{
 
   private final EventQueue eventQueue = new EventQueue();
   private PortConfig portConfig;
   private Component cut;
+  private T definitionUnderTest;
+  private FSM<T> fsm;
 
   Proxy() {
     getComponentCore().setScheduler(new CallingThreadScheduler());
   }
 
-  @SuppressWarnings("unchecked")
-  <T extends ComponentDefinition> T createComponentUnderTest(
+  T createComponentUnderTest(
           Class<T> definition, Init<T> initEvent) {
     cut = create(definition, initEvent);
-    createPortConfig();
-    return (T) cut.getComponent();
+    init();
+    return definitionUnderTest;
+  }
+
+  T createComponentUnderTest(
+          Class<T> definition, Init.None initEvent) {
+    cut = create(definition, initEvent);
+    init();
+    return definitionUnderTest;
   }
 
   @SuppressWarnings("unchecked")
-  <T extends ComponentDefinition> T createComponentUnderTest(
-          Class<T> definition, Init.None initEvent) {
-    cut = create(definition, initEvent);
+  private void init() {
     createPortConfig();
-    return (T) cut.getComponent();
+    definitionUnderTest = (T) cut.getComponent();
+    fsm = new FSM<T>(this, definitionUnderTest);
+  }
+
+  FSM<T> getFsm() {
+    return fsm;
   }
 
   Component getComponentUnderTest() {
@@ -86,14 +98,25 @@ public class Proxy extends ComponentDefinition{
     return ((JavaComponent) cut).negativePorts;
   }
 
-  <P extends PortType> void doConnect(Positive<P> positive,
-                                      Negative<P> negative,
-                                      ChannelFactory factory) {
+  <P extends PortType> void doConnect(
+          Positive<P> positive, Negative<P> negative, ChannelFactory factory) {
     portConfig.doConnect(positive, negative, factory);
   }
 
   boolean isConnectedPort(Port<? extends PortType> port) {
     return portConfig.isConnectedPort(port);
+  }
+
+  @Override
+  public Fault.ResolveAction handleFault(Fault fault) {
+    // sync
+    AssertThrown assertThrown = fsm.getNextAssertThrown();
+    if (assertThrown == null) {
+      Kompics.logger.error("Unexpected fault was thrown");
+      return Fault.ResolveAction.ESCALATE;
+    }
+
+    return assertThrown.matchException(fault);
   }
 
 }
