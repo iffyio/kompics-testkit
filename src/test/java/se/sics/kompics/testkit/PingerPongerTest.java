@@ -1,17 +1,29 @@
 package se.sics.kompics.testkit;
 
-import com.google.common.base.Predicate;
+import com.google.common.base.Function;
+
 import org.junit.Test;
 import static junit.framework.Assert.assertEquals;
-import se.sics.kompics.*;
+
+import se.sics.kompics.Component;
+import se.sics.kompics.ComponentDefinition;
+import se.sics.kompics.Handler;
+import se.sics.kompics.Init;
+import se.sics.kompics.KompicsEvent;
+import se.sics.kompics.Negative;
+import se.sics.kompics.PortType;
+import se.sics.kompics.Positive;
+import se.sics.kompics.Request;
+import se.sics.kompics.Start;
+
+import static se.sics.kompics.testkit.Direction.INCOMING;
+import static se.sics.kompics.testkit.Direction.OUTGOING;
 
 public class PingerPongerTest {
 
   private TestContext<Pinger> tc = Testkit.newTestContext(Pinger.class, Init.NONE);
   private Component pinger = tc.getComponentUnderTest();
   private Component ponger = tc.create(Ponger.class, Init.NONE);
-  private Direction incoming = Direction.INCOMING;
-  private Direction outgoing = Direction.OUTGOING;
 
   private Ping ping = new Ping(0);
   private Pong pong = new Pong(0);
@@ -43,8 +55,8 @@ public class PingerPongerTest {
         repeat(3, resetPong).
           onEachIteration(incrementCounters).
         body().
-          expect(ping, pinger.getNegative(PingPongPort.class), outgoing).
-          expect(pong, pinger.getNegative(PingPongPort.class), incoming).
+          expect(ping, pinger.getNegative(PingPongPort.class), OUTGOING).
+          expect(pong, pinger.getNegative(PingPongPort.class), INCOMING).
         end().
       end();
 
@@ -54,16 +66,16 @@ public class PingerPongerTest {
   @Test
   public void defaultActionTest() {
     tc.
-      setDefaultAction(Pong.class, new Predicate<Pong>() {
+      setDefaultAction(Pong.class, new Function<Pong, Action>() {
         @Override
-        public boolean apply(Pong event) {
-          return true;
+        public Action apply(Pong event) {
+          return Action.HANDLE;
         }
       }).
-      setDefaultAction(KompicsEvent.class, new Predicate<KompicsEvent>() {
+      setDefaultAction(KompicsEvent.class, new Function<KompicsEvent, Action>() {
         @Override
-        public boolean apply(KompicsEvent event) {
-          return false;
+        public Action apply(KompicsEvent event) {
+          return Action.FAIL;
         }
       }).
       connect(pinger.getNegative(PingPongPort.class), ponger.getPositive(PingPongPort.class)).
@@ -74,7 +86,7 @@ public class PingerPongerTest {
           repeat(30, resetPong).
             onEachIteration(incrementCounters).
           body().
-            expect(ping, pinger.getNegative(PingPongPort.class), outgoing).
+            expect(ping, pinger.getNegative(PingPongPort.class), OUTGOING).
           end().
         end();
 

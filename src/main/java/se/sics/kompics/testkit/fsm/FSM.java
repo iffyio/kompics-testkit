@@ -1,15 +1,30 @@
 package se.sics.kompics.testkit.fsm;
 
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Stack;
+
+import com.google.common.base.Function;
 import com.google.common.base.Predicate;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import se.sics.kompics.*;
+
+import se.sics.kompics.Component;
+import se.sics.kompics.ComponentCore;
+import se.sics.kompics.ComponentDefinition;
+import se.sics.kompics.PortType;
+import se.sics.kompics.Port;
+import se.sics.kompics.KompicsEvent;
+import se.sics.kompics.Start;
+
+import se.sics.kompics.testkit.Action;
 import se.sics.kompics.testkit.Direction;
 import se.sics.kompics.testkit.LoopInit;
 import se.sics.kompics.testkit.Proxy;
-
-import java.util.*;
-
 
 public class FSM<T extends ComponentDefinition> {
   static final Logger logger = LoggerFactory.getLogger(FSM.class);
@@ -21,14 +36,14 @@ public class FSM<T extends ComponentDefinition> {
   private String ERROR_MESSAGE = "";
 
   private final ComponentCore proxyComponent;
-  private Collection<Component> participants = new HashSet<>();
-  private final Stack<Block> balancedRepeat = new Stack<>();
+  private Collection<Component> participants = new HashSet<Component>();
+  private final Stack<Block> balancedRepeat = new Stack<Block>();
   private final EventQueue eventQueue;
 
-  private Map<Integer, Repeat> loops = new HashMap<>();
-  private Map<Integer, Repeat> end = new HashMap<>();
-  private Map<Integer, Trigger> triggeredEvents = new HashMap<>();
-  private Map<Integer, Predicate<T>> assertPredicates = new HashMap<>();
+  private Map<Integer, Repeat> loops = new HashMap<Integer, Repeat>();
+  private Map<Integer, Repeat> end = new HashMap<Integer, Repeat>();
+  private Map<Integer, Trigger> triggeredEvents = new HashMap<Integer, Trigger>();
+  private Map<Integer, Predicate<T>> assertPredicates = new HashMap<Integer, Predicate<T>>();
 
   private ComparatorMap comparators = new ComparatorMap();
   private StateTable table = new StateTable();
@@ -52,7 +67,7 @@ public class FSM<T extends ComponentDefinition> {
     participants.add(c);
   }
 
-  public <P extends  PortType> void addDisallowedEvent(
+  public <P extends PortType> void addDisallowedEvent(
           KompicsEvent event, Port<P> port, Direction direction) {
     checkInHeaderMode();
     currentBlock.env.addDisallowedMessage(newEventSpec(event, port, direction));
@@ -176,8 +191,8 @@ public class FSM<T extends ComponentDefinition> {
     currentState++;
   }
 
-  public <P extends PortType> void expectMessage(KompicsEvent event,
-                                                 Port<P> port, Direction direction) {
+  public <P extends PortType> void expectMessage(
+          KompicsEvent event, Port<P> port, Direction direction) {
     checkInBodyMode();
     EventSpec eventSpec = newEventSpec(event, port, direction);
     table.registerExpectedEvent(currentState, eventSpec, currentBlock.env);
@@ -192,10 +207,10 @@ public class FSM<T extends ComponentDefinition> {
     currentState++;
   }
 
-  public <E extends KompicsEvent> void setDefaultAction(Class<E> eventType,
-                                                        Predicate<E> predicate) {
+  public <E extends KompicsEvent> void setDefaultAction(
+          Class<E> eventType, Function<E, Action> function) {
     checkInInitialHeader();
-    table.setDefaultAction(eventType, predicate);
+    table.setDefaultAction(eventType, function);
   }
 
   private void run() {
@@ -211,18 +226,18 @@ public class FSM<T extends ComponentDefinition> {
         EventSpec received = removeEventFromQueue();
         setComparatorForEvent(received);
 
-        StateTable.Action action = table.lookup(currentState, received);
+        StateTable.Transition transition = table.lookup(currentState, received);
 
-        if (!transitionedToErrorState(expected, received, action)) {
+        if (!transitionedToErrorState(expected, received, transition)) {
 
-          logger.warn("{}: Matched ({}) with Action = {}",
-                  currentState, received, action);
+          logger.warn("{}: Matched ({}) with Transition = {}",
+                  currentState, received, transition);
 
-          if (action.handleEvent()) {
+          if (transition.handleEvent()) {
             received.handle();
           }
 
-          currentState = action.nextIndex;
+          currentState = transition.nextState;
         }
       }
     }
@@ -231,15 +246,15 @@ public class FSM<T extends ComponentDefinition> {
   }
 
   private boolean transitionedToErrorState(
-          Spec expected, EventSpec received, StateTable.Action action) {
-    if (action != null && action.nextIndex != ERROR_STATE) {
+          Spec expected, EventSpec received, StateTable.Transition transition) {
+    if (transition != null && transition.nextState != ERROR_STATE) {
       return false;
     }
 
     gotoErrorState();
-    ERROR_MESSAGE = String.format(
-            "Received %s message <%s> while expecting <%s>",
-            (action == null? "unexpected" : "unwanted"), received, expected);
+    ERROR_MESSAGE =
+            String.format("Received %s message <%s> while expecting <%s>",
+            (transition == null? "unexpected" : "unwanted"), received, expected);
     return true;
   }
 
@@ -394,7 +409,8 @@ public class FSM<T extends ComponentDefinition> {
   }
 
   private class ComparatorMap {
-    Map<Class<? extends KompicsEvent>, Comparator<? extends KompicsEvent>> comparators = new HashMap<>();
+    Map<Class<? extends KompicsEvent>, Comparator<? extends KompicsEvent>> comparators =
+            new HashMap<Class<? extends KompicsEvent>, Comparator<? extends KompicsEvent>>();
 
     @SuppressWarnings("unchecked")
     public <E extends KompicsEvent> Comparator<E> get(Class<E> eventType) {

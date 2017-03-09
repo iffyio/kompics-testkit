@@ -1,8 +1,25 @@
 package se.sics.kompics.testkit;
 
+import com.google.common.base.Function;
 import com.google.common.base.Predicate;
-import se.sics.kompics.*;
+
+import se.sics.kompics.Channel;
+import se.sics.kompics.ChannelFactory;
+import se.sics.kompics.Component;
+import se.sics.kompics.ComponentCore;
+import se.sics.kompics.ComponentDefinition;
+import se.sics.kompics.Init;
+import se.sics.kompics.Kompics;
+import se.sics.kompics.KompicsEvent;
+import se.sics.kompics.Negative;
+import se.sics.kompics.Port;
+import se.sics.kompics.PortCore;
+import se.sics.kompics.PortType;
+import se.sics.kompics.Positive;
+import se.sics.kompics.Scheduler;
+import se.sics.kompics.Start;
 import se.sics.kompics.scheduler.ThreadPoolScheduler;
+
 import se.sics.kompics.testkit.fsm.FSM;
 
 import java.util.Comparator;
@@ -52,11 +69,13 @@ public class TestContext<T extends ComponentDefinition> {
     return c;
   }
 
-  public <P extends PortType> TestContext<T> connect(Negative<P> negative, Positive<P> positive) {
+  public <P extends PortType> TestContext<T> connect(
+          Negative<P> negative, Positive<P> positive) {
     return connect(positive, negative);
   }
 
-  public <P extends PortType> TestContext<T> connect(Positive<P> positive, Negative<P> negative) {
+  public <P extends PortType> TestContext<T> connect(
+          Positive<P> positive, Negative<P> negative) {
     return connect(positive, negative, Channel.TWO_WAY);
   }
 
@@ -169,10 +188,10 @@ public class TestContext<T extends ComponentDefinition> {
     return this;
   }
 
-  public <E extends KompicsEvent> TestContext<T> setDefaultAction(Class<E> eventType,
-                                                                  Predicate<E> predicate) {
-    Testkit.checkNotNull(eventType, predicate);
-    fsm.setDefaultAction(eventType, predicate);
+  public <E extends KompicsEvent> TestContext<T> setDefaultAction(
+          Class<E> eventType, Function<E, Action> function) {
+    Testkit.checkNotNull(eventType, function);
+    fsm.setDefaultAction(eventType, function);
     return this;
   }
 
