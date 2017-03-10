@@ -23,7 +23,7 @@ import se.sics.kompics.KompicsEvent;
 import se.sics.kompics.Start;
 
 import se.sics.kompics.testkit.Action;
-import se.sics.kompics.testkit.AssertThrown;
+import se.sics.kompics.testkit.ExpectedFault;
 import se.sics.kompics.testkit.Direction;
 import se.sics.kompics.testkit.LoopInit;
 import se.sics.kompics.testkit.Proxy;
@@ -46,7 +46,7 @@ public class FSM<T extends ComponentDefinition> {
   private Map<Integer, Repeat> end = new HashMap<Integer, Repeat>();
   private Map<Integer, Trigger> triggeredEvents = new HashMap<Integer, Trigger>();
   private Map<Integer, Predicate<T>> componentPredicates = new HashMap<Integer, Predicate<T>>();
-  private Map<Integer, AssertThrown> assertThrows = new HashMap<Integer, AssertThrown>();
+  private Map<Integer, ExpectedFault> expectedFaults = new HashMap<Integer, ExpectedFault>();
 
   private ComparatorMap comparators = new ComparatorMap();
   private StateTable table = new StateTable();
@@ -216,44 +216,46 @@ public class FSM<T extends ComponentDefinition> {
     table.setDefaultAction(eventType, function);
   }
 
-  public void addAssertThrown(
+  public void addExpectedFault(
           Class<? extends Throwable> exceptionType, Fault.ResolveAction resolveAction) {
     checkInBodyMode();
-    checkAssertThrownHasMatchingClause();
-    assertThrows.put(currentState, new AssertThrown(exceptionType, resolveAction));
+    checkExpectedFaultHasMatchingClause();
+    expectedFaults.put(currentState, new ExpectedFault(exceptionType, resolveAction));
     currentState++;
   }
 
-  public void addAssertThrown(
+  public void addExpectedFault(
           Predicate<Throwable> exceptionPredicate, Fault.ResolveAction resolveAction) {
     checkInBodyMode();
-    checkAssertThrownHasMatchingClause();
-    assertThrows.put(currentState, new AssertThrown(exceptionPredicate, resolveAction));
+    checkExpectedFaultHasMatchingClause();
+    expectedFaults.put(currentState, new ExpectedFault(exceptionPredicate, resolveAction));
     currentState++;
   }
 
-  public AssertThrown getNextAssertThrown() {
+  public ExpectedFault getNextExpectedFault() {
     // method is called from outside thread when handling faults
     int initialState = currentState;
-    //fsm thread may(not) have advanced to next state 'x' (assertThrown state)
+    //fsm thread may(not) have advanced to next state 'x' (expectFault state)
     //initialState must be x or (x - 1) if any
 
-    AssertThrown assertThrown = assertThrows.get(initialState);
-    if (assertThrown == null) { // try next state
-      assertThrown = assertThrows.get(initialState + 1);
+    ExpectedFault expectedFault = expectedFaults.get(initialState);
+    if (expectedFault == null) { // try next state
+      expectedFault = expectedFaults.get(initialState + 1);
     }
+    for (int s : expectedFaults.keySet())
+      logger.warn("as = {}, init = {}", s, initialState);
 
-    return assertThrown;
+    return expectedFault;
   }
 
-  private void checkAssertThrownHasMatchingClause() {
+  private void checkExpectedFaultHasMatchingClause() {
     int previousState = currentState - 1;
     if (table.getExpectedSpecAt(previousState) == null && !triggeredEvents.containsKey(previousState)) {
-      throw new IllegalStateException("assert thrown must be preceded by an expect or trigger");
+      throw new IllegalStateException("expected fault must be preceded by an expect or trigger");
       /*
       expect(...)
       repeat()
-      assertThrow()
+      expectFault()
       expect()
       end
        */
@@ -293,7 +295,7 @@ public class FSM<T extends ComponentDefinition> {
 
   private boolean expectingAnEvent() {
     return !(startOfLoop() || endOfLoop() || triggeredAnEvent()
-            || assertedComponent() || assertedExceptionThrown());
+            || assertedComponent() || expectedFault());
   }
 
   private boolean transitionedToErrorState(
@@ -326,20 +328,19 @@ public class FSM<T extends ComponentDefinition> {
     return true;
   }
 
-  private boolean assertedExceptionThrown() {
-    AssertThrown assertThrown = this.assertThrows.get(currentState);
-    if (assertThrown == null) {
+  private boolean expectedFault() {
+    ExpectedFault expectedFault = this.expectedFaults.get(currentState);
+    if (expectedFault == null) {
       return false;
     }
 
-    logger.warn("Expecting exception matching {}", assertThrown.strReprOfExpectedException());
+    logger.warn("Expect fault matching {}", expectedFault.strReprOfExpectedException());
 
-    boolean assertionWasSuccessful = assertThrown.isSuccessful();
+    ExpectedFault.Result result = expectedFault.getResult();
 
-    String assertMessage = assertThrown.getMessage();
-    assertThrown.reset();
+    String assertMessage = result.message;
 
-    if (assertionWasSuccessful) {
+    if (result.succeeded) {
       logger.warn(assertMessage);
       currentState++;
     } else {
@@ -409,7 +410,7 @@ public class FSM<T extends ComponentDefinition> {
 
   private void runFinalState() {
     logger.warn("Done!({})", currentState == ERROR_STATE?
-            "FAILED -> " + ERROR_MESSAGE : "PASS");
+            "FAILURE -> " + ERROR_MESSAGE : "PASS");
   }
 
   private void checkBalancedRepeatBlocks() {

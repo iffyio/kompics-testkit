@@ -1,7 +1,6 @@
 package se.sics.kompics.testkit;
 
-import com.google.common.base.Function;
-
+import com.google.common.base.Predicate;
 import org.junit.Test;
 import static junit.framework.Assert.assertEquals;
 
@@ -18,23 +17,25 @@ import se.sics.kompics.Request;
 import se.sics.kompics.Start;
 
 import static se.sics.kompics.testkit.Direction.INCOMING;
-import static se.sics.kompics.testkit.Direction.OUTGOING;
 
-public class PingerPongerTest {
+public class ExpectFaultTest {
 
   private TestContext<Pinger> tc = Testkit.newTestContext(Pinger.class, Init.NONE);
   private Component pinger = tc.getComponentUnderTest();
   private Component ponger = tc.create(Ponger.class, Init.NONE);
 
-  private Ping ping = new Ping(0);
-  private Pong pong = new Pong(0);
-  private LoopInit resetPong = new LoopInit() {
+  private Predicate<Throwable> negativePingPredicate = new Predicate<Throwable>() {
     @Override
-    public void init() {
-      pong.count = 0;
-      Ponger.counter = 0;
+    public boolean apply(Throwable throwable) {
+      return throwable.getMessage().equals(NEGATIVE_PONG);
     }
   };
+
+  private static int N = 5;
+  private static String NEGATIVE_PONG = "negative ping";
+  private static String MULTIPLE_OF_N = "multiple of " + N;
+  private Ping ping = new Ping(0);
+  private Pong pong = new Pong(0);
 
   private LoopInit incrementCounters = new LoopInit() {
     @Override
@@ -45,72 +46,97 @@ public class PingerPongerTest {
   };
 
   @Test
-  public void iterationInitTest() {
-
-    tc.
-      connect(pinger.getNegative(PingPongPort.class), ponger.getPositive(PingPongPort.class)).
-      body().
-
-      repeat(3).
-      body().
-        repeat(3, resetPong).
-          onEachIteration(incrementCounters).
-        body().
-          expect(ping, pinger.getNegative(PingPongPort.class), OUTGOING).
-          expect(pong, pinger.getNegative(PingPongPort.class), INCOMING).
-        end().
-      end();
-
-    assertEquals(tc.check(), tc.getFinalState());
+  public void faultPairedWithTriggerTest() {
+    throwErrorOnNegativeFault(true);
   }
 
   @Test
-  public void defaultActionTest() {
+  public void faultPairedWithExpectTest() {
     tc.
-      setDefaultAction(Pong.class, new Function<Pong, Action>() {
-        @Override
-        public Action apply(Pong event) {
-          return Action.HANDLE;
-        }
-      }).
-      setDefaultAction(KompicsEvent.class, new Function<KompicsEvent, Action>() {
-        @Override
-        public Action apply(KompicsEvent event) {
-          return Action.FAIL;
-        }
-      }).
       connect(pinger.getNegative(PingPongPort.class), ponger.getPositive(PingPongPort.class)).
       body().
 
-        repeat(3).
+        repeat(10).
         body().
-          repeat(30, resetPong).
+          repeat(N - 1). // pinger receive n - 1 pongs
             onEachIteration(incrementCounters).
           body().
-            expect(ping, pinger.getNegative(PingPongPort.class), OUTGOING).
+            trigger(pong, ponger.getPositive(PingPongPort.class).getPair()).
+            expect(pong, pinger.getNegative(PingPongPort.class), INCOMING).
+          end().
+
+            // on Nth pong, throws exception
+          repeat(1).
+            onEachIteration(incrementCounters).
+          body().
+            trigger(pong, ponger.getPositive(PingPongPort.class).getPair()).
+            expect(pong, pinger.getNegative(PingPongPort.class), INCOMING).
+            expectFault(IllegalStateException.class, Fault.ResolveAction.IGNORE).
           end().
         end();
 
     assertEquals(tc.check(), tc.getFinalState());
   }
 
+  @Test
+  public void expectFaultWithPredicateTest() {
+    throwErrorOnNegativeFault(false);
+  }
+
+
+  private void throwErrorOnNegativeFault(boolean matchByClass) {
+    Pong negativePong = new Pong(-1);
+
+    tc.
+      connect(pinger.getNegative(PingPongPort.class), ponger.getPositive(PingPongPort.class)).
+      body().
+
+      repeat(10, incrementCounters).
+        body().
+          trigger(pong, ponger.getPositive(PingPongPort.class).getPair()).
+          expect(pong, pinger.getNegative(PingPongPort.class), INCOMING).
+
+          // trigger from ponger's port
+          trigger(negativePong, ponger.getPositive(PingPongPort.class).getPair()).
+          expect(negativePong, pinger.getNegative(PingPongPort.class), INCOMING);
+          matchNegativePong(matchByClass);
+
+          // trigger directly on pinger's port
+          tc.trigger(negativePong, pinger.getNegative(PingPongPort.class));
+          matchNegativePong(matchByClass);
+      tc.end();
+
+    assertEquals(tc.check(), tc.getFinalState());
+  }
+
+  private void matchNegativePong(boolean matchByClass) {
+    if (matchByClass) {
+      tc.expectFault(IllegalStateException.class, Fault.ResolveAction.IGNORE);
+    } else {
+      tc.expectFault(negativePingPredicate, Fault.ResolveAction.IGNORE);
+    }
+  }
+
   public static class Pinger extends ComponentDefinition {
-    static int counter = 0;
 
     Positive<PingPongPort> ppPort = requires(PingPongPort.class);
 
     Handler<Pong> pongHandler = new Handler<Pong>() {
       @Override
-      public void handle(Pong event) {
-        trigger(new Ping(++counter), ppPort);
+      public void handle(Pong pong) {
+        if (pong.count < 0) {
+          throw new IllegalStateException(NEGATIVE_PONG);
+        }
+
+        if (pong.count != 0 && (pong.count) % N == 0) {
+          throw new IllegalStateException(MULTIPLE_OF_N);
+        }
       }
     };
 
     Handler<Start> startHandler = new Handler<Start>() {
       @Override
-      public void handle(Start event) {
-          trigger(new Ping(++counter), ppPort);
-      }
+      public void handle(Start event) { }
     };
 
     {
@@ -120,14 +146,13 @@ public class PingerPongerTest {
   }
 
   public static class Ponger extends ComponentDefinition {
-    static int counter = 0;
 
     Negative<PingPongPort> pingPongPort = provides(PingPongPort.class);
 
     Handler<Ping> pingHandler = new Handler<Ping>() {
       @Override
       public void handle(Ping ping) {
-        Pong pong = new Pong(++counter);
+        Pong pong = new Pong(ping.count);
         trigger(pong, pingPongPort);
       }
     };

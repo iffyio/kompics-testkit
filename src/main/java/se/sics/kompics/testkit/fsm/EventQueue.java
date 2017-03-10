@@ -1,6 +1,8 @@
 package se.sics.kompics.testkit.fsm;
 
 
+import se.sics.kompics.Kompics;
+
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class EventQueue {
@@ -15,7 +17,7 @@ public class EventQueue {
   public synchronized EventSpec poll() {
     while (q.peek() == null) {
       try {
-        wait();
+        this.wait();
       } catch (InterruptedException e) {
         throw new RuntimeException(e);
       }

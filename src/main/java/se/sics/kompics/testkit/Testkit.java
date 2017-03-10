@@ -1,10 +1,14 @@
 package se.sics.kompics.testkit;
 
 import com.google.common.base.Preconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import se.sics.kompics.ComponentDefinition;
 import se.sics.kompics.Init;
 
 public class Testkit {
+
+  static final Logger logger = LoggerFactory.getLogger(Testkit.class);
 
   private Testkit() {}
 

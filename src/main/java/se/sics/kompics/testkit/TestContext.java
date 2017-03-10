@@ -151,9 +151,9 @@ public class TestContext<T extends ComponentDefinition> {
   public <P extends PortType> TestContext<T> trigger(
           KompicsEvent event, Port<P> port) {
     Testkit.checkNotNull(event, port);
-    if (port.getOwner() == cut.getComponentCore()) {
+/*    if (port.getOwner() == cut.getComponentCore()) {
       throw new IllegalStateException("Triggers are not allowed on component being tested");
-    }
+    }*/
     fsm.addTrigger(event, port);
     return this;
   }
@@ -207,17 +207,17 @@ public class TestContext<T extends ComponentDefinition> {
     return this;
   }
 
-  public TestContext<T> assertThrown(
+  public TestContext<T> expectFault(
           Class<? extends Throwable> exceptionType, Fault.ResolveAction resolveAction) {
     Testkit.checkNotNull(exceptionType, resolveAction);
-    fsm.addAssertThrown(exceptionType, resolveAction);
+    fsm.addExpectedFault(exceptionType, resolveAction);
     return this;
   }
 
-  public TestContext<T> assertThrown(
+  public TestContext<T> expectFault(
           Predicate<Throwable> exceptionPredicate, Fault.ResolveAction resolveAction) {
     Testkit.checkNotNull(exceptionPredicate, resolveAction);
-    fsm.addAssertThrown(exceptionPredicate, resolveAction);
+    fsm.addExpectedFault(exceptionPredicate, resolveAction);
     return this;
   }
 

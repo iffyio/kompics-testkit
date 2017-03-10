@@ -3,10 +3,10 @@ package se.sics.kompics.testkit;
 import com.google.common.base.Predicate;
 import se.sics.kompics.Fault;
 
-public class AssertThrown {
+public class ExpectedFault {
 
   private enum STATUS {
-    PENDING, PASSED, FAILED
+    PENDING, SUCCESS, FAILURE
   }
 
   private final Class<? extends Throwable> exceptionType;
@@ -16,7 +16,7 @@ public class AssertThrown {
   private STATUS status;
   private String message;
 
-  public AssertThrown(
+  public ExpectedFault(
           Class<? extends Throwable> exceptionType, Fault.ResolveAction resolveAction) {
     this.exceptionType = exceptionType;
     this.resolveAction = resolveAction;
@@ -24,7 +24,7 @@ public class AssertThrown {
     reset();
   }
 
-  public AssertThrown(
+  public ExpectedFault(
           Predicate<Throwable> exceptionPredicate, Fault.ResolveAction resolveAction) {
     this.exceptionPredicate = exceptionPredicate;
     this.resolveAction = resolveAction;
@@ -32,9 +32,10 @@ public class AssertThrown {
     reset();
   }
 
-  public synchronized Fault.ResolveAction matchException(Fault fault) {
+  synchronized Fault.ResolveAction matchFault(Fault fault) {
     if (status != STATUS.PENDING) {
-      throw new IllegalStateException("reset() must be called before reusing object");
+      // unexpected fault was thrown before previous exception was asserted
+      return Fault.ResolveAction.ESCALATE;
     }
 
     if (exceptionType != null) {
@@ -43,34 +44,30 @@ public class AssertThrown {
       matchByPredicate(fault.getCause());
     }
 
-    if (status == STATUS.PASSED) {
-      return resolveAction;
-    } else {
-      return Fault.ResolveAction.ESCALATE;
-    }
+    this.notifyAll();
+    return resolveAction;
   }
 
-  public synchronized boolean isSuccessful() {
+  public synchronized Result getResult() {
     while (status == STATUS.PENDING) {
       try {
-        wait();
+        this.wait();
       } catch (InterruptedException e) {
         throw new RuntimeException(e);
       }
     }
-    return status == STATUS.PASSED;
+
+    Result r = new Result(status == STATUS.SUCCESS, getMessage());
+    reset();
+    return r;
   }
 
-  public void reset() {
+  private void reset() {
     status = STATUS.PENDING;
     message = null;
   }
 
-  public Fault.ResolveAction getResolveAction() {
-    return resolveAction;
-  }
-
-  public String getMessage() {
+  private String getMessage() {
     return status == STATUS.PENDING?
             String.format("Expected to throw exception matching '%s'" +
                           " but none was thrown", strReprOfExpectedException())
@@ -100,14 +97,21 @@ public class AssertThrown {
   }
 
   private void pass(Throwable exception) {
-    status = STATUS.PASSED;
-    message = "Asserted thrown\n" + exception;
+    status = STATUS.SUCCESS;
+    message = "Expect Fault Succeeded (" + exception + ")";
   }
 
   private void fail(String message) {
-    status = STATUS.FAILED;
-    this.message = "AssertThrown Failed: " + message;
+    status = STATUS.FAILURE;
+    this.message = "Expect Fault Failed: " + message;
   }
 
-
+  public static class Result {
+    public final boolean succeeded;
+    public final String message;
+    private Result(boolean succeeded, String message) {
+      this.succeeded = succeeded;
+      this.message = message;
+    }
+  }
 }
