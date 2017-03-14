@@ -1,6 +1,14 @@
 package se.sics.kompics.testkit;
 
-import se.sics.kompics.*;
+import se.sics.kompics.ChannelFactory;
+import se.sics.kompics.ControlPort;
+import se.sics.kompics.JavaPort;
+import se.sics.kompics.LoopbackPort;
+import se.sics.kompics.Negative;
+import se.sics.kompics.Port;
+import se.sics.kompics.PortCore;
+import se.sics.kompics.PortType;
+import se.sics.kompics.Positive;
 
 import java.util.HashMap;
 import java.util.Map;

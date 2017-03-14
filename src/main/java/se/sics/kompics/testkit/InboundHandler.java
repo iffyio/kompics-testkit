@@ -2,7 +2,13 @@ package se.sics.kompics.testkit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import se.sics.kompics.*;
+
+import se.sics.kompics.KompicsEvent;
+import se.sics.kompics.Port;
+import se.sics.kompics.PortType;
+import se.sics.kompics.Request;
+import se.sics.kompics.Response;
+
 import se.sics.kompics.testkit.fsm.EventSpec;
 
 class InboundHandler extends ProxyHandler {
@@ -18,7 +24,7 @@ class InboundHandler extends ProxyHandler {
 
   @Override
   public void handle(KompicsEvent event) {
-    //logger.warn("received event: {}", event);
+    logger.trace("received event: {}", event);
     if (event instanceof Response) {
       Response response = (Response) event;
       assert response.getTopPathElementFirst().getComponent() == destPort.getPair().getOwner();

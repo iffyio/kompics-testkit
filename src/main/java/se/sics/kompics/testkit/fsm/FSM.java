@@ -29,7 +29,7 @@ import se.sics.kompics.testkit.LoopInit;
 import se.sics.kompics.testkit.Proxy;
 
 public class FSM<T extends ComponentDefinition> {
-  static final Logger logger = LoggerFactory.getLogger(FSM.class);
+  static final Logger logger = LoggerFactory.getLogger("Testkit");
 
   private final T definitionUnderTest;
   static final int ERROR_STATE = -1;
@@ -110,14 +110,11 @@ public class FSM<T extends ComponentDefinition> {
 
   private void addRepeat(Repeat repeat) {
     checkInBodyMode();
-
     if (repeat.times <= 0) {
       throw new IllegalArgumentException("only positive value allowed for repeat");
     }
-
     currentBlock = new Block(repeat, currentBlock);
     balancedRepeat.push(currentBlock);
-
     loops.put(currentState, repeat);
     currentState++;
   }
@@ -140,16 +137,13 @@ public class FSM<T extends ComponentDefinition> {
 
   public void endRepeat() {
     checkInBodyMode();
-
     if (balancedRepeat.isEmpty()) {
       throw new IllegalStateException("matching repeat not found for end");
     } else if (currentRepeatBlockIsEmpty()) {
       throw new IllegalStateException("empty repeat blocks are not allowed");
     }
-
     Repeat loopHead = currentBlock.repeat;
     end.put(currentState, loopHead);
-
     restorePreviousBlock();
     currentState++;
   }
@@ -232,19 +226,12 @@ public class FSM<T extends ComponentDefinition> {
     currentState++;
   }
 
-  public ExpectedFault getNextExpectedFault() {
-    // method is called from outside thread when handling faults
+  public ExpectedFault getExpectedFault() {
     int initialState = currentState;
-    //fsm thread may(not) have advanced to next state 'x' (expectFault state)
-    //initialState must be x or (x - 1) if any
-
     ExpectedFault expectedFault = expectedFaults.get(initialState);
     if (expectedFault == null) { // try next state
       expectedFault = expectedFaults.get(initialState + 1);
     }
-    for (int s : expectedFaults.keySet())
-      logger.warn("as = {}, init = {}", s, initialState);
-
     return expectedFault;
   }
 
@@ -252,19 +239,11 @@ public class FSM<T extends ComponentDefinition> {
     int previousState = currentState - 1;
     if (table.getExpectedSpecAt(previousState) == null && !triggeredEvents.containsKey(previousState)) {
       throw new IllegalStateException("expected fault must be preceded by an expect or trigger");
-      /*
-      expect(...)
-      repeat()
-      expectFault()
-      expect()
-      end
-       */
     }
   }
 
   private void run() {
     runStartState();
-
     currentState = 0;
     while (currentState < FINAL_STATE && currentState != ERROR_STATE) {
       if (expectingAnEvent()) {
@@ -277,19 +256,14 @@ public class FSM<T extends ComponentDefinition> {
         StateTable.Transition transition = table.lookup(currentState, received);
 
         if (!transitionedToErrorState(expected, received, transition)) {
-
-          logger.warn("{}: Matched ({}) with Transition = {}",
-                  currentState, received, transition);
-
+          logger.debug("{}: Matched ({}) with Transition = {}", currentState, received, transition);
           if (transition.handleEvent()) {
             received.handle();
           }
-
           currentState = transition.nextState;
         }
       }
     }
-
     runFinalState();
   }
 
@@ -303,7 +277,6 @@ public class FSM<T extends ComponentDefinition> {
     if (transition != null && transition.nextState != ERROR_STATE) {
       return false;
     }
-
     String errorMessage = String.format("Received %s message <%s> while expecting <%s>",
                             (transition == null? "unexpected" : "unwanted"), received, expected);
     gotoErrorState(errorMessage);
@@ -315,8 +288,7 @@ public class FSM<T extends ComponentDefinition> {
     if (assertPred == null) {
       return false;
     }
-
-    logger.warn("{}: Asserting Component", currentState);
+    logger.debug("{}: Asserting Component", currentState);
     boolean successful = assertPred.apply(definitionUnderTest);
 
     if (!successful) {
@@ -324,7 +296,6 @@ public class FSM<T extends ComponentDefinition> {
     } else {
       currentState++;
     }
-
     return true;
   }
 
@@ -333,20 +304,17 @@ public class FSM<T extends ComponentDefinition> {
     if (expectedFault == null) {
       return false;
     }
-
-    logger.warn("Expect fault matching {}", expectedFault.strReprOfExpectedException());
+    logger.info("Expect fault matching {}", expectedFault.strReprOfExpectedException());
 
     ExpectedFault.Result result = expectedFault.getResult();
-
     String assertMessage = result.message;
 
     if (result.succeeded) {
-      logger.warn(assertMessage);
+      logger.debug(assertMessage);
       currentState++;
     } else {
       gotoErrorState(assertMessage);
     }
-
     return true;
   }
 
@@ -357,12 +325,10 @@ public class FSM<T extends ComponentDefinition> {
 
   private boolean triggeredAnEvent() {
     Trigger trigger = triggeredEvents.get(currentState);
-
     if (trigger == null) {
       return false;
     }
-
-    logger.warn("{}: triggeredAnEvent({})\t", currentState, trigger);
+    logger.debug("{}: triggeredAnEvent({})\t", currentState, trigger);
     trigger.doTrigger();
     currentState++;
     return true;
@@ -374,9 +340,7 @@ public class FSM<T extends ComponentDefinition> {
       return false;
     } else {
       loop.initialize();
-
-      logger.warn("{}: repeat({})\t", currentState, loop.getCurrentCount());
-
+      logger.debug("{}: repeat({})\t", currentState, loop.getCurrentCount());
       currentState++;
       return true;
     }
@@ -387,30 +351,25 @@ public class FSM<T extends ComponentDefinition> {
     if (loop == null) {
       return false;
     }
-
-    logger.warn("{}: end({})\t", currentState, loop.times);
-
+    logger.debug("{}: end({})\t", currentState, loop.times);
     loop.iterationComplete();
-
     if (loop.hasMoreIterations()) {
       currentState = loop.indexOfFirstState();
     } else {
       currentState++;
     }
-
     return true;
   }
 
   private void runStartState() {
-    logger.warn("Sending Start to {} participant component(s)", participants.size());
+    logger.debug("Sending Start to {} participant component(s)", participants.size());
     for (Component child : participants) {
       child.getControl().doTrigger(Start.event, 0, proxyComponent);
     }
   }
 
   private void runFinalState() {
-    logger.warn("Done!({})", currentState == ERROR_STATE?
-            "FAILURE -> " + ERROR_MESSAGE : "PASS");
+    logger.info("Done!({})", currentState == ERROR_STATE? "FAILURE -> " + ERROR_MESSAGE : "PASS");
   }
 
   private void checkBalancedRepeatBlocks() {

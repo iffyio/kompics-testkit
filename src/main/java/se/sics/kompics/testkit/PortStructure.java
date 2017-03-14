@@ -2,9 +2,22 @@ package se.sics.kompics.testkit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import se.sics.kompics.*;
+import se.sics.kompics.Channel;
+import se.sics.kompics.ChannelCore;
+import se.sics.kompics.ChannelFactory;
+import se.sics.kompics.Handler;
+import se.sics.kompics.KompicsEvent;
+import se.sics.kompics.Port;
+import se.sics.kompics.PortCore;
+import se.sics.kompics.PortType;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 
 class PortStructure {

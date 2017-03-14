@@ -1,10 +1,21 @@
 package se.sics.kompics.testkit;
 
-import se.sics.kompics.*;
+import se.sics.kompics.ChannelFactory;
+import se.sics.kompics.Component;
+import se.sics.kompics.ComponentDefinition;
+import se.sics.kompics.Fault;
+import se.sics.kompics.Handler;
+import se.sics.kompics.Init;
+import se.sics.kompics.JavaComponent;
+import se.sics.kompics.JavaPort;
+import se.sics.kompics.Negative;
+import se.sics.kompics.Port;
+import se.sics.kompics.PortType;
+import se.sics.kompics.Positive;
+import se.sics.kompics.Start;
 import se.sics.kompics.testkit.fsm.EventQueue;
 import se.sics.kompics.testkit.fsm.FSM;
 import se.sics.kompics.testkit.scheduler.CallingThreadScheduler;
-
 import java.util.Map;
 
 public class Proxy<T extends ComponentDefinition> extends ComponentDefinition{
@@ -115,7 +126,7 @@ public class Proxy<T extends ComponentDefinition> extends ComponentDefinition{
       return Fault.ResolveAction.ESCALATE;
     }
     // sync with fsm
-    ExpectedFault expectedFault = fsm.getNextExpectedFault();
+    ExpectedFault expectedFault = fsm.getExpectedFault();
 
     if (expectedFault == null) {
       Testkit.logger.error("Unexpected fault was escalated: No matching state was found");

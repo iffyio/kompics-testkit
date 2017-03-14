@@ -54,7 +54,7 @@ class StateTable {
   }
 
   void printExpectedEventAt(int state) {
-    FSM.logger.warn("{}: Expect\t{}", state, getExpectedSpecAt(state));
+    FSM.logger.debug("{}: Expect\t{}", state, getExpectedSpecAt(state));
   }
 
   Spec getExpectedSpecAt(int state) {
@@ -64,21 +64,16 @@ class StateTable {
   Transition lookup(int state, EventSpec receivedSpec) {
     Map<EventSpec, Transition> entry = table.get(state);
     assert entry != null;
-
     Transition transition = null;
-
     if (predicateWasRegisteredFor(state)) {
       transition = predicateLookup(state, receivedSpec);
     }
-
     if (transition == null) {
       transition = entry.get(receivedSpec);
     }
-
     if (transition == null) {
       transition = defaultLookup(state, receivedSpec);
     }
-
     return transition;
   }
 
@@ -90,12 +85,11 @@ class StateTable {
   private Transition predicateLookup(int state, EventSpec eventSpec) {
     PredicateSpec predSpec = predicateSpecs.get(state);
     KompicsEvent receivedEvent = eventSpec.getEvent();
-
-    if (predSpec != null && predSpec.getPredicate().apply(receivedEvent)) {
-      int nextState = state + 1;
-      return new Transition(eventSpec, Action.HANDLE, nextState);
+    if (predSpec != null &&
+        predSpec.match(receivedEvent.getClass()) && predSpec.getPredicate().apply(receivedEvent)) {
+        int nextState = state + 1;
+        return new Transition(eventSpec, Action.HANDLE, nextState);
     }
-
     return null;
   }
 
@@ -121,36 +115,29 @@ class StateTable {
 
   private void createStateEntryIfNotExists(int state, Environment env) {
     Map<EventSpec, Transition> entry = table.get(state);
-
     if (entry != null) {
       return;
     }
-
     entry = new HashMap<>();
     table.put(state, entry);
     for (EventSpec e : env.getDisallowedEvents()) {
       entry.put(e, new Transition(e, Action.FAIL, FSM.ERROR_STATE));
     }
-
     for (EventSpec e : env.getAllowedEvents()) {
       entry.put(e, new Transition(e, Action.HANDLE, state));
     }
-
     for (EventSpec e : env.getDroppedEvents()) {
       entry.put(e, new Transition(e, Action.DROP, state));
     }
   }
 
   private Transition defaultLookup(int state, EventSpec eventSpec) {
-
     KompicsEvent event = eventSpec.getEvent();
     Class<? extends KompicsEvent> eventType = event.getClass();
 
     for (Class<? extends KompicsEvent> registeredType : defaultActions.keySet()) {
       if (registeredType.isAssignableFrom(eventType)) {
-
-        Action action = actionFor(event, defaultActions.get(registeredType));
-
+        Action action = actionFor(event, registeredType);
         switch (action) {
           case HANDLE:
             return new Transition(eventSpec, Action.HANDLE, state);
@@ -161,18 +148,23 @@ class StateTable {
         }
       }
     }
-
     return null;
   }
 
-  private <E extends KompicsEvent> Action actionFor(KompicsEvent event, Function<E, Action> function) {
-    E e = (E) event;
-    return function.apply(e);
+  private <E extends KompicsEvent> Action actionFor(
+          KompicsEvent event, Class<? extends KompicsEvent> registeredType) {
+    E ev = (E) event;
+    Function<E, Action> function = (Function<E, Action>) defaultActions.get(registeredType);
+    Action action = function.apply(ev);
+    if (action == null) {
+      throw new NullPointerException(String.format("(default handler for %s returned null for event '%s')",
+              registeredType, event));
+    }
+    return action;
   }
 
 
   static class Transition {
-
     final EventSpec eventSpec;
     final Action action;
     final int nextState;
@@ -192,7 +184,6 @@ class StateTable {
       if (!(obj instanceof Transition)) {
         return false;
       }
-
       Transition other = (Transition) obj;
       return this.eventSpec.equals(other.eventSpec);
     }

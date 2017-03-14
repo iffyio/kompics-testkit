@@ -151,9 +151,6 @@ public class TestContext<T extends ComponentDefinition> {
   public <P extends PortType> TestContext<T> trigger(
           KompicsEvent event, Port<P> port) {
     Testkit.checkNotNull(event, port);
-/*    if (port.getOwner() == cut.getComponentCore()) {
-      throw new IllegalStateException("Triggers are not allowed on component being tested");
-    }*/
     fsm.addTrigger(event, port);
     return this;
   }

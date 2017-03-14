@@ -27,6 +27,10 @@ class PredicateSpec implements Spec{
     return predicate;
   }
 
+  boolean match(Class<? extends KompicsEvent> eType) {
+    return eventType.isAssignableFrom(eType);
+  }
+
   public boolean equals(Object o) {
     if (o == null || !(o instanceof PredicateSpec)) {
       return false;
