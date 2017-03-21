@@ -88,106 +88,6 @@ public class FSM<T extends ComponentDefinition> {
     currentBlock.env.addDroppedMessage(newEventSpec(event, port, direction));
   }
 
-  private  <P extends  PortType, E extends KompicsEvent> EventSpec newEventSpec(
-          KompicsEvent event, Port<P> port, Direction direction) {
-    Comparator<E> c = (Comparator<E>) comparators.get(event.getClass());
-    return new EventSpec<>((E) event, port, direction, c);
-  }
-
-  public int getFinalState() {
-    return STARTED? FINAL_STATE : currentState;
-  }
-
-  public void repeat(int times) {
-    Repeat repeat = new Repeat(times, currentState);
-    addRepeat(repeat);
-  }
-
-  public void repeat(int times, LoopInit init) {
-    Repeat repeat = new Repeat(times, currentState, init);
-    addRepeat(repeat);
-  }
-
-  private void addRepeat(Repeat repeat) {
-    checkInBodyMode();
-    if (repeat.times <= 0) {
-      throw new IllegalArgumentException("only positive value allowed for repeat");
-    }
-    currentBlock = new Block(repeat, currentBlock);
-    balancedRepeat.push(currentBlock);
-    loops.put(currentState, repeat);
-    currentState++;
-  }
-
-  public void setIterationInit(LoopInit iterationInit) {
-    checkInHeaderMode();
-    currentBlock.repeat.setIterationInit(iterationInit);
-  }
-
-  public void body() {
-    checkInHeaderMode();
-    currentBlock.inHeaderMode = false;
-  }
-
-  public void addTrigger(KompicsEvent event, Port<? extends PortType> port) {
-    checkInBodyMode();
-    triggeredEvents.put(currentState, new Trigger(event, port));
-    currentState++;
-  }
-
-  public void endRepeat() {
-    checkInBodyMode();
-    if (balancedRepeat.isEmpty()) {
-      throw new IllegalStateException("matching repeat not found for end");
-    } else if (currentRepeatBlockIsEmpty()) {
-      throw new IllegalStateException("empty repeat blocks are not allowed");
-    }
-    Repeat loopHead = currentBlock.repeat;
-    end.put(currentState, loopHead);
-    restorePreviousBlock();
-    currentState++;
-  }
-
-  private void restorePreviousBlock() {
-    if (!balancedRepeat.isEmpty()) { // false only for initial block
-      currentBlock = balancedRepeat.pop().previousBlock;
-    }
-  }
-
-  private boolean currentRepeatBlockIsEmpty() {
-    // compare current stateIndex with startOfLoop stateIndex
-    return  balancedRepeat.isEmpty() ||
-            // no state was added since start of loop
-            balancedRepeat.peek().repeat.getStateIndex() == currentState - 1;
-  }
-
-
-  public int start() {
-    if (!STARTED) {
-      STARTED = true;
-      addFinalState();
-      checkBalancedRepeatBlocks();
-      table.printTable(FINAL_STATE);
-      run();
-    }
-    return currentState;
-  }
-
-  private void addFinalState() { FINAL_STATE = currentState;
-    endRepeat();
-  }
-
-  public <E extends KompicsEvent> void addComparator(
-          Class<E> eventType, Comparator<E> comparator) {
-    checkInInitialHeader();
-    comparators.put(eventType, comparator);
-  }
-
-  public void addAssertComponent(Predicate<T> assertPred) {
-    componentPredicates.put(currentState, assertPred);
-    currentState++;
-  }
-
   public <P extends PortType> void expectMessage(
           KompicsEvent event, Port<P> port, Direction direction) {
     checkInBodyMode();
@@ -204,10 +104,43 @@ public class FSM<T extends ComponentDefinition> {
     currentState++;
   }
 
-  public <E extends KompicsEvent> void setDefaultAction(
-          Class<E> eventType, Function<E, Action> function) {
-    checkInInitialHeader();
-    table.setDefaultAction(eventType, function);
+  public void addTrigger(KompicsEvent event, Port<? extends PortType> port) {
+    checkInBodyMode();
+    triggeredEvents.put(currentState, new Trigger(event, port));
+    currentState++;
+  }
+
+  public void repeat(int times) {
+    Repeat repeat = new Repeat(times, currentState);
+    addRepeat(repeat);
+  }
+
+  public void repeat(int times, LoopInit init) {
+    Repeat repeat = new Repeat(times, currentState, init);
+    addRepeat(repeat);
+  }
+
+  public void body() {
+    checkInHeaderMode();
+    currentBlock.inHeaderMode = false;
+  }
+
+  public void endRepeat() {
+    checkInBodyMode();
+    if (balancedRepeat.isEmpty()) {
+      throw new IllegalStateException("matching repeat not found for end");
+    } else if (currentRepeatBlockIsEmpty()) {
+      throw new IllegalStateException("empty repeat blocks are not allowed");
+    }
+    Repeat loopHead = currentBlock.repeat;
+    end.put(currentState, loopHead);
+    restorePreviousBlock();
+    currentState++;
+  }
+
+  public void setIterationInit(LoopInit iterationInit) {
+    checkInHeaderMode();
+    currentBlock.repeat.setIterationInit(iterationInit);
   }
 
   public void addExpectedFault(
@@ -226,13 +159,114 @@ public class FSM<T extends ComponentDefinition> {
     currentState++;
   }
 
+  public void addAssertComponent(Predicate<T> assertPred) {
+    componentPredicates.put(currentState, assertPred);
+    currentState++;
+  }
+
+  public <E extends KompicsEvent> void addComparator(
+          Class<E> eventType, Comparator<E> comparator) {
+    checkInInitialHeader();
+    comparators.put(eventType, comparator);
+  }
+
+  public <E extends KompicsEvent> void setDefaultAction(
+          Class<E> eventType, Function<E, Action> function) {
+    checkInInitialHeader();
+    table.setDefaultAction(eventType, function);
+  }
+
+  public int getFinalState() {
+    return STARTED? FINAL_STATE : currentState;
+  }
+
+  public void checkInInitialHeader() {
+    checkInHeaderMode();
+    if (currentBlock == null || currentBlock.previousBlock != null) {
+      throw new IllegalStateException("Operation only supported in initial header");
+    }
+  }
+
+  public int start() {
+    if (!STARTED) {
+      STARTED = true;
+      addFinalState();
+      checkBalancedRepeatBlocks();
+      table.printTable(FINAL_STATE);
+      run();
+    }
+    return currentState;
+  }
+
+  // PACKAGE_PRIVATE
+
   public ExpectedFault getExpectedFault() {
+    // // TODO: 3/21/17 use view with (expect, fault) pair
     int initialState = currentState;
     ExpectedFault expectedFault = expectedFaults.get(initialState);
     if (expectedFault == null) { // try next state
       expectedFault = expectedFaults.get(initialState + 1);
     }
     return expectedFault;
+  }
+
+  // PRIVATE
+
+  private void run() {
+    runStartState();
+    currentState = 0;
+    while (currentState < FINAL_STATE && currentState != ERROR_STATE) {
+      if (expectingAnEvent()) {
+        table.printExpectedEventAt(currentState);
+        String expected = table.getExpectedSpecAt(currentState);
+
+        EventSpec<? extends KompicsEvent> received = removeEventFromQueue();
+        setComparatorForEvent(received);
+
+        StateTable.Transition transition = table.lookup(currentState, received);
+
+        if (!transitionedToErrorState(expected, received.toString(), transition)) {
+          logger.debug("{}: Matched ({}) with Transition = {}", currentState, received, transition);
+          currentState = transition.nextState;
+        }
+      }
+    }
+    runFinalState();
+  }
+
+  private  <P extends  PortType, E extends KompicsEvent> EventSpec<? extends KompicsEvent> newEventSpec(
+          KompicsEvent event, Port<P> port, Direction direction) {
+    Comparator<E> c = (Comparator<E>) comparators.get(event.getClass());
+    return new EventSpec<>((E) event, port, direction, c);
+  }
+
+  private void addRepeat(Repeat repeat) {
+    checkInBodyMode();
+    if (repeat.times <= 0) {
+      throw new IllegalArgumentException("only positive value allowed for repeat");
+    }
+    currentBlock = new Block(repeat, currentBlock);
+    balancedRepeat.push(currentBlock);
+    loops.put(currentState, repeat);
+    currentState++;
+  }
+
+  private void restorePreviousBlock() {
+    if (!balancedRepeat.isEmpty()) { // false only for initial block
+      currentBlock = balancedRepeat.pop().previousBlock;
+    }
+  }
+
+  private boolean currentRepeatBlockIsEmpty() {
+    // compare current stateIndex with startOfLoop stateIndex
+    return  balancedRepeat.isEmpty() ||
+            // no state was added since start of loop
+            balancedRepeat.peek().repeat.getStateIndex() == currentState - 1;
+  }
+
+
+  private void addFinalState() { FINAL_STATE = currentState;
+    endRepeat();
   }
 
   private void checkExpectedFaultHasMatchingClause() {
@@ -242,38 +276,13 @@ public class FSM<T extends ComponentDefinition> {
     }
   }
 
-  private void run() {
-    runStartState();
-    currentState = 0;
-    while (currentState < FINAL_STATE && currentState != ERROR_STATE) {
-      if (expectingAnEvent()) {
-        table.printExpectedEventAt(currentState);
-        Spec expected = table.getExpectedSpecAt(currentState);
-
-        EventSpec received = removeEventFromQueue();
-        setComparatorForEvent(received);
-
-        StateTable.Transition transition = table.lookup(currentState, received);
-
-        if (!transitionedToErrorState(expected, received, transition)) {
-          logger.debug("{}: Matched ({}) with Transition = {}", currentState, received, transition);
-          if (transition.handleEvent()) {
-            received.handle();
-          }
-          currentState = transition.nextState;
-        }
-      }
-    }
-    runFinalState();
-  }
-
   private boolean expectingAnEvent() {
     return !(startOfLoop() || endOfLoop() || triggeredAnEvent()
             || assertedComponent() || expectedFault());
   }
 
   private boolean transitionedToErrorState(
-          Spec expected, EventSpec received, StateTable.Transition transition) {
+          String expected, String received, StateTable.Transition transition) {
     if (transition != null && transition.nextState != ERROR_STATE) {
       return false;
     }
@@ -378,13 +387,6 @@ public class FSM<T extends ComponentDefinition> {
     }
   }
 
-  public void checkInInitialHeader() {
-    checkInHeaderMode();
-    if (currentBlock == null || currentBlock.previousBlock != null) {
-      throw new IllegalStateException("Operation only supported in initial header");
-    }
-  }
-
   private void checkInBodyMode() {
     if (currentBlock != null && currentBlock.inHeaderMode) {
       throw new IllegalStateException("Not in body mode");
@@ -402,7 +404,7 @@ public class FSM<T extends ComponentDefinition> {
     ERROR_MESSAGE = errorMessage;
   }
 
-  private EventSpec removeEventFromQueue() {
+  private EventSpec<? extends KompicsEvent> removeEventFromQueue() {
     return eventQueue.poll();
   }
 

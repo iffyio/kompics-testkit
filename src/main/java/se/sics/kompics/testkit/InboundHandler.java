@@ -33,7 +33,7 @@ class InboundHandler extends ProxyHandler {
       request.pushPathElement(proxy.getComponentCore());
     }
 
-    EventSpec eventSpec = new EventSpec<>(event, destPort, Direction.INCOMING);
+    EventSpec<? extends KompicsEvent> eventSpec = new EventSpec<KompicsEvent>(event, destPort, Direction.INCOMING);
     eventSpec.setHandler(this);
     eventQueue.offer(eventSpec);
   }

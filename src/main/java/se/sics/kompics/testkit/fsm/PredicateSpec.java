@@ -27,12 +27,19 @@ class PredicateSpec implements Spec{
     return predicate;
   }
 
-  boolean match(Class<? extends KompicsEvent> eType) {
-    return eventType.isAssignableFrom(eType);
+  public boolean match(EventSpec<? extends KompicsEvent> receivedSpec) {
+    KompicsEvent receivedEvent = receivedSpec.getEvent();
+    return eventType.isAssignableFrom(receivedEvent.getClass()) &&
+           matchHelper(predicate, receivedEvent);
+  }
+
+  private <E extends KompicsEvent> boolean matchHelper(Predicate<E> predicate, KompicsEvent receivedEvent) {
+    E r = (E) receivedEvent;
+    return predicate.apply(r);
   }
 
   public boolean equals(Object o) {
-    if (o == null || !(o instanceof PredicateSpec)) {
+    if (!(o instanceof PredicateSpec)) {
       return false;
     }
     PredicateSpec other = (PredicateSpec) o;

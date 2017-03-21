@@ -1,13 +1,15 @@
 package se.sics.kompics.testkit.fsm;
 
+import se.sics.kompics.KompicsEvent;
+
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 
 class Environment {
-  private Set<EventSpec> disallowed;
-  private Set<EventSpec> allowed;
-  private Set<EventSpec> dropped;
+  private Set<EventSpec<? extends KompicsEvent>> disallowed;
+  private Set<EventSpec<? extends KompicsEvent>> allowed;
+  private Set<EventSpec<? extends KompicsEvent>> dropped;
 
   Environment(Environment previousEnv) {
     if (previousEnv == null) {
@@ -25,34 +27,34 @@ class Environment {
     dropped = new HashSet<>();
   }
 
-  void addDisallowedMessage(EventSpec eventSpec) {
+  void addDisallowedMessage(EventSpec<? extends KompicsEvent> eventSpec) {
     if (disallowed.add(eventSpec)) {
       allowed.remove(eventSpec);
       dropped.remove(eventSpec);
     }
   }
 
-  void addAllowedMessage(EventSpec eventSpec) {
+  void addAllowedMessage(EventSpec<? extends KompicsEvent> eventSpec) {
     if (allowed.add(eventSpec)) {
       disallowed.remove(eventSpec);
       dropped.remove(eventSpec);
     }
   }
 
-  void addDroppedMessage(EventSpec eventSpec) {
+  void addDroppedMessage(EventSpec<? extends KompicsEvent> eventSpec) {
     if (dropped.add(eventSpec)) {
       disallowed.remove(eventSpec);
       allowed.remove(eventSpec);
     }
   }
 
-  Collection<EventSpec> getDisallowedEvents() {
+  Collection<EventSpec<? extends KompicsEvent>> getDisallowedEvents() {
     return disallowed;
   }
-  Collection<EventSpec> getAllowedEvents() {
+  Collection<EventSpec<? extends KompicsEvent>> getAllowedEvents() {
     return allowed;
   }
-  Collection<EventSpec> getDroppedEvents() {
+  Collection<EventSpec<? extends KompicsEvent>> getDroppedEvents() {
     return dropped;
   }
 

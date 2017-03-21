@@ -54,8 +54,12 @@ public class EventSpec<E extends KompicsEvent> implements Spec{
     handler.doHandle(event);
   }
 
+  public boolean match(EventSpec<? extends KompicsEvent> receivedSpec) {
+    return this.equals(receivedSpec);
+  }
+
   public boolean equals(Object o) {
-    if (o == null || !(o instanceof EventSpec)) {
+    if (!(o instanceof EventSpec)) {
       return false;
     }
     EventSpec other = (EventSpec) o;

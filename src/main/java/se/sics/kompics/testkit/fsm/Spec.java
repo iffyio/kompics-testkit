@@ -1,3 +1,7 @@
 package se.sics.kompics.testkit.fsm;
 
-interface Spec { }
+import se.sics.kompics.KompicsEvent;
+
+interface Spec {
+  boolean match(EventSpec<? extends KompicsEvent> receivedSpec);
+}

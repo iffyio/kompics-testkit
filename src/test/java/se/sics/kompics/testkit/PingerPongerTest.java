@@ -2,12 +2,12 @@ package se.sics.kompics.testkit;
 
 import com.google.common.base.Function;
 
+import org.junit.Before;
 import org.junit.Test;
 import static junit.framework.Assert.assertEquals;
 
 import se.sics.kompics.Component;
 import se.sics.kompics.ComponentDefinition;
-import se.sics.kompics.Fault;
 import se.sics.kompics.Handler;
 import se.sics.kompics.Init;
 import se.sics.kompics.KompicsEvent;
@@ -22,31 +22,17 @@ import static se.sics.kompics.testkit.Direction.OUTGOING;
 
 public class PingerPongerTest {
 
-  private TestContext<Pinger> tc = Testkit.newTestContext(Pinger.class, Init.NONE);
-  private Component pinger = tc.getComponentUnderTest();
-  private Component ponger = tc.create(Ponger.class, Init.NONE);
+  private TestContext<Pinger> tc;
+  private Component pinger;
+  private Component ponger;
 
-  private Ping ping = new Ping(0);
-  private Pong pong = new Pong(0);
-  private LoopInit resetPong = new LoopInit() {
-    @Override
-    public void init() {
-      pong.count = 0;
-      Ponger.counter = 0;
-    }
-  };
-
-  private LoopInit incrementCounters = new LoopInit() {
-    @Override
-    public void init() {
-      ping.count++;
-      pong.count++;
-    }
-  };
+  private Ping ping;
+  private Pong pong;
+  private LoopInit resetPong;
+  private LoopInit incrementCounters;
 
   @Test
   public void iterationInitTest() {
-
     tc.
       connect(pinger.getNegative(PingPongPort.class), ponger.getPositive(PingPongPort.class)).
       body().
@@ -92,6 +78,33 @@ public class PingerPongerTest {
         end();
 
     assertEquals(tc.check(), tc.getFinalState());
+  }
+
+  @Before
+  public void init() {
+    Pinger.counter = 0;
+    Ponger.counter = 0;
+    ping = new Ping(0);
+    pong = new Pong(0);
+    resetPong = new LoopInit() {
+      @Override
+      public void init() {
+        pong.count = 0;
+        Ponger.counter = 0;
+      }
+    };
+
+    incrementCounters = new LoopInit() {
+      @Override
+      public void init() {
+        ping.count++;
+        pong.count++;
+      }
+    };
+
+    tc = Testkit.newTestContext(Pinger.class, Init.NONE);
+    pinger = tc.getComponentUnderTest();
+    ponger = tc.create(Ponger.class, Init.NONE);
   }
 
   public static class Pinger extends ComponentDefinition {
