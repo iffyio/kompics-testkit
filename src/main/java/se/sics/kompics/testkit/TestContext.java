@@ -35,23 +35,24 @@ public class TestContext<T extends ComponentDefinition> {
   private boolean checked;
 
 
-  private TestContext() {
+  private TestContext(Init<? extends ComponentDefinition> initEvent, Class<T> definition) {
     proxy = new Proxy<T>();
     proxyComponent = proxy.getComponentCore();
+    init();
+    if (initEvent == Init.NONE) {
+      cut = proxy.createComponentUnderTest(definition, (Init.None) initEvent);
+    } else {
+      cut = proxy.createComponentUnderTest(definition, (Init<T>) initEvent);
+    }
+    initFSM();
   }
 
   TestContext(Class<T> definition, Init<T> initEvent) {
-    this();
-    init();
-    cut = proxy.createComponentUnderTest(definition, initEvent);
-    initFSM();
+    this(initEvent, definition);
   }
 
   TestContext(Class<T> definition, Init.None initEvent) {
-    this();
-    init();
-    cut = proxy.createComponentUnderTest(definition, initEvent);
-    initFSM();
+    this(initEvent, definition);
   }
 
   public <T extends ComponentDefinition> Component create(
@@ -151,7 +152,6 @@ public class TestContext<T extends ComponentDefinition> {
     fsm.expectMessage(eventType, pred, port, direction);
     return this;
   }
-
 
   public <P extends PortType> TestContext<T> trigger(
           KompicsEvent event, Port<P> port) {

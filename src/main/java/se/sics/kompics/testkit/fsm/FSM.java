@@ -296,8 +296,8 @@ public class FSM<T extends ComponentDefinition> {
             balancedRepeat.peek().repeat.getStateIndex() == currentState - 1;
   }
 
-
-  private void addFinalState() { FINAL_STATE = currentState;
+  private void addFinalState() {
+    FINAL_STATE = currentState;
     endRepeat();
   }
 

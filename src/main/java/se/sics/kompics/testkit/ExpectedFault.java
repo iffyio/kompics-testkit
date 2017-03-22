@@ -68,10 +68,10 @@ public class ExpectedFault {
   }
 
   private String getMessage() {
-    return status == STATUS.PENDING?
-            String.format("Expected to throw exception matching '%s'" +
-                          " but none was thrown", strReprOfExpectedException())
-            : message;
+    return status == STATUS.PENDING
+           ? String.format("Expected to throw exception matching '%s'" +
+                           " but none was thrown", strReprOfExpectedException())
+           : message;
   }
 
   public String strReprOfExpectedException() {
@@ -83,8 +83,7 @@ public class ExpectedFault {
     if (exceptionType.isAssignableFrom(exception.getClass())) {
       pass(exception);
     } else {
-      fail(String.format("Could not match throwable of type %s, Actual %s",
-              exceptionType, exception));
+      fail(String.format("Could not match throwable of type %s, Actual %s", exceptionType, exception));
     }
   }
 

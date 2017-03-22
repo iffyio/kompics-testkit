@@ -2,7 +2,6 @@ package se.sics.kompics.testkit;
 
 import org.junit.Test;
 import se.sics.kompics.Component;
-import se.sics.kompics.Init;
 import se.sics.kompics.network.Network;
 import se.sics.kompics.network.Transport;
 import se.sics.kompics.network.netty.NettyInit;
@@ -52,8 +51,16 @@ public class UrbTest {
     sAddr = addresses[3];
   }
 
+  Counter counter = new Counter();
+  LoopInit incrementCount = new LoopInit() {
+    @Override
+    public void init() {
+      counter.i++;
+    }
+  };
+
   @Test
-  public void run() throws IOException {
+  public void deliverOnAllAcksTest() throws IOException {
 
     tc = Testkit.newTestContext(UrbComponent.class, new UrbComponent.Init(pAddr));
     p = tc.getComponentUnderTest();
@@ -67,38 +74,35 @@ public class UrbTest {
       addComparator(BebMsg.class, new BebComparator()).
       addComparator(UrbDeliver.class, new URBDeliverComparator()).
       body();
-      //expect(spt, p.getNegative(Timer.class), outgoing);
-    int count = 0;
 
     tc.
       repeat(10).
+            onEachIteration(incrementCount).
       body().
-            trigger(new UrbBroadcast(count), p.getPositive(UrbPort.class)).
+            trigger(new UrbBroadcast(counter), p.getPositive(UrbPort.class)).
             ignoreOrder().
-              expect(bebMsg(pAddr, pAddr, count), p.getNegative(Network.class), outgoing).
-              expect(bebMsg(pAddr, qAddr, count), p.getNegative(Network.class), outgoing).
-              expect(bebMsg(pAddr, rAddr, count), p.getNegative(Network.class), outgoing).
-              expect(bebMsg(pAddr, sAddr, count), p.getNegative(Network.class), outgoing).
+              expect(bebMsg(pAddr, pAddr), p.getNegative(Network.class), outgoing).
+              expect(bebMsg(pAddr, qAddr), p.getNegative(Network.class), outgoing).
+              expect(bebMsg(pAddr, rAddr), p.getNegative(Network.class), outgoing).
+              expect(bebMsg(pAddr, sAddr), p.getNegative(Network.class), outgoing).
             end().
 
             ignoreOrder().
-              expect(bebMsg(pAddr, pAddr, count), p.getNegative(Network.class), incoming).
-              expect(bebMsg(rAddr, pAddr, count), p.getNegative(Network.class), incoming).
-              expect(bebMsg(qAddr, pAddr, count), p.getNegative(Network.class), incoming).
-              expect(bebMsg(sAddr, pAddr, count), p.getNegative(Network.class), incoming).
+              expect(bebMsg(pAddr, pAddr), p.getNegative(Network.class), incoming).
+              expect(bebMsg(rAddr, pAddr), p.getNegative(Network.class), incoming).
+              expect(bebMsg(qAddr, pAddr), p.getNegative(Network.class), incoming).
+              expect(bebMsg(sAddr, pAddr), p.getNegative(Network.class), incoming).
             end().
 
-      expect(new UrbDeliver(0), p.getPositive(UrbPort.class), outgoing).
+            expect(new UrbDeliver(counter), p.getPositive(UrbPort.class), outgoing).
       end();
 
     assertEquals(tc.check(), tc.getFinalState());
   }
 
-  private BebMsg bebMsg(TAddress src, TAddress dst, int c) {
-    return new BebMsg(src, dst, Transport.TCP, new Data(src, c));
+  private BebMsg bebMsg(TAddress src, TAddress dst) {
+    return new BebMsg(src, dst, Transport.TCP, new Data(src, counter));
   }
-
-
 
   private Component createURBComponent(TAddress self) {
     Component c = tc.create(UrbComponent.class, new UrbComponent.Init(self));

@@ -32,20 +32,27 @@ public class Proxy<T extends ComponentDefinition> extends ComponentDefinition{
 
   T createComponentUnderTest(
           Class<T> definition, Init<T> initEvent) {
-    cut = create(definition, initEvent);
-    init();
+    init(definition, initEvent);
     return definitionUnderTest;
   }
 
   T createComponentUnderTest(
           Class<T> definition, Init.None initEvent) {
-    cut = create(definition, initEvent);
-    init();
+    init(definition, initEvent);
     return definitionUnderTest;
   }
 
   @SuppressWarnings("unchecked")
-  private void init() {
+  private void init(Class<T> definition, Init<? extends ComponentDefinition> initEvent) {
+    if (definitionUnderTest != null) {
+      return;
+    }
+
+    if (initEvent == Init.NONE) {
+      cut = create(definition, (Init.None) initEvent);
+    } else {
+      cut = create(definition, (Init<T>) initEvent);
+    }
     createPortConfig();
     definitionUnderTest = (T) cut.getComponent();
     fsm = new FSM<T>(this, definitionUnderTest);

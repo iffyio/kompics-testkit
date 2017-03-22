@@ -2,21 +2,24 @@ package se.sics.kompics.testkit.urb;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import se.sics.kompics.*;
+import se.sics.kompics.ComponentDefinition;
+import se.sics.kompics.Handler;
+import se.sics.kompics.Negative;
+import se.sics.kompics.Positive;
 import se.sics.kompics.network.Network;
 import se.sics.kompics.network.Transport;
 import se.sics.kompics.testkit.fd.TAddress;
-import se.sics.kompics.timer.CancelPeriodicTimeout;
 import se.sics.kompics.timer.SchedulePeriodicTimeout;
 import se.sics.kompics.timer.Timeout;
-import se.sics.kompics.timer.Timer;
 
-import java.io.Serializable;
-import java.util.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
-public class UrbComponent extends ComponentDefinition{
+public class UrbComponent extends ComponentDefinition {
 
-  static final Logger logger = LoggerFactory.getLogger(UrbComponent.class);
+  static final Logger logger = LoggerFactory.getLogger("Testkit");
 
   public static Set<TAddress> nodes;
   public static Map<TAddress, String> names;
@@ -36,14 +39,6 @@ public class UrbComponent extends ComponentDefinition{
     MAJORITY = nodes.size();// / 2 + 1;
   }
 
-  Handler<Start> startHandler = new Handler<Start>() {
-    @Override
-    public void handle(Start event) {
-      //logger.warn("{} started...", self);
-      //logger.warn("number of nodes = {}", nodes.size());
-    }
-  };
-
   private Handler<URBTimeout> urbTimeoutHandler = new Handler<URBTimeout>() {
     @Override
     public void handle(URBTimeout event) {
@@ -54,9 +49,12 @@ public class UrbComponent extends ComponentDefinition{
 
   private Handler<UrbBroadcast> urbHandler = new Handler<UrbBroadcast>() {
     @Override
-    public void handle(UrbBroadcast event) {
-      Serializable m = event.message;
-      Data data = new Data(self, m);
+    public void handle(UrbBroadcast urbBroadcast) {
+      // clone counter
+      Counter c = urbBroadcast.counter;
+      c = new Counter(c);
+      Data data = new Data(self, c);
+
       pending.add(data);
       ack.put(data, new HashSet<TAddress>());
       bebBroadcast(data);
@@ -72,22 +70,19 @@ public class UrbComponent extends ComponentDefinition{
         ack.put(data, new HashSet<TAddress>());
       }
 
-      logger.warn("{}: received msg {}, from {}",
-              names.get(self), data,
-              names.get(bebMsg.getSource()));
+      logger.debug("{}: received msg {}, from {}, sender {}",
+              names.get(self), data, names.get(bebMsg.getSource()),
+              names.get(data.sender));
 
       Set<TAddress> acksForM = ack.get(data);
       acksForM.add(bebMsg.getSource());
 
-      if (names.get(data.sender).equals("p")) {
-        logger.error("pppp");
-        trigger(new UrbDeliver(data.msg), urbPort);
-      }
-/*      if (!pending.contains(data)) {
+      if (!pending.contains(data)) {
         pending.add(data);
-        logger.error("{}, acked {}, from {}, sender {}", names.get(self), data, names.get(bebMsg.getSource()), names.get(data.sender));
+        logger.debug("{}, acked {}, from {}, sender {}", names.get(self), data, names.get(bebMsg.getSource()), names.get(data.sender));
+        assert !names.get(self).contains("p");
         bebBroadcast(data); // acknowledge seen
-      }*/
+      }
 
       tryDeliver();
     }
@@ -101,13 +96,13 @@ public class UrbComponent extends ComponentDefinition{
       }
     }
 
-    int i = 0;
     for (Data data : delivered) {
-      i++;
       pending.remove(data);
     }
-/*    logger.warn("{} -> delivered {} messages, {} pending",
-            names.get(self), delivered.size(), pending.size());*/
+    if (names.get(self).contains("p")) {
+      logger.warn("{} -> delivered total {} messages, {} pending",
+              names.get(self), delivered.size(), pending.size());
+    }
   }
 
   private void bebBroadcast(Data data) {
@@ -115,23 +110,20 @@ public class UrbComponent extends ComponentDefinition{
       BebMsg bebMsg = new BebMsg(
               self, dst, Transport.TCP, data);
       trigger(bebMsg, network);
-      //logger.warn("<<triggered {}", bebMsg);
     }
   }
 
-
   {
-    subscribe(startHandler, control);
     subscribe(bebHandler, network);
     subscribe(urbHandler, urbPort);
   }
-
 
   public static class URBTimeout extends Timeout {
     public URBTimeout(SchedulePeriodicTimeout spt) {
       super(spt);
     }
   }
+
   public static class Init extends se.sics.kompics.Init<UrbComponent> {
     TAddress self;
     public Init(TAddress self) {

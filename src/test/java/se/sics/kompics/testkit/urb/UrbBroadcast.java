@@ -2,13 +2,11 @@ package se.sics.kompics.testkit.urb;
 
 import se.sics.kompics.KompicsEvent;
 
-import java.io.Serializable;
-
 public class UrbBroadcast implements KompicsEvent {
 
-  final Serializable message;
+  final Counter counter;
 
-  public UrbBroadcast(Serializable message) {
-    this.message = message;
+  public UrbBroadcast(Counter counter) {
+    this.counter = counter;
   }
 }
