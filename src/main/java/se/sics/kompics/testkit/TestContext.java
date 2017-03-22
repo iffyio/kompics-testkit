@@ -110,13 +110,13 @@ public class TestContext<T extends ComponentDefinition> {
     return this;
   }
 
-  public TestContext<T> repeat(int times, LoopInit loopInit) {
-    Testkit.checkNotNull(loopInit);
-    fsm.repeat(times, loopInit);
+  public TestContext<T> repeat(int times, BlockInit blockInit) {
+    Testkit.checkNotNull(blockInit);
+    fsm.repeat(times, blockInit);
     return this;
   }
 
-  public TestContext<T> onEachIteration(LoopInit iterationInit) {
+  public TestContext<T> onEachIteration(BlockInit iterationInit) {
     Testkit.checkNotNull(iterationInit);
     fsm.setIterationInit(iterationInit);
     return this;

@@ -37,7 +37,7 @@ public class ExpectFaultTest {
   private Ping ping = new Ping(0);
   private Pong pong = new Pong(0);
 
-  private LoopInit incrementCounters = new LoopInit() {
+  private BlockInit incrementCounters = new BlockInit() {
     @Override
     public void init() {
       ping.count++;

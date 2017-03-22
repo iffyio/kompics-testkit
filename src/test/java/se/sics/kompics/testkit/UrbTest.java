@@ -36,7 +36,7 @@ public class UrbTest {
     Set<TAddress> nodes = new HashSet<>();
     Map<TAddress, String> m = new HashMap<>();
     for (int i = 0; i < addresses.length; i++) {
-      TAddress addr = Util.createAddress(2345 + i);
+      TAddress addr = Util.createAddress(3345 + i);
       addresses[i] = addr;
       nodes.add(addr);
       m.put(addr, names[i]);
@@ -52,7 +52,7 @@ public class UrbTest {
   }
 
   Counter counter = new Counter();
-  LoopInit incrementCount = new LoopInit() {
+  BlockInit incrementCount = new BlockInit() {
     @Override
     public void init() {
       counter.i++;

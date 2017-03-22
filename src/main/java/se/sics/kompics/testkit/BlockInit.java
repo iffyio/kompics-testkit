@@ -1,5 +1,5 @@
 package se.sics.kompics.testkit;
 
-public abstract class LoopInit {
+public abstract class BlockInit {
   public abstract void init();
 }

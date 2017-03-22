@@ -28,8 +28,8 @@ public class PingerPongerTest {
 
   private Ping ping;
   private Pong pong;
-  private LoopInit resetPong;
-  private LoopInit incrementCounters;
+  private BlockInit resetPong;
+  private BlockInit incrementCounters;
 
   @Test
   public void iterationInitTest() {
@@ -86,7 +86,7 @@ public class PingerPongerTest {
     Ponger.counter = 0;
     ping = new Ping(0);
     pong = new Pong(0);
-    resetPong = new LoopInit() {
+    resetPong = new BlockInit() {
       @Override
       public void init() {
         pong.count = 0;
@@ -94,7 +94,7 @@ public class PingerPongerTest {
       }
     };
 
-    incrementCounters = new LoopInit() {
+    incrementCounters = new BlockInit() {
       @Override
       public void init() {
         ping.count++;

@@ -31,12 +31,12 @@ class StateTable {
 
   private Map<Integer, State> states = new HashMap<Integer, State>();
 
-  void registerExpectedEvent(int state, Spec spec, Environment env) {
-    states.put(state, new State(state, spec, env));
+  void registerExpectedEvent(int state, Spec spec, Block block) {
+    states.put(state, new State(state, spec, block));
   }
 
-  void registerExpectedEvent(int state, List<Spec> expectUnordered, Environment env) {
-    states.put(state, new State(state, expectUnordered, env));
+  void registerExpectedEvent(int state, List<Spec> expectUnordered, Block block) {
+    states.put(state, new State(state, expectUnordered, block));
   }
 
   <E extends KompicsEvent> void setDefaultAction(
@@ -51,6 +51,10 @@ class StateTable {
   String getExpectedSpecAt(int state) {
     assert states.get(state) != null;
     return states.get(state).toString();
+  }
+
+  boolean isExpectState(int state) {
+    return states.containsKey(state);
   }
 
   Transition lookup(int state, EventSpec<? extends KompicsEvent> receivedSpec) {
@@ -105,6 +109,7 @@ class StateTable {
 
   private class State {
     private final int state;
+    private final Block block;
     private PredicateSpec predicateSpec;
     private EventSpec<? extends KompicsEvent> eventSpec;
     private List<Spec> expectUnordered;
@@ -114,13 +119,14 @@ class StateTable {
     private final Map<EventSpec<? extends KompicsEvent>, Transition> transitions =
             new HashMap<EventSpec<? extends KompicsEvent>, Transition>();
 
-    private State(int state, Environment env) {
+    private State(int state, Block block) {
       this.state = state;
-      addTransitions(env);
+      this.block = block;
+      addTransitions(block);
     }
 
-    State(int state, Spec spec, Environment env) {
-      this(state, env);
+    State(int state, Spec spec, Block block) {
+      this(state, block);
       if (spec instanceof EventSpec) {
         this.eventSpec = (EventSpec<? extends KompicsEvent>) spec;
       } else {
@@ -128,21 +134,21 @@ class StateTable {
       }
     }
 
-    State(int state, List<Spec> expectUnordered, Environment env) {
-      this(state, env);
+    State(int state, List<Spec> expectUnordered, Block block) {
+      this(state, block);
       this.expectUnordered = expectUnordered;
       seen = new ArrayList<EventSpec<? extends KompicsEvent>>(expectUnordered.size());
       pending = new ArrayList<Spec>(expectUnordered);
     }
 
-    void addTransitions(Environment env) {
-      for (EventSpec<? extends KompicsEvent> e : env.getDisallowedEvents()) {
+    void addTransitions(Block block) {
+      for (EventSpec<? extends KompicsEvent> e : block.getDisallowedEvents()) {
         addTransition(e, Action.FAIL, FSM.ERROR_STATE);
       }
-      for (EventSpec<? extends KompicsEvent> e : env.getAllowedEvents()) {
+      for (EventSpec<? extends KompicsEvent> e : block.getAllowedEvents()) {
         addTransition(e, Action.HANDLE, state);
       }
-      for (EventSpec<? extends KompicsEvent> e : env.getDroppedEvents()) {
+      for (EventSpec<? extends KompicsEvent> e : block.getDroppedEvents()) {
         addTransition(e, Action.DROP, state);
       }
     }
@@ -153,6 +159,8 @@ class StateTable {
     }
 
     Transition onEvent(EventSpec<? extends KompicsEvent> receivedSpec) {
+      block.notifyOnEvent(receivedSpec);
+
       // single event or predicate transition
       if ((eventSpec != null && eventSpec.match(receivedSpec)) ||
           (predicateSpec != null && predicateSpec.match(receivedSpec))) {

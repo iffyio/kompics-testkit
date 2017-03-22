@@ -39,8 +39,8 @@ class PortConfig {
         continue;
       }
 
-      Port<? extends PortType> inboundPort = provided?
-              proxy.providePort(portType) : proxy.requirePort(portType);
+      Port<? extends PortType> inboundPort =
+              provided? proxy.providePort(portType) : proxy.requirePort(portType);
 
       PortStructure portStruct = new PortStructure(proxy, inboundPort, outboundPort, provided);
 

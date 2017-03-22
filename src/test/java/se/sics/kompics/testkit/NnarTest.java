@@ -9,9 +9,22 @@ import se.sics.kompics.network.netty.NettyInit;
 import se.sics.kompics.network.netty.NettyNetwork;
 import se.sics.kompics.testkit.fd.TAddress;
 import se.sics.kompics.testkit.fd.Util;
-import se.sics.kompics.testkit.nnar.*;
+import se.sics.kompics.testkit.nnar.Ack;
+import se.sics.kompics.testkit.nnar.Nnar;
+import se.sics.kompics.testkit.nnar.NnarPort;
+import se.sics.kompics.testkit.nnar.Read;
+import se.sics.kompics.testkit.nnar.ReadRequest;
+import se.sics.kompics.testkit.nnar.ReadReturn;
+import se.sics.kompics.testkit.nnar.ReadValue;
+import se.sics.kompics.testkit.nnar.Register;
+import se.sics.kompics.testkit.nnar.WriteRequest;
 
-import java.util.*;
+
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 import static junit.framework.Assert.assertEquals;
 
@@ -22,8 +35,8 @@ public class NnarTest {
   private Direction incoming = Direction.INCOMING;
   private Direction outgoing = Direction.OUTGOING;
 
-  private Component p, q, r, s;
-  private TAddress pAddr, qAddr, rAddr, sAddr;
+  private Component p;
+  private TAddress pAddr;
   private String[] names = {"p", "q", "r", "s"};
 
   {
@@ -36,10 +49,6 @@ public class NnarTest {
     tc = Testkit.newTestContext(Nnar.class, new Nnar.Init(pAddr));
     p = tc.getComponentUnderTest();
     setup(pAddr, p);
-
-/*    q = createURBComponent(qAddr);
-    r = createURBComponent(rAddr);
-    s = createURBComponent(sAddr);*/
   }
 
   private void setAddresses() {
@@ -61,9 +70,6 @@ public class NnarTest {
     Nnar.nodes = nodes;
 
     pAddr = addresses[0];
-/*    qAddr = addresses[1];
-    rAddr = addresses[2];
-    sAddr = addresses[3];*/
   }
 
   private ReadRequest rr1 = readRequest(pAddr, pAddr, 1);
