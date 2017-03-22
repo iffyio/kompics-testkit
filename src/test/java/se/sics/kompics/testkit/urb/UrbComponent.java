@@ -33,7 +33,7 @@ public class UrbComponent extends ComponentDefinition{
 
   public UrbComponent(Init init) {
     self = init.self;
-    MAJORITY = nodes.size() / 2 + 1;
+    MAJORITY = nodes.size();// / 2 + 1;
   }
 
   Handler<Start> startHandler = new Handler<Start>() {
@@ -72,17 +72,22 @@ public class UrbComponent extends ComponentDefinition{
         ack.put(data, new HashSet<TAddress>());
       }
 
-/*      logger.warn("{}: received msg from {}",
-              names.get(self),
-              names.get(bebMsg.getSource()));*/
+      logger.warn("{}: received msg {}, from {}",
+              names.get(self), data,
+              names.get(bebMsg.getSource()));
 
       Set<TAddress> acksForM = ack.get(data);
       acksForM.add(bebMsg.getSource());
 
-      if (!pending.contains(data)) {
-        pending.add(data);
-        bebBroadcast(data); // acknowledge seen
+      if (names.get(data.sender).equals("p")) {
+        logger.error("pppp");
+        trigger(new UrbDeliver(data.msg), urbPort);
       }
+/*      if (!pending.contains(data)) {
+        pending.add(data);
+        logger.error("{}, acked {}, from {}, sender {}", names.get(self), data, names.get(bebMsg.getSource()), names.get(data.sender));
+        bebBroadcast(data); // acknowledge seen
+      }*/
 
       tryDeliver();
     }
@@ -101,8 +106,8 @@ public class UrbComponent extends ComponentDefinition{
       i++;
       pending.remove(data);
     }
-/*    logger.warn("delivered {} messages, {} pending",
-            delivered.size(), pending.size());*/
+/*    logger.warn("{} -> delivered {} messages, {} pending",
+            names.get(self), delivered.size(), pending.size());*/
   }
 
   private void bebBroadcast(Data data) {

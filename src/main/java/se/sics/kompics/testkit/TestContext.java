@@ -122,12 +122,17 @@ public class TestContext<T extends ComponentDefinition> {
   }
 
   public TestContext<T> end() {
-    fsm.endRepeat();
+    fsm.end();
     return this;
   }
 
   public TestContext<T> body() {
     fsm.body();
+    return this;
+  }
+
+  public TestContext<T> ignoreOrder() {
+    fsm.setUnorderedMode();
     return this;
   }
 

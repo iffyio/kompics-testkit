@@ -66,31 +66,27 @@ public class UrbTest {
     tc.
       addComparator(BebMsg.class, new BebComparator()).
       addComparator(UrbDeliver.class, new URBDeliverComparator()).
-      allow(bebMsg(pAddr, pAddr, 0), p.getNegative(Network.class), outgoing).
-      allow(bebMsg(pAddr, qAddr, 0), p.getNegative(Network.class), outgoing).
-      allow(bebMsg(pAddr, rAddr, 0), p.getNegative(Network.class), outgoing).
-      allow(bebMsg(pAddr, sAddr, 0), p.getNegative(Network.class), outgoing).
-
-      allow(bebMsg(pAddr, pAddr, 0), p.getNegative(Network.class), incoming).
-      allow(bebMsg(qAddr, pAddr, 0), p.getNegative(Network.class), incoming).
-      allow(bebMsg(rAddr, pAddr, 0), p.getNegative(Network.class), incoming).
-      allow(bebMsg(sAddr, pAddr, 0), p.getNegative(Network.class), incoming).
       body();
       //expect(spt, p.getNegative(Timer.class), outgoing);
+    int count = 0;
 
     tc.
-      repeat(10).body().
-      trigger(new UrbBroadcast(0), p.getPositive(UrbPort.class)).
+      repeat(10).
+      body().
+            trigger(new UrbBroadcast(count), p.getPositive(UrbPort.class)).
+            ignoreOrder().
+              expect(bebMsg(pAddr, pAddr, count), p.getNegative(Network.class), outgoing).
+              expect(bebMsg(pAddr, qAddr, count), p.getNegative(Network.class), outgoing).
+              expect(bebMsg(pAddr, rAddr, count), p.getNegative(Network.class), outgoing).
+              expect(bebMsg(pAddr, sAddr, count), p.getNegative(Network.class), outgoing).
+            end().
 
-/*      expect(bebMsg(pAddr, pAddr, 0), p.getNegative(Network.class), outgoing).
-      expect(bebMsg(pAddr, qAddr, 0), p.getNegative(Network.class), outgoing).
-      expect(bebMsg(pAddr, rAddr, 0), p.getNegative(Network.class), outgoing).
-      expect(bebMsg(pAddr, sAddr, 0), p.getNegative(Network.class), outgoing).
-
-      expect(bebMsg(pAddr, pAddr, 0), p.getNegative(Network.class), incoming).
-      expect(bebMsg(rAddr, pAddr, 0), p.getNegative(Network.class), incoming).
-      expect(bebMsg(qAddr, pAddr, 0), p.getNegative(Network.class), incoming).
-      expect(bebMsg(sAddr, pAddr, 0), p.getNegative(Network.class), incoming).*/
+            ignoreOrder().
+              expect(bebMsg(pAddr, pAddr, count), p.getNegative(Network.class), incoming).
+              expect(bebMsg(rAddr, pAddr, count), p.getNegative(Network.class), incoming).
+              expect(bebMsg(qAddr, pAddr, count), p.getNegative(Network.class), incoming).
+              expect(bebMsg(sAddr, pAddr, count), p.getNegative(Network.class), incoming).
+            end().
 
       expect(new UrbDeliver(0), p.getPositive(UrbPort.class), outgoing).
       end();

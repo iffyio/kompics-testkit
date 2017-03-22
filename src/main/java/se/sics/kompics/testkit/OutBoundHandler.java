@@ -14,7 +14,7 @@ import se.sics.kompics.testkit.fsm.EventSpec;
 import java.util.List;
 
 class OutBoundHandler extends ProxyHandler {
-  private static final Logger logger = LoggerFactory.getLogger(OutBoundHandler.class);
+  private static final Logger logger = LoggerFactory.getLogger("Testkit");
   
   private Port<? extends PortType> sourcePort;
   private List<? extends Port<? extends PortType>> destPorts;

@@ -23,10 +23,6 @@ class PredicateSpec implements Spec{
     this.direction = direction;
   }
 
-  Predicate getPredicate() {
-    return predicate;
-  }
-
   public boolean match(EventSpec<? extends KompicsEvent> receivedSpec) {
     KompicsEvent receivedEvent = receivedSpec.getEvent();
     return eventType.isAssignableFrom(receivedEvent.getClass()) &&

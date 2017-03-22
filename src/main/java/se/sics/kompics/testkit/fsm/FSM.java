@@ -1,9 +1,11 @@
 package se.sics.kompics.testkit.fsm;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 
@@ -40,6 +42,7 @@ public class FSM<T extends ComponentDefinition> {
   private final ComponentCore proxyComponent;
   private Collection<Component> participants = new HashSet<Component>();
   private final Stack<Block> balancedRepeat = new Stack<Block>();
+  private List<Spec> expectUnordered = new ArrayList<>();
   private final EventQueue eventQueue;
 
   private Map<Integer, Repeat> loops = new HashMap<Integer, Repeat>();
@@ -90,22 +93,45 @@ public class FSM<T extends ComponentDefinition> {
 
   public <P extends PortType> void expectMessage(
           KompicsEvent event, Port<P> port, Direction direction) {
-    checkInBodyMode();
-    EventSpec eventSpec = newEventSpec(event, port, direction);
-    table.registerExpectedEvent(currentState, eventSpec, currentBlock.env);
-    currentState++;
+    EventSpec<? extends KompicsEvent> eventSpec = newEventSpec(event, port, direction);
+    registerSpec(eventSpec);
   }
 
   public <P extends PortType, E extends KompicsEvent> void expectMessage(
           Class<E> eventType, Predicate<E> pred, Port<P> port, Direction direction) {
-    checkInBodyMode();
     PredicateSpec predicateSpec = new PredicateSpec(eventType, pred, port, direction);
-    table.registerExpectedEvent(currentState, predicateSpec, currentBlock.env);
+    registerSpec(predicateSpec);
+  }
+
+  private void registerSpec(Spec spec) {
+    if (inUnorderedMode()) {
+      checkInUnorderedMode();
+      expectUnordered.add(spec);
+    } else {
+      checkInBodyMode();
+      table.registerExpectedEvent(currentState, spec, currentBlock.env);
+      currentState++;
+    }
+  }
+
+  public void setUnorderedMode() {
+    checkInBodyAndNotUnorderedMode();
+    currentBlock.mode = MODE.UNORDERED;
+    expectUnordered = new ArrayList<Spec>();
+  }
+
+  private void endUnorderedMode() {
+    currentBlock.mode = MODE.BODY;
+    if (expectUnordered.isEmpty()) {
+      throw new IllegalStateException("No events were specified in unordered mode");
+    }
+
+    table.registerExpectedEvent(currentState, expectUnordered, currentBlock.env);
     currentState++;
   }
 
   public void addTrigger(KompicsEvent event, Port<? extends PortType> port) {
-    checkInBodyMode();
+    checkInBodyAndNotUnorderedMode();
     triggeredEvents.put(currentState, new Trigger(event, port));
     currentState++;
   }
@@ -122,11 +148,19 @@ public class FSM<T extends ComponentDefinition> {
 
   public void body() {
     checkInHeaderMode();
-    currentBlock.inHeaderMode = false;
+    currentBlock.mode = MODE.BODY;
   }
 
-  public void endRepeat() {
-    checkInBodyMode();
+  public void end() {
+    if (inUnorderedMode()) {
+      endUnorderedMode();
+    } else {
+      endRepeat();
+    }
+  }
+
+  private void endRepeat() {
+    checkInBodyAndNotUnorderedMode();
     if (balancedRepeat.isEmpty()) {
       throw new IllegalStateException("matching repeat not found for end");
     } else if (currentRepeatBlockIsEmpty()) {
@@ -145,7 +179,7 @@ public class FSM<T extends ComponentDefinition> {
 
   public void addExpectedFault(
           Class<? extends Throwable> exceptionType, Fault.ResolveAction resolveAction) {
-    checkInBodyMode();
+    checkInBodyAndNotUnorderedMode();
     checkExpectedFaultHasMatchingClause();
     expectedFaults.put(currentState, new ExpectedFault(exceptionType, resolveAction));
     currentState++;
@@ -153,7 +187,7 @@ public class FSM<T extends ComponentDefinition> {
 
   public void addExpectedFault(
           Predicate<Throwable> exceptionPredicate, Fault.ResolveAction resolveAction) {
-    checkInBodyMode();
+    checkInBodyAndNotUnorderedMode();
     checkExpectedFaultHasMatchingClause();
     expectedFaults.put(currentState, new ExpectedFault(exceptionPredicate, resolveAction));
     currentState++;
@@ -226,7 +260,7 @@ public class FSM<T extends ComponentDefinition> {
         StateTable.Transition transition = table.lookup(currentState, received);
 
         if (!transitionedToErrorState(expected, received.toString(), transition)) {
-          logger.debug("{}: Matched ({}) with Transition = {}", currentState, received, transition);
+          logger.debug("{}: Matched({}) with Transition({})", currentState, received, transition);
           currentState = transition.nextState;
         }
       }
@@ -241,7 +275,7 @@ public class FSM<T extends ComponentDefinition> {
   }
 
   private void addRepeat(Repeat repeat) {
-    checkInBodyMode();
+    checkInBodyAndNotUnorderedMode();
     if (repeat.times <= 0) {
       throw new IllegalArgumentException("only positive value allowed for repeat");
     }
@@ -252,15 +286,13 @@ public class FSM<T extends ComponentDefinition> {
   }
 
   private void restorePreviousBlock() {
-    if (!balancedRepeat.isEmpty()) { // false only for initial block
+    if (!balancedRepeat.isEmpty()) {
       currentBlock = balancedRepeat.pop().previousBlock;
     }
   }
 
   private boolean currentRepeatBlockIsEmpty() {
-    // compare current stateIndex with startOfLoop stateIndex
     return  balancedRepeat.isEmpty() ||
-            // no state was added since start of loop
             balancedRepeat.peek().repeat.getStateIndex() == currentState - 1;
   }
 
@@ -387,16 +419,32 @@ public class FSM<T extends ComponentDefinition> {
     }
   }
 
+  private void checkInBodyAndNotUnorderedMode() {
+    checkInBodyMode();
+    if (inUnorderedMode()) {
+      throw new IllegalStateException("Not in unordered mode");
+    }
+  }
+
+  private void checkInUnorderedMode() {
+    if (!inUnorderedMode()) {
+      throw new IllegalStateException("Not in unordered mode");
+    }
+  }
   private void checkInBodyMode() {
-    if (currentBlock != null && currentBlock.inHeaderMode) {
+    if (currentBlock != null && currentBlock.mode != MODE.BODY) {
       throw new IllegalStateException("Not in body mode");
     }
   }
 
   private void checkInHeaderMode() {
-    if (!currentBlock.inHeaderMode) {
+    if (currentBlock.mode != MODE.HEADER) {
       throw new IllegalStateException("Not in header mode");
     }
+  }
+
+  private boolean inUnorderedMode() {
+    return currentBlock != null && currentBlock.mode == MODE.UNORDERED;
   }
 
   private void gotoErrorState(String errorMessage) {
@@ -427,7 +475,7 @@ public class FSM<T extends ComponentDefinition> {
   }
 
   private class Block {
-    boolean inHeaderMode = true;
+    MODE mode = MODE.HEADER;
     final Repeat repeat;
     final Block previousBlock;
     Environment env;
@@ -443,6 +491,8 @@ public class FSM<T extends ComponentDefinition> {
       }
     }
   }
+
+  private enum MODE { HEADER, BODY, UNORDERED }
 
   private class ComparatorMap {
     Map<Class<? extends KompicsEvent>, Comparator<? extends KompicsEvent>> comparators =

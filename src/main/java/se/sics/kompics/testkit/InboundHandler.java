@@ -12,7 +12,7 @@ import se.sics.kompics.Response;
 import se.sics.kompics.testkit.fsm.EventSpec;
 
 class InboundHandler extends ProxyHandler {
-  private static final Logger logger = LoggerFactory.getLogger(InboundHandler.class);
+  private static final Logger logger = LoggerFactory.getLogger("Testkit");
 
   private Port<? extends PortType> destPort;
 
@@ -24,7 +24,7 @@ class InboundHandler extends ProxyHandler {
 
   @Override
   public void handle(KompicsEvent event) {
-    logger.trace("received event: {}", event);
+    logger.trace("received incoming event: {}", event);
     if (event instanceof Response) {
       Response response = (Response) event;
       assert response.getTopPathElementFirst().getComponent() == destPort.getPair().getOwner();
