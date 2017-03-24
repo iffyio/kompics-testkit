@@ -25,6 +25,8 @@ public class PingerPongerTest {
   private TestContext<Pinger> tc;
   private Component pinger;
   private Component ponger;
+  private Negative<PingPongPort> pingerPort;
+  private Positive<PingPongPort> pongerPort;
 
   private Ping ping;
   private Pong pong;
@@ -34,7 +36,7 @@ public class PingerPongerTest {
   @Test
   public void iterationInitTest() {
     tc.
-      connect(pinger.getNegative(PingPongPort.class), ponger.getPositive(PingPongPort.class)).
+      connect(pingerPort, pongerPort).
       body().
 
       repeat(3).
@@ -42,8 +44,8 @@ public class PingerPongerTest {
         repeat(3, resetPong).
           onEachIteration(incrementCounters).
         body().
-          expect(ping, pinger.getNegative(PingPongPort.class), OUTGOING).
-          expect(pong, pinger.getNegative(PingPongPort.class), INCOMING).
+          expect(ping, pingerPort, OUTGOING).
+          expect(pong, pingerPort, INCOMING).
         end().
       end();
 
@@ -52,20 +54,21 @@ public class PingerPongerTest {
 
   @Test
   public void defaultActionTest() {
-    tc.
-      setDefaultAction(Pong.class, new Function<Pong, Action>() {
+    tc.setDefaultAction(Pong.class, new Function<Pong, Action>() {
         @Override
         public Action apply(Pong event) {
           return Action.HANDLE;
         }
-      }).
-      setDefaultAction(KompicsEvent.class, new Function<KompicsEvent, Action>() {
+    });
+
+    tc.setDefaultAction(KompicsEvent.class, new Function<KompicsEvent, Action>() {
         @Override
         public Action apply(KompicsEvent event) {
           return Action.FAIL;
         }
-      }).
-      connect(pinger.getNegative(PingPongPort.class), ponger.getPositive(PingPongPort.class)).
+    });
+
+    tc.connect(pingerPort, pongerPort).
       body().
 
         repeat(3).
@@ -73,7 +76,7 @@ public class PingerPongerTest {
           repeat(30, resetPong).
             onEachIteration(incrementCounters).
           body().
-            expect(ping, pinger.getNegative(PingPongPort.class), OUTGOING).
+            expect(ping, pingerPort, OUTGOING).
           end().
         end();
 
@@ -105,6 +108,8 @@ public class PingerPongerTest {
     tc = Testkit.newTestContext(Pinger.class, Init.NONE);
     pinger = tc.getComponentUnderTest();
     ponger = tc.create(Ponger.class, Init.NONE);
+    pingerPort = pinger.getNegative(PingPongPort.class);
+    pongerPort = ponger.getPositive(PingPongPort.class);
   }
 
   public static class Pinger extends ComponentDefinition {

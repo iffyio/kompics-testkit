@@ -37,7 +37,7 @@ class OutBoundHandler extends ProxyHandler {
       request.pushPathElement(proxy.getComponentCore());
     }
 
-    EventSpec<? extends KompicsEvent> eventSpec = new EventSpec<KompicsEvent>(event, sourcePort, Direction.OUTGOING);
+    EventSpec<? extends KompicsEvent> eventSpec = proxy.getFsm().newEventSpec(event, sourcePort, Direction.OUTGOING);
     eventSpec.setHandler(this);
     eventQueue.offer(eventSpec);
   }

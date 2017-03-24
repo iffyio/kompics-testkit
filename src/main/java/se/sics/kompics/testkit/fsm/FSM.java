@@ -35,7 +35,7 @@ public class FSM<T extends ComponentDefinition> {
   static final Logger logger = LoggerFactory.getLogger("Testkit");
 
   private final T definitionUnderTest;
-  static final int ERROR_STATE = -1;
+  public static final int ERROR_STATE = -1;
   private int FINAL_STATE;
   private boolean STARTED = false;
   private String ERROR_MESSAGE = "";
@@ -104,9 +104,22 @@ public class FSM<T extends ComponentDefinition> {
     registerSpec(predicateSpec);
   }
 
+  public <P extends PortType> void expectWithinBlock(
+          KompicsEvent event, Port<P> port, Direction direction) {
+    EventSpec<? extends KompicsEvent> eventSpec = newEventSpec(event, port, direction);
+    checkInHeaderMode();
+    currentBlock.expectWithinBlock(eventSpec);
+  }
+
+  public <P extends PortType, E extends KompicsEvent> void expectWithinBlock(
+          Class<E> eventType, Predicate<E> pred, Port<P> port, Direction direction) {
+    PredicateSpec predicateSpec = new PredicateSpec(eventType, pred, port, direction);
+    checkInHeaderMode();
+    currentBlock.expectWithinBlock(predicateSpec);
+  }
+
   private void registerSpec(Spec spec) {
     if (inUnorderedMode()) {
-      checkInUnorderedMode();
       expectUnordered.add(spec);
     } else {
       checkInBodyMode();
@@ -164,11 +177,8 @@ public class FSM<T extends ComponentDefinition> {
     checkInBodyAndNotUnorderedMode();
     if (balancedBlock.isEmpty()) {
       throw new IllegalStateException("matching repeat not found for end");
-    } else if (currentRepeatBlockIsEmpty()) {
-      throw new IllegalStateException("empty repeat blocks are not allowed");
     }
     blockEnd.put(currentState, currentBlock);
-    currentBlock.setEndState(currentState);
     restorePreviousBlock();
     currentState++;
   }
@@ -230,7 +240,7 @@ public class FSM<T extends ComponentDefinition> {
       table.printTable(FINAL_STATE);
       run();
     }
-    return currentState;
+    return currentState == FINAL_STATE + 1 ? FINAL_STATE : currentState;
   }
 
   // PACKAGE_PRIVATE
@@ -250,7 +260,7 @@ public class FSM<T extends ComponentDefinition> {
   private void run() {
     runStartState();
     currentState = 0;
-    while (currentState < FINAL_STATE && currentState != ERROR_STATE) {
+    while (currentState <= FINAL_STATE && currentState != ERROR_STATE) {
       if (expectingAnEvent()) {
         table.printExpectedEventAt(currentState);
         String expected = table.getExpectedSpecAt(currentState);
@@ -269,10 +279,10 @@ public class FSM<T extends ComponentDefinition> {
     runFinalState();
   }
 
-  private  <P extends  PortType, E extends KompicsEvent> EventSpec<? extends KompicsEvent> newEventSpec(
+  public <P extends  PortType, E extends KompicsEvent> EventSpec<? extends KompicsEvent> newEventSpec(
           KompicsEvent event, Port<P> port, Direction direction) {
     Comparator<E> c = (Comparator<E>) comparators.get(event.getClass());
-    return new EventSpec<>((E) event, port, direction, c);
+    return EventSpec.create(c, (E) event, port, direction);
   }
 
   private void enterNewBlock(Block block) {
@@ -280,7 +290,7 @@ public class FSM<T extends ComponentDefinition> {
     if (block.times <= 0) {
       throw new IllegalArgumentException("only positive value allowed for block");
     }
-    //currentBlock = new Block(block, currentBlock);
+
     currentBlock = block;
     balancedBlock.push(currentBlock);
     blockStart.put(currentState, block);
@@ -291,11 +301,6 @@ public class FSM<T extends ComponentDefinition> {
     if (!balancedBlock.isEmpty()) {
       currentBlock = balancedBlock.pop().previousBlock;
     }
-  }
-
-  private boolean currentRepeatBlockIsEmpty() {
-    return  balancedBlock.isEmpty() ||
-            balancedBlock.peek().getStartState() == currentState - 1;
   }
 
   private void addFinalState() {
@@ -311,7 +316,7 @@ public class FSM<T extends ComponentDefinition> {
   }
 
   private boolean expectingAnEvent() {
-    return !(startOfBlock() || endOfBlock() || triggeredAnEvent()
+    return !(isStartOfBlock() || isEndOfBlock() || triggeredAnEvent()
             || assertedComponent() || expectedFault());
   }
 
@@ -377,7 +382,7 @@ public class FSM<T extends ComponentDefinition> {
     return true;
   }
 
-  private boolean startOfBlock() {
+  private boolean isStartOfBlock() {
     Block block = blockStart.get(currentState);
     if (block == null) {
       return false;
@@ -389,29 +394,35 @@ public class FSM<T extends ComponentDefinition> {
     }
   }
 
-  private boolean endOfBlock() {
+  private boolean isEndOfBlock() {
     Block block = blockEnd.get(currentState);
-    if (block == null) {
+    if (block == null) { // not end of block
       return false;
     }
 
-    logger.debug("{}: blockEnd({})\t", currentState, block.times);
+    logger.debug("{}: end({})\t", currentState, block.times);
 
     if (block.hasPendingEvents()) {
-      assert false;
-      gotoErrorState(block.eventStatus());
-    } else if (block.isEmptyBlock() ) {
-      assert false;
+
       while (block.hasPendingEvents()) {
-        // empty block mode
-        // remove event from queue
+        logger.debug("Awaiting pending events in empty block: {}", block.pendingEventsToString());
         EventSpec<? extends KompicsEvent> receivedSpec = removeEventFromQueue();
+        logger.debug("Received ({})", receivedSpec);
+
         // match event
-        // fail if not match
-        // else handle, drop, allow?
+        StateTable.Transition transition = table.lookupWithBlock(currentState, receivedSpec, block);
+
+        if (transitionedToErrorState(block.status(), receivedSpec.toString(), transition)) {
+          break;
+        }
+
+        logger.debug("{}: Matched({}) with Transition({})", currentState, receivedSpec, transition);
+
+        currentState = transition.nextState;
       }
     } else {
       block.iterationComplete();
+
       if (block.hasMoreIterations()) {
         currentState = block.indexOfFirstState();
       } else {

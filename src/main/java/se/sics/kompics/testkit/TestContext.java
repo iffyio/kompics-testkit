@@ -104,7 +104,6 @@ public class TestContext<T extends ComponentDefinition> {
     return this;
   }
 
-
   public TestContext<T> repeat(int times) {
     fsm.repeat(times);
     return this;
@@ -147,9 +146,25 @@ public class TestContext<T extends ComponentDefinition> {
 
   public <P extends  PortType, E extends KompicsEvent> TestContext<T> expect(
           Class<E> eventType, Predicate<E> pred, Port<P> port, Direction direction) {
-    Testkit.checkNotNull(eventType, port, direction);
+    Testkit.checkNotNull(eventType, port, pred, direction);
     checkValidPort(port, direction);
     fsm.expectMessage(eventType, pred, port, direction);
+    return this;
+  }
+
+  public <P extends  PortType> TestContext<T> expectWithinBlock(
+          KompicsEvent event, Port<P> port, Direction direction) {
+    Testkit.checkNotNull(event, port, direction);
+    checkValidPort(port, direction);
+    fsm.expectWithinBlock(event, port, direction);
+    return this;
+  }
+
+  public <P extends  PortType, E extends KompicsEvent> TestContext<T> expectWithinBlock(
+          Class<E> eventType, Predicate<E> pred, Port<P> port, Direction direction) {
+    Testkit.checkNotNull(eventType, pred, port, direction);
+    checkValidPort(port, direction);
+    fsm.expectWithinBlock(eventType, pred, port, direction);
     return this;
   }
 

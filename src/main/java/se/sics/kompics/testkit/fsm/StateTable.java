@@ -3,6 +3,7 @@ package se.sics.kompics.testkit.fsm;
 import com.google.common.base.Function;
 import se.sics.kompics.KompicsEvent;
 import se.sics.kompics.testkit.Action;
+import se.sics.kompics.testkit.Testkit;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -59,6 +60,68 @@ class StateTable {
 
   Transition lookup(int state, EventSpec<? extends KompicsEvent> receivedSpec) {
     return states.get(state).onEvent(receivedSpec);
+  }
+
+  private Transition defaultLookup(int state, EventSpec eventSpec) {
+    KompicsEvent event = eventSpec.getEvent();
+    Class<? extends KompicsEvent> eventType = event.getClass();
+
+    for (Class<? extends KompicsEvent> registeredType : defaultActions.keySet()) {
+      if (registeredType.isAssignableFrom(eventType)) {
+        Action action = actionFor(event, registeredType);
+        switch (action) {
+          case HANDLE:
+            return new Transition(eventSpec, Action.HANDLE, state);
+          case DROP:
+            return new Transition(eventSpec, Action.DROP, state);
+          default:
+            return new Transition(eventSpec, Action.FAIL, FSM.ERROR_STATE);
+        }
+      }
+    }
+    return null;
+  }
+
+  StateTable.Transition lookupWithBlock(int state, EventSpec<? extends KompicsEvent> receivedSpec, Block block) {
+    //// TODO: 3/23/17 merge with state onEvent lookup
+    if (block.handle(receivedSpec)) {
+      return new Transition(receivedSpec, state);
+    }
+    Testkit.logger.debug("{}: looking up {} with block {}", state, receivedSpec, block.pendingEventsToString());
+
+    for (EventSpec<? extends KompicsEvent> eventSpec : block.getAllowedEvents()) {
+      if (eventSpec.match(receivedSpec)) {
+        StateTable.Transition transition = new StateTable.Transition(eventSpec, Action.HANDLE, state);
+        receivedSpec.handle();
+        return transition;
+      }
+    }
+
+    for (EventSpec<? extends KompicsEvent> eventSpec : block.getDroppedEvents()) {
+      if (eventSpec.match(receivedSpec)) {
+        return new StateTable.Transition(eventSpec, Action.DROP, state);
+      }
+    }
+
+    for (EventSpec<? extends KompicsEvent> eventSpec : block.getDisallowedEvents()) {
+      if (eventSpec.match(receivedSpec)) {
+        return new StateTable.Transition(eventSpec, Action.FAIL, FSM.ERROR_STATE);
+      }
+    }
+
+    return defaultLookup(state, receivedSpec);
+  }
+
+  private <E extends KompicsEvent> Action actionFor(
+          KompicsEvent event, Class<? extends KompicsEvent> registeredType) {
+    E ev = (E) event;
+    Function<E, Action> function = (Function<E, Action>) defaultActions.get(registeredType);
+    Action action = function.apply(ev);
+    if (action == null) {
+      throw new NullPointerException(String.format("(default handler for %s returned null for event '%s')",
+              registeredType, event));
+    }
+    return action;
   }
 
   void printTable(int final_state) {
@@ -159,7 +222,9 @@ class StateTable {
     }
 
     Transition onEvent(EventSpec<? extends KompicsEvent> receivedSpec) {
-      block.notifyOnEvent(receivedSpec);
+      if (block.handle(receivedSpec)) {
+        return new Transition(receivedSpec, state);
+      }
 
       // single event or predicate transition
       if ((eventSpec != null && eventSpec.match(receivedSpec)) ||
@@ -206,38 +271,6 @@ class StateTable {
         pending.add(spec);
       }
       seen.clear();
-    }
-
-    private Transition defaultLookup(int state, EventSpec eventSpec) {
-      KompicsEvent event = eventSpec.getEvent();
-      Class<? extends KompicsEvent> eventType = event.getClass();
-
-      for (Class<? extends KompicsEvent> registeredType : defaultActions.keySet()) {
-        if (registeredType.isAssignableFrom(eventType)) {
-          Action action = actionFor(event, registeredType);
-          switch (action) {
-            case HANDLE:
-              return new Transition(eventSpec, Action.HANDLE, state);
-            case DROP:
-              return new Transition(eventSpec, Action.DROP, state);
-            default:
-              return new Transition(eventSpec, Action.FAIL, FSM.ERROR_STATE);
-          }
-        }
-      }
-      return null;
-    }
-
-    private <E extends KompicsEvent> Action actionFor(
-            KompicsEvent event, Class<? extends KompicsEvent> registeredType) {
-      E ev = (E) event;
-      Function<E, Action> function = (Function<E, Action>) defaultActions.get(registeredType);
-      Action action = function.apply(ev);
-      if (action == null) {
-        throw new NullPointerException(String.format("(default handler for %s returned null for event '%s')",
-                registeredType, event));
-      }
-      return action;
     }
 
     public String toString() {

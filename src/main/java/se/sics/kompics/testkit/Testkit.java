@@ -8,7 +8,7 @@ import se.sics.kompics.Init;
 
 public class Testkit {
 
-  static final Logger logger = LoggerFactory.getLogger(Testkit.class);
+  public static final Logger logger = LoggerFactory.getLogger("Testkit");
 
   private Testkit() {}
 

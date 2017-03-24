@@ -2,6 +2,7 @@ package se.sics.kompics.testkit.fsm;
 
 import se.sics.kompics.KompicsEvent;
 import se.sics.kompics.testkit.BlockInit;
+import se.sics.kompics.testkit.Testkit;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -15,7 +16,6 @@ class Block {
   // // TODO: 2/17/17 make this private
   final int times;
   private final int startState;
-  private int endState;
   private int currentCount;
   private BlockInit blockInit, iterationInit;
 
@@ -24,7 +24,7 @@ class Block {
   private Set<EventSpec<? extends KompicsEvent>> dropped;
   Block previousBlock;
 
-  private List<Spec> receiveWithinBlock = new ArrayList<Spec>();
+  private List<Spec> expected = new ArrayList<Spec>();
   private List<Spec> pending = new ArrayList<Spec>();
   private List<Spec> received = new ArrayList<Spec>();
 
@@ -88,6 +88,10 @@ class Block {
     return startState + 1;
   }
 
+  void expectWithinBlock(Spec spec) {
+    expected.add(spec);
+  }
+
   private void runIterationInit() {
     if (iterationInit != null) {
       iterationInit.init();
@@ -95,43 +99,50 @@ class Block {
 
     pending.clear();
     received.clear();
-    for (Spec spec : receiveWithinBlock) {
+    for (Spec spec : expected) {
       pending.add(spec);
     }
   }
 
-  void notifyOnEvent(EventSpec<? extends KompicsEvent> receivedSpec) {
+  boolean handle(EventSpec<? extends KompicsEvent> receivedSpec) {
+    //Testkit.logger.info("block try handle {}, {}", receivedSpec, pendingEventsToString());
     for (Iterator<Spec> iterator = pending.iterator(); iterator.hasNext();) {
       Spec spec = iterator.next();
       if (spec.match(receivedSpec)) {
         received.add(spec);
         iterator.remove();
-        break;
+        Testkit.logger.trace("block handling {}, {}", receivedSpec, pendingEventsToString());
+        receivedSpec.handle();
+        return true;
       }
     }
-  }
-
-  boolean tryHandle(EventSpec<? extends KompicsEvent> receivedSpec) {
-    notifyOnEvent(receivedSpec);
-    //if ()
-    return false;
+    return previousBlock != null && previousBlock.handle(receivedSpec);
   }
 
   boolean hasPendingEvents() {
     return !pending.isEmpty();
   }
 
-  boolean isEmptyBlock() {
-    assert endState != 0;
-    return startState == endState + 1;
+  String pendingEventsToString() {
+    StringBuilder sb = new StringBuilder("Pending<");
+    for (Spec spec : pending) {
+      sb.append("(").append(spec).append(") ");
+    }
+    sb.append(">");
+    return sb.toString();
   }
 
-  void setEndState(int endState) {
-    this.endState = endState;
-  }
-
-  String eventStatus() {
-    return "spam";
+  String status() {
+    StringBuilder sb = new StringBuilder("Block<Received(");
+    for (Spec spec : received) {
+      sb.append(spec).append(" ");
+    }
+    sb.append(")Pending(");
+    for (Spec spec : pending) {
+      sb.append(spec).append(" ");
+    }
+    sb.append(")>");
+    return sb.toString();
   }
 
   private void initEmptyBlock() {

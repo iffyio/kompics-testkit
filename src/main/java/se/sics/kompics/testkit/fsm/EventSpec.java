@@ -16,18 +16,17 @@ public class EventSpec<E extends KompicsEvent> implements Spec{
   private Comparator<E> comparator;
   private ProxyHandler handler;
 
-  EventSpec(E event, Port<? extends PortType> port,
+  private EventSpec(E event, Port<? extends PortType> port,
             Direction direction, Comparator<E> comparator) {
-    this(event, port, direction);
-    this.comparator = comparator;
-  }
-
-  // // TODO: 2/17/17 remove constructor if not needed
-  public EventSpec(E event, Port<? extends PortType> port,
-            Direction direction) {
     this.event = event;
     this.port = port;
     this.direction = direction;
+    this.comparator = comparator;
+  }
+
+  static <P extends  PortType, E extends KompicsEvent> EventSpec<? extends KompicsEvent> create(
+          Comparator<E> comparator, E event, Port<P> port, Direction direction) {
+    return new EventSpec<>((E) event, port, direction, comparator);
   }
 
   public E getEvent() {
