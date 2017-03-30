@@ -1,4 +1,4 @@
-package se.sics.kompics.testkit.fsm;
+package se.sics.kompics.testkit;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -13,7 +13,6 @@ import com.google.common.base.Function;
 import com.google.common.base.Predicate;
 
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import se.sics.kompics.Component;
 import se.sics.kompics.ComponentCore;
@@ -25,29 +24,26 @@ import se.sics.kompics.Port;
 import se.sics.kompics.KompicsEvent;
 import se.sics.kompics.Start;
 
-import se.sics.kompics.testkit.Action;
-import se.sics.kompics.testkit.BlockInit;
-import se.sics.kompics.testkit.ExpectedFault;
-import se.sics.kompics.testkit.Direction;
-import se.sics.kompics.testkit.Proxy;
-
-public class FSM<T extends ComponentDefinition> {
-  static final Logger logger = LoggerFactory.getLogger("Testkit");
+class FSM<T extends ComponentDefinition> {
+  static final Logger logger = Testkit.logger;
 
   private final T definitionUnderTest;
-  public static final int ERROR_STATE = -1;
+
+  static final int ERROR_STATE = -1;
+  private String ERROR_MESSAGE = "";
   private int FINAL_STATE;
   private boolean STARTED = false;
-  private String ERROR_MESSAGE = "";
 
   private final ComponentCore proxyComponent;
   private Collection<Component> participants = new HashSet<Component>();
-  private final Stack<Block> balancedBlock = new Stack<Block>();
-  private List<Spec> expectUnordered = new ArrayList<>();
-  private final EventQueue eventQueue;
 
+  private final Stack<Block> balancedBlock = new Stack<Block>();
   private Map<Integer, Block> blockStart = new HashMap<Integer, Block>();
   private Map<Integer, Block> blockEnd = new HashMap<Integer, Block>();
+
+  private List<Spec> expectUnordered = new ArrayList<Spec>();
+  private final EventQueue eventQueue;
+
   private Map<Integer, Trigger> triggeredEvents = new HashMap<Integer, Trigger>();
   private Map<Integer, Predicate<T>> componentPredicates = new HashMap<Integer, Predicate<T>>();
   private Map<Integer, ExpectedFault> expectedFaults = new HashMap<Integer, ExpectedFault>();
@@ -58,114 +54,90 @@ public class FSM<T extends ComponentDefinition> {
   private Block currentBlock;
   private int currentState = 0;
 
-  public FSM(Proxy<T> proxy, T definition) {
+  FSM(Proxy<T> proxy, T definitionUnderTest) {
     this.eventQueue = proxy.getEventQueue();
     this.proxyComponent =  proxy.getComponentCore();
-    definitionUnderTest = definition;
+    this.definitionUnderTest = definitionUnderTest;
 
     initializeFSM();
   }
 
-  private void initializeFSM() {
-    repeat(1);
-  }
-
-  public void addParticipatingComponents(Component c) {
+  void addParticipant(Component c) {
     participants.add(c);
   }
 
-  public <P extends PortType> void addDisallowedEvent(
+  <P extends PortType> void addDisallowedEvent(
           KompicsEvent event, Port<P> port, Direction direction) {
     checkInHeaderMode();
     currentBlock.addDisallowedMessage(newEventSpec(event, port, direction));
   }
 
-  public <P extends  PortType> void addAllowedEvent(
+  <P extends  PortType> void addAllowedEvent(
           KompicsEvent event, Port<P> port, Direction direction) {
     checkInHeaderMode();
     currentBlock.addAllowedMessage(newEventSpec(event, port, direction));
   }
 
-  public <P extends  PortType> void addDroppedEvent(
+  <P extends  PortType> void addDroppedEvent(
           KompicsEvent event, Port<P> port, Direction direction) {
     checkInHeaderMode();
     currentBlock.addDroppedMessage(newEventSpec(event, port, direction));
   }
 
-  public <P extends PortType> void expectMessage(
+  <P extends PortType> void expectMessage(
           KompicsEvent event, Port<P> port, Direction direction) {
     EventSpec<? extends KompicsEvent> eventSpec = newEventSpec(event, port, direction);
     registerSpec(eventSpec);
   }
 
-  public <P extends PortType, E extends KompicsEvent> void expectMessage(
-          Class<E> eventType, Predicate<E> pred, Port<P> port, Direction direction) {
-    PredicateSpec predicateSpec = new PredicateSpec(eventType, pred, port, direction);
+  <P extends PortType, E extends KompicsEvent> void expectMessage(
+          Class<E> eventType, Predicate<E> predicate, Port<P> port, Direction direction) {
+    PredicateSpec predicateSpec = new PredicateSpec(eventType, predicate, port, direction);
     registerSpec(predicateSpec);
   }
 
-  public <P extends PortType> void expectWithinBlock(
+  <P extends PortType> void expectWithinBlock(
           KompicsEvent event, Port<P> port, Direction direction) {
     EventSpec<? extends KompicsEvent> eventSpec = newEventSpec(event, port, direction);
     checkInHeaderMode();
     currentBlock.expectWithinBlock(eventSpec);
   }
 
-  public <P extends PortType, E extends KompicsEvent> void expectWithinBlock(
-          Class<E> eventType, Predicate<E> pred, Port<P> port, Direction direction) {
-    PredicateSpec predicateSpec = new PredicateSpec(eventType, pred, port, direction);
+  <P extends PortType, E extends KompicsEvent> void expectWithinBlock(
+          Class<E> eventType, Predicate<E> predicate, Port<P> port, Direction direction) {
+    PredicateSpec predicateSpec = new PredicateSpec(eventType, predicate, port, direction);
     checkInHeaderMode();
     currentBlock.expectWithinBlock(predicateSpec);
   }
 
-  private void registerSpec(Spec spec) {
-    if (inUnorderedMode()) {
-      expectUnordered.add(spec);
-    } else {
-      checkInBodyMode();
-      table.registerExpectedEvent(currentState, spec, currentBlock);
-      currentState++;
-    }
-  }
-
-  public void setUnorderedMode() {
+  void setUnorderedMode() {
     checkInBodyAndNotUnorderedMode();
     currentBlock.mode = Block.MODE.UNORDERED;
     expectUnordered = new ArrayList<Spec>();
   }
 
-  private void endUnorderedMode() {
-    currentBlock.mode = Block.MODE.BODY;
-    if (expectUnordered.isEmpty()) {
-      throw new IllegalStateException("No events were specified in unordered mode");
-    }
-
-    table.registerExpectedEvent(currentState, expectUnordered, currentBlock);
-    currentState++;
-  }
-
-  public void addTrigger(KompicsEvent event, Port<? extends PortType> port) {
+  void addTrigger(KompicsEvent event, Port<? extends PortType> port) {
     checkInBodyAndNotUnorderedMode();
     triggeredEvents.put(currentState, new Trigger(event, port));
-    currentState++;
+    gotoNextState();
   }
 
-  public void repeat(int times) {
+  void repeat(int times) {
     Block block = new Block(currentBlock, times, currentState);
     enterNewBlock(block);
   }
 
-  public void repeat(int times, BlockInit init) {
+  void repeat(int times, BlockInit init) {
     Block block = new Block(currentBlock, times, currentState, init);
     enterNewBlock(block);
   }
 
-  public void body() {
+  void body() {
     checkInHeaderMode();
     currentBlock.mode = Block.MODE.BODY;
   }
 
-  public void end() {
+  void end() {
     if (inUnorderedMode()) {
       endUnorderedMode();
     } else {
@@ -173,49 +145,39 @@ public class FSM<T extends ComponentDefinition> {
     }
   }
 
-  private void endBlock() {
-    checkInBodyAndNotUnorderedMode();
-    if (balancedBlock.isEmpty()) {
-      throw new IllegalStateException("matching repeat not found for end");
-    }
-    blockEnd.put(currentState, currentBlock);
-    restorePreviousBlock();
-    currentState++;
-  }
-
-  public void setIterationInit(BlockInit iterationInit) {
+  void setIterationInit(BlockInit iterationInit) {
     checkInHeaderMode();
     currentBlock.setIterationInit(iterationInit);
   }
 
-  public void addExpectedFault(
+  void addExpectedFault(
           Class<? extends Throwable> exceptionType, Fault.ResolveAction resolveAction) {
     checkInBodyAndNotUnorderedMode();
     checkExpectedFaultHasMatchingClause();
     expectedFaults.put(currentState, new ExpectedFault(exceptionType, resolveAction));
-    currentState++;
+    gotoNextState();
   }
 
-  public void addExpectedFault(
+  void addExpectedFault(
           Predicate<Throwable> exceptionPredicate, Fault.ResolveAction resolveAction) {
     checkInBodyAndNotUnorderedMode();
     checkExpectedFaultHasMatchingClause();
     expectedFaults.put(currentState, new ExpectedFault(exceptionPredicate, resolveAction));
-    currentState++;
+    gotoNextState();
   }
 
-  public void addAssertComponent(Predicate<T> assertPred) {
+  void addAssertComponent(Predicate<T> assertPred) {
     componentPredicates.put(currentState, assertPred);
-    currentState++;
+    gotoNextState();
   }
 
-  public <E extends KompicsEvent> void addComparator(
+  <E extends KompicsEvent> void addComparator(
           Class<E> eventType, Comparator<E> comparator) {
     checkInInitialHeader();
     comparators.put(eventType, comparator);
   }
 
-  public <E extends KompicsEvent> void setDefaultAction(
+  <E extends KompicsEvent> void setDefaultAction(
           Class<E> eventType, Function<E, Action> function) {
     checkInInitialHeader();
     table.setDefaultAction(eventType, function);
@@ -225,14 +187,14 @@ public class FSM<T extends ComponentDefinition> {
     return STARTED? FINAL_STATE : currentState;
   }
 
-  public void checkInInitialHeader() {
+  void checkInInitialHeader() {
     checkInHeaderMode();
     if (currentBlock == null || currentBlock.previousBlock != null) {
       throw new IllegalStateException("Operation only supported in initial header");
     }
   }
 
-  public int start() {
+  int start() {
     if (!STARTED) {
       STARTED = true;
       addFinalState();
@@ -243,9 +205,13 @@ public class FSM<T extends ComponentDefinition> {
     return currentState == FINAL_STATE + 1 ? FINAL_STATE : currentState;
   }
 
-  // PACKAGE_PRIVATE
+  <P extends  PortType, E extends KompicsEvent> EventSpec<? extends KompicsEvent> newEventSpec(
+          KompicsEvent event, Port<P> port, Direction direction) {
+    Comparator<E> c = (Comparator<E>) comparators.get(event.getClass());
+    return EventSpec.create(c, (E) event, port, direction);
+  }
 
-  public ExpectedFault getExpectedFault() {
+  ExpectedFault getExpectedFault() {
     // // TODO: 3/21/17 use view with (expect, fault) pair
     int initialState = currentState;
     ExpectedFault expectedFault = expectedFaults.get(initialState);
@@ -254,8 +220,6 @@ public class FSM<T extends ComponentDefinition> {
     }
     return expectedFault;
   }
-
-  // PRIVATE
 
   private void run() {
     runStartState();
@@ -279,10 +243,39 @@ public class FSM<T extends ComponentDefinition> {
     runFinalState();
   }
 
-  public <P extends  PortType, E extends KompicsEvent> EventSpec<? extends KompicsEvent> newEventSpec(
-          KompicsEvent event, Port<P> port, Direction direction) {
-    Comparator<E> c = (Comparator<E>) comparators.get(event.getClass());
-    return EventSpec.create(c, (E) event, port, direction);
+  private void initializeFSM() {
+    repeat(1);
+  }
+
+  private void registerSpec(Spec spec) {
+    if (inUnorderedMode()) {
+      expectUnordered.add(spec);
+    } else {
+      checkInBodyMode();
+      table.registerExpectedEvent(currentState, spec, currentBlock);
+      gotoNextState();
+    }
+  }
+
+  private void endUnorderedMode() {
+    currentBlock.mode = Block.MODE.BODY;
+    if (expectUnordered.isEmpty()) {
+      throw new IllegalStateException("No events were specified in unordered mode");
+    }
+
+    table.registerExpectedEvent(currentState, expectUnordered, currentBlock);
+    gotoNextState();
+  }
+
+  private void endBlock() {
+    checkInBodyAndNotUnorderedMode();
+    if (balancedBlock.isEmpty()) {
+      throw new IllegalStateException("matching repeat not found for end");
+    }
+
+    blockEnd.put(currentState, currentBlock);
+    restorePreviousBlock();
+    gotoNextState();
   }
 
   private void enterNewBlock(Block block) {
@@ -294,7 +287,7 @@ public class FSM<T extends ComponentDefinition> {
     currentBlock = block;
     balancedBlock.push(currentBlock);
     blockStart.put(currentState, block);
-    currentState++;
+    gotoNextState();
   }
 
   private void restorePreviousBlock() {
@@ -342,7 +335,7 @@ public class FSM<T extends ComponentDefinition> {
     if (!successful) {
       gotoErrorState("Component assertion failed");
     } else {
-      currentState++;
+      gotoNextState();
     }
     return true;
   }
@@ -359,7 +352,7 @@ public class FSM<T extends ComponentDefinition> {
 
     if (result.succeeded) {
       logger.debug(assertMessage);
-      currentState++;
+      gotoNextState();
     } else {
       gotoErrorState(assertMessage);
     }
@@ -378,7 +371,7 @@ public class FSM<T extends ComponentDefinition> {
     }
     logger.debug("{}: triggeredAnEvent({})\t", currentState, trigger);
     trigger.doTrigger();
-    currentState++;
+    gotoNextState();
     return true;
   }
 
@@ -389,7 +382,7 @@ public class FSM<T extends ComponentDefinition> {
     } else {
       block.initialize();
       logger.debug("{}: repeat({})\t", currentState, block.getCurrentCount());
-      currentState++;
+      gotoNextState();
       return true;
     }
   }
@@ -426,9 +419,10 @@ public class FSM<T extends ComponentDefinition> {
       if (block.hasMoreIterations()) {
         currentState = block.indexOfFirstState();
       } else {
-        currentState++;
+        gotoNextState();
       }
     }
+
     return true;
   }
 
@@ -457,11 +451,6 @@ public class FSM<T extends ComponentDefinition> {
     }
   }
 
-  private void checkInUnorderedMode() {
-    if (!inUnorderedMode()) {
-      throw new IllegalStateException("Not in unordered mode");
-    }
-  }
   private void checkInBodyMode() {
     if (currentBlock != null && currentBlock.mode != Block.MODE.BODY) {
       throw new IllegalStateException("Not in body mode");
@@ -478,6 +467,10 @@ public class FSM<T extends ComponentDefinition> {
     return currentBlock != null && currentBlock.mode == Block.MODE.UNORDERED;
   }
 
+  private void gotoNextState() {
+    currentState++;
+  }
+  
   private void gotoErrorState(String errorMessage) {
     currentState = ERROR_STATE;
     ERROR_MESSAGE = errorMessage;

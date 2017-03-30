@@ -1,7 +1,5 @@
 package se.sics.kompics.testkit;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import se.sics.kompics.Channel;
 import se.sics.kompics.ChannelCore;
 import se.sics.kompics.ChannelFactory;
@@ -25,8 +23,8 @@ class PortStructure {
 
   private List<Port<? extends PortType>> connectedPorts = new ArrayList<Port<? extends PortType>>();
   private Port<? extends PortType> inboundPort, outboundPort;
-
   boolean isProvidedPort;
+
   private Proxy proxy;
   private Map<Port, Channel> portToChannel = new HashMap<>();
 
@@ -36,7 +34,6 @@ class PortStructure {
   PortStructure(Proxy proxy, Port<? extends PortType> inboundPort,
                 Port<? extends PortType> outboundPort,
                 boolean isProvidedPort) {
-
     this.proxy = proxy;
     this.inboundPort = inboundPort;
     this.outboundPort = outboundPort;
@@ -47,10 +44,40 @@ class PortStructure {
     addProxyHandlers();
   }
 
+  List<Port<? extends PortType>> getConnectedPorts() {
+    return connectedPorts;
+  }
+
+  Port<? extends PortType> getOutboundPort() {
+    return outboundPort;
+  }
+
+  <P extends PortType> void addConnectedPort(PortCore<P> connectedPort, ChannelFactory factory) {
+    Channel<P> channel;
+
+    PortCore<P> proxyOutsidePort = (PortCore<P>) inboundPort.getPair();
+
+    if (isProvidedPort) {
+      channel = factory.connect(proxyOutsidePort, connectedPort);
+    } else {
+      channel = factory.connect(connectedPort, proxyOutsidePort);
+    }
+
+    connectedPorts.add(connectedPort);
+    portToChannel.put(connectedPort, channel);
+  }
+
+  <P extends PortType> ChannelCore<P> getChannel(Port<P> port) {
+    Channel channel = portToChannel.get(port);
+    assert channel != null;
+    return (ChannelCore<P>) channel;
+  }
+
   private void addProxyHandlers() {
     PortType portType = inboundPort.getPortType();
     Collection<Class<? extends KompicsEvent>> positiveEvents = Unsafe.getPositiveEvents(portType);
     Collection<Class<? extends KompicsEvent>> negativeEvents = Unsafe.getNegativeEvents(portType);
+
     if (isProvidedPort) {
       subscribeOutboundHandlersFor(positiveEvents);
       subscribeInboundHandlersFor(negativeEvents);
@@ -78,36 +105,6 @@ class PortStructure {
         inboundPort.doSubscribe(inboundHandler);
       }
     }
-  }
-
-  List<Port<? extends PortType>> getConnectedPorts() {
-    return connectedPorts;
-  }
-
-  Port<? extends PortType> getOutboundPort() {
-    return outboundPort;
-  }
-
-  <P extends PortType> void addConnectedPort(PortCore<P> connectedPort,
-                        ChannelFactory factory) {
-    Channel<P> channel;
-
-    PortCore<P> proxyOutsidePort = (PortCore<P>) inboundPort.getPair();
-
-    if (isProvidedPort) {
-      channel = factory.connect(proxyOutsidePort, connectedPort);
-    } else {
-      channel = factory.connect(connectedPort, proxyOutsidePort);
-    }
-
-    connectedPorts.add(connectedPort);
-    portToChannel.put(connectedPort, channel);
-  }
-
-  <P extends PortType> ChannelCore<P> getChannel(Port<P> port) {
-    Channel channel = portToChannel.get(port);
-    assert channel != null;
-    return (ChannelCore<P>) channel;
   }
 
   private boolean hasEquivalentHandler(

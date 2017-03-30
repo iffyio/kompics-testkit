@@ -3,7 +3,7 @@ package se.sics.kompics.testkit;
 import com.google.common.base.Predicate;
 import se.sics.kompics.Fault;
 
-public class ExpectedFault {
+class ExpectedFault {
 
   private enum STATUS {
     PENDING, SUCCESS, FAILURE
@@ -16,7 +16,7 @@ public class ExpectedFault {
   private STATUS status;
   private String message;
 
-  public ExpectedFault(
+  ExpectedFault(
           Class<? extends Throwable> exceptionType, Fault.ResolveAction resolveAction) {
     this.exceptionType = exceptionType;
     this.resolveAction = resolveAction;
@@ -24,7 +24,7 @@ public class ExpectedFault {
     reset();
   }
 
-  public ExpectedFault(
+  ExpectedFault(
           Predicate<Throwable> exceptionPredicate, Fault.ResolveAction resolveAction) {
     this.exceptionPredicate = exceptionPredicate;
     this.resolveAction = resolveAction;
@@ -43,12 +43,12 @@ public class ExpectedFault {
     } else {
       matchByPredicate(fault.getCause());
     }
-
     this.notifyAll();
+
     return resolveAction;
   }
 
-  public synchronized Result getResult() {
+  synchronized Result getResult() {
     while (status == STATUS.PENDING) {
       try {
         this.wait();
@@ -56,10 +56,14 @@ public class ExpectedFault {
         throw new RuntimeException(e);
       }
     }
-
     Result r = new Result(status == STATUS.SUCCESS, getMessage());
     reset();
+
     return r;
+  }
+
+  String strReprOfExpectedException() {
+    return exceptionType != null? exceptionType.toString() : exceptionPredicate.toString();
   }
 
   private void reset() {
@@ -73,11 +77,6 @@ public class ExpectedFault {
                            " but none was thrown", strReprOfExpectedException())
            : message;
   }
-
-  public String strReprOfExpectedException() {
-    return exceptionType != null? exceptionType.toString() : exceptionPredicate.toString();
-  }
-
 
   private void matchByType(Throwable exception) {
     if (exceptionType.isAssignableFrom(exception.getClass())) {
@@ -105,9 +104,9 @@ public class ExpectedFault {
     this.message = "Expect Fault Failed: " + message;
   }
 
-  public static class Result {
-    public final boolean succeeded;
-    public final String message;
+  static class Result {
+    final boolean succeeded;
+    final String message;
     private Result(boolean succeeded, String message) {
       this.succeeded = succeeded;
       this.message = message;

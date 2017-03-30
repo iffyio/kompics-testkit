@@ -1,47 +1,42 @@
-package se.sics.kompics.testkit.fsm;
+package se.sics.kompics.testkit;
 
 import se.sics.kompics.KompicsEvent;
 import se.sics.kompics.Port;
 import se.sics.kompics.PortType;
-import se.sics.kompics.testkit.Direction;
-import se.sics.kompics.testkit.ProxyHandler;
 
 import java.util.Comparator;
 
-public class EventSpec<E extends KompicsEvent> implements Spec{
+class EventSpec<E extends KompicsEvent> extends Spec{
 
   private final E event;
-  private final Port<? extends PortType> port;
-  private final Direction direction;
   private Comparator<E> comparator;
   private ProxyHandler handler;
 
   private EventSpec(E event, Port<? extends PortType> port,
             Direction direction, Comparator<E> comparator) {
+    super(port, direction);
     this.event = event;
-    this.port = port;
-    this.direction = direction;
     this.comparator = comparator;
   }
 
   static <P extends  PortType, E extends KompicsEvent> EventSpec<? extends KompicsEvent> create(
           Comparator<E> comparator, E event, Port<P> port, Direction direction) {
-    return new EventSpec<>((E) event, port, direction, comparator);
+    return new EventSpec<E>((E) event, port, direction, comparator);
   }
 
-  public E getEvent() {
+  E getEvent() {
     return event;
   }
 
-  public Port<? extends PortType> getPort() {
+  Port<? extends PortType> getPort() {
     return port;
   }
 
-  public Direction getDirection() {
+  Direction getDirection() {
     return direction;
   }
 
-  public void setHandler(ProxyHandler handler) {
+  void setHandler(ProxyHandler handler) {
     this.handler = handler;
   }
 
@@ -49,7 +44,7 @@ public class EventSpec<E extends KompicsEvent> implements Spec{
     this.comparator = comparator;
   }
 
-  public void handle() {
+  void handle() {
     handler.doHandle(event);
   }
 

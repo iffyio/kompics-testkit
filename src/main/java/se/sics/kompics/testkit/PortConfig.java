@@ -13,9 +13,9 @@ import se.sics.kompics.Positive;
 import java.util.HashMap;
 import java.util.Map;
 
-
 class PortConfig {
-  private final Map<Port<? extends PortType>, PortStructure> portStructs = new HashMap<>();
+
+  private final Map<Port<? extends PortType>, PortStructure> portStructs = new HashMap<Port<? extends PortType>, PortStructure>();
   private final Proxy proxy;
 
   PortConfig(Proxy proxy) {
@@ -47,15 +47,7 @@ class PortConfig {
       portStructs.put(outboundPort, portStruct);
     }
   }
-
-  private boolean isMonitoredPort(Class<? extends PortType> portClass) {
-    return !portClass.equals(LoopbackPort.class) &&
-           !portClass.equals(ControlPort.class);
-  }
-
-  public <P extends PortType> void doConnect(Positive<P> positive,
-                                             Negative<P> negative,
-                                             ChannelFactory factory) {
+  <P extends PortType> void doConnect(Positive<P> positive, Negative<P> negative, ChannelFactory factory) {
 
     boolean cutOwnsPositive = positive.getPair().getOwner() == proxy.getComponentUnderTest();
     boolean cutOwnsNegative = negative.getPair().getOwner() == proxy.getComponentUnderTest();
@@ -74,4 +66,9 @@ class PortConfig {
     PortStructure portStruct = portStructs.get(port);
     return !(portStruct == null || portStruct.getConnectedPorts().isEmpty());
   }
+
+  private boolean isMonitoredPort(Class<? extends PortType> portClass) {
+    return !(portClass.equals(LoopbackPort.class) || portClass.equals(ControlPort.class));
+  }
+
 }

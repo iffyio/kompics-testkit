@@ -1,9 +1,7 @@
-package se.sics.kompics.testkit.fsm;
+package se.sics.kompics.testkit;
 
 import com.google.common.base.Function;
 import se.sics.kompics.KompicsEvent;
-import se.sics.kompics.testkit.Action;
-import se.sics.kompics.testkit.Testkit;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -40,8 +38,7 @@ class StateTable {
     states.put(state, new State(state, expectUnordered, block));
   }
 
-  <E extends KompicsEvent> void setDefaultAction(
-          Class<E> eventType, Function<E, Action> predicate) {
+  <E extends KompicsEvent> void setDefaultAction(Class<E> eventType, Function<E, Action> predicate) {
     defaultActions.put(eventType, predicate);
   }
 
@@ -60,26 +57,6 @@ class StateTable {
 
   Transition lookup(int state, EventSpec<? extends KompicsEvent> receivedSpec) {
     return states.get(state).onEvent(receivedSpec);
-  }
-
-  private Transition defaultLookup(int state, EventSpec eventSpec) {
-    KompicsEvent event = eventSpec.getEvent();
-    Class<? extends KompicsEvent> eventType = event.getClass();
-
-    for (Class<? extends KompicsEvent> registeredType : defaultActions.keySet()) {
-      if (registeredType.isAssignableFrom(eventType)) {
-        Action action = actionFor(event, registeredType);
-        switch (action) {
-          case HANDLE:
-            return new Transition(eventSpec, Action.HANDLE, state);
-          case DROP:
-            return new Transition(eventSpec, Action.DROP, state);
-          default:
-            return new Transition(eventSpec, Action.FAIL, FSM.ERROR_STATE);
-        }
-      }
-    }
-    return null;
   }
 
   StateTable.Transition lookupWithBlock(int state, EventSpec<? extends KompicsEvent> receivedSpec, Block block) {
@@ -112,11 +89,30 @@ class StateTable {
     return defaultLookup(state, receivedSpec);
   }
 
+  private Transition defaultLookup(int state, EventSpec eventSpec) {
+    KompicsEvent event = eventSpec.getEvent();
+    Class<? extends KompicsEvent> eventType = event.getClass();
+
+    for (Class<? extends KompicsEvent> registeredType : defaultActions.keySet()) {
+      if (registeredType.isAssignableFrom(eventType)) {
+        Action action = actionFor(event, registeredType);
+        switch (action) {
+          case HANDLE:
+            return new Transition(eventSpec, Action.HANDLE, state);
+          case DROP:
+            return new Transition(eventSpec, Action.DROP, state);
+          default:
+            return new Transition(eventSpec, Action.FAIL, FSM.ERROR_STATE);
+        }
+      }
+    }
+    return null;
+  }
+
   private <E extends KompicsEvent> Action actionFor(
           KompicsEvent event, Class<? extends KompicsEvent> registeredType) {
-    E ev = (E) event;
     Function<E, Action> function = (Function<E, Action>) defaultActions.get(registeredType);
-    Action action = function.apply(ev);
+    Action action = function.apply((E) event);
     if (action == null) {
       throw new NullPointerException(String.format("(default handler for %s returned null for event '%s')",
               registeredType, event));

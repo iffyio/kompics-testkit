@@ -9,22 +9,19 @@ import se.sics.kompics.PortType;
 import se.sics.kompics.Request;
 import se.sics.kompics.Response;
 
-import se.sics.kompics.testkit.fsm.EventSpec;
-
 class InboundHandler extends ProxyHandler {
-  private static final Logger logger = LoggerFactory.getLogger("Testkit");
 
   private Port<? extends PortType> destPort;
 
-  InboundHandler(Proxy proxy, PortStructure portStruct,
-                 Class<? extends KompicsEvent> eventType) {
+  InboundHandler(
+          Proxy proxy, PortStructure portStruct, Class<? extends KompicsEvent> eventType) {
     super(proxy, portStruct, eventType);
     this.destPort = portStruct.getOutboundPort();
   }
 
   @Override
   public void handle(KompicsEvent event) {
-    logger.trace("received incoming event: {}", event);
+    Testkit.logger.trace("received incoming event: {}", event);
     if (event instanceof Response) {
       Response response = (Response) event;
       assert response.getTopPathElementFirst().getComponent() == destPort.getPair().getOwner();

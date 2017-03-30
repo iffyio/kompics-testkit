@@ -4,59 +4,37 @@ import se.sics.kompics.ChannelFactory;
 import se.sics.kompics.Component;
 import se.sics.kompics.ComponentDefinition;
 import se.sics.kompics.Fault;
-import se.sics.kompics.Handler;
 import se.sics.kompics.Init;
-import se.sics.kompics.JavaComponent;
 import se.sics.kompics.JavaPort;
 import se.sics.kompics.Negative;
 import se.sics.kompics.Port;
 import se.sics.kompics.PortType;
 import se.sics.kompics.Positive;
-import se.sics.kompics.Start;
 import se.sics.kompics.Unsafe;
-import se.sics.kompics.testkit.fsm.EventQueue;
-import se.sics.kompics.testkit.fsm.FSM;
 import se.sics.kompics.testkit.scheduler.CallingThreadScheduler;
 import java.util.Map;
 
-public class Proxy<T extends ComponentDefinition> extends ComponentDefinition{
+class Proxy<T extends ComponentDefinition> extends ComponentDefinition{
 
   private final EventQueue eventQueue = new EventQueue();
+
+  private T definitionUnderTest;
   private PortConfig portConfig;
   private Component cut;
-  private T definitionUnderTest;
   private FSM<T> fsm;
 
   Proxy() {
     getComponentCore().setScheduler(new CallingThreadScheduler());
   }
 
-  T createComponentUnderTest(
-          Class<T> definition, Init<T> initEvent) {
+  T createComponentUnderTest(Class<T> definition, Init<T> initEvent) {
     init(definition, initEvent);
     return definitionUnderTest;
   }
 
-  T createComponentUnderTest(
-          Class<T> definition, Init.None initEvent) {
+  T createComponentUnderTest(Class<T> definition, Init.None initEvent) {
     init(definition, initEvent);
     return definitionUnderTest;
-  }
-
-  @SuppressWarnings("unchecked")
-  private void init(Class<T> definition, Init<? extends ComponentDefinition> initEvent) {
-    if (definitionUnderTest != null) {
-      return;
-    }
-
-    if (initEvent == Init.NONE) {
-      cut = create(definition, (Init.None) initEvent);
-    } else {
-      cut = create(definition, (Init<T>) initEvent);
-    }
-    createPortConfig();
-    definitionUnderTest = (T) cut.getComponent();
-    fsm = new FSM<T>(this, definitionUnderTest);
   }
 
   FSM<T> getFsm() {
@@ -67,7 +45,7 @@ public class Proxy<T extends ComponentDefinition> extends ComponentDefinition{
     return cut;
   }
 
-  public EventQueue getEventQueue() {
+  EventQueue getEventQueue() {
     return eventQueue;
   }
 
@@ -91,30 +69,12 @@ public class Proxy<T extends ComponentDefinition> extends ComponentDefinition{
     return requires(portType);
   }
 
-  private Handler<Start> startHandler = new Handler<Start>() {
-    @Override
-    public void handle(Start event) { }
-  };
-
-  private void setupComponent(Component c) {
-    // only proxy is scheduled on calling thread
-    c.getComponent().getComponentCore().setScheduler(null);
-  }
-
-  {
-    subscribe(startHandler, control);
-  }
-
-  private void createPortConfig() {
-    portConfig = new PortConfig(this);
-  }
-
   Map<Class<? extends PortType>, JavaPort<? extends PortType>> getCutPositivePorts() {
-    return Unsafe.getPositivePorts(((JavaComponent) cut));
+    return Unsafe.getPositivePorts(cut);
   }
 
   Map<Class<? extends PortType>, JavaPort<? extends PortType>> getCutNegativePorts() {
-    return Unsafe.getNegativePorts(((JavaComponent) cut));
+    return Unsafe.getNegativePorts(cut);
   }
 
   <P extends PortType> void doConnect(
@@ -144,4 +104,24 @@ public class Proxy<T extends ComponentDefinition> extends ComponentDefinition{
     return expectedFault.matchFault(fault);
   }
 
+  @SuppressWarnings("unchecked")
+  private void init(Class<T> definition, Init<? extends ComponentDefinition> initEvent) {
+    if (definitionUnderTest != null) {
+      return;
+    }
+    if (initEvent == Init.NONE) {
+      cut = create(definition, (Init.None) initEvent);
+    } else {
+      cut = create(definition, (Init<T>) initEvent);
+    }
+
+    portConfig = new PortConfig(this);
+    definitionUnderTest = (T) cut.getComponent();
+    fsm = new FSM<T>(this, definitionUnderTest);
+  }
+
+  private void setupComponent(Component c) {
+    // only proxy is scheduled on calling thread
+    c.getComponent().getComponentCore().setScheduler(null);
+  }
 }

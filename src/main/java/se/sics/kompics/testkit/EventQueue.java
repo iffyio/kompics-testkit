@@ -1,14 +1,14 @@
-package se.sics.kompics.testkit.fsm;
+package se.sics.kompics.testkit;
 
 import se.sics.kompics.KompicsEvent;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-public class EventQueue {
+class EventQueue {
 
   private final ConcurrentLinkedQueue<EventSpec<? extends KompicsEvent>> q = new ConcurrentLinkedQueue<EventSpec<? extends KompicsEvent>>();
 
-  public synchronized void offer(EventSpec<? extends KompicsEvent> event) {
+  synchronized void offer(EventSpec<? extends KompicsEvent> event) {
     q.offer(event);
     this.notifyAll();
   }

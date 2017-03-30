@@ -21,8 +21,6 @@ import se.sics.kompics.Scheduler;
 import se.sics.kompics.Start;
 import se.sics.kompics.scheduler.ThreadPoolScheduler;
 
-import se.sics.kompics.testkit.fsm.FSM;
-
 import java.util.Comparator;
 
 
@@ -59,7 +57,7 @@ public class TestContext<T extends ComponentDefinition> {
           Class<T> definition, Init<T> initEvent) {
     Testkit.checkNotNull(definition, initEvent);
     Component c = proxy.createSetupComponent(definition, initEvent);
-    fsm.addParticipatingComponents(c);
+    fsm.addParticipant(c);
     return c;
   }
 
@@ -67,7 +65,7 @@ public class TestContext<T extends ComponentDefinition> {
           Class<T> definition, Init.None initEvent) {
     Testkit.checkNotNull(definition, initEvent);
     Component c = proxy.createSetupComponent(definition, initEvent);
-    fsm.addParticipatingComponents(c);
+    fsm.addParticipant(c);
     return c;
   }
 
@@ -266,7 +264,7 @@ public class TestContext<T extends ComponentDefinition> {
 
   private void initFSM() {
     fsm = proxy.getFsm();
-    fsm.addParticipatingComponents(cut.getComponentCore());
+    fsm.addParticipant(cut.getComponentCore());
   }
 
 

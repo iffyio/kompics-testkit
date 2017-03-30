@@ -1,8 +1,6 @@
-package se.sics.kompics.testkit.fsm;
+package se.sics.kompics.testkit;
 
 import se.sics.kompics.KompicsEvent;
-import se.sics.kompics.testkit.BlockInit;
-import se.sics.kompics.testkit.Testkit;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -17,12 +15,13 @@ class Block {
   final int times;
   private final int startState;
   private int currentCount;
+
   private BlockInit blockInit, iterationInit;
+  Block previousBlock;
 
   private Set<EventSpec<? extends KompicsEvent>> disallowed;
   private Set<EventSpec<? extends KompicsEvent>> allowed;
   private Set<EventSpec<? extends KompicsEvent>> dropped;
-  Block previousBlock;
 
   private List<Spec> expected = new ArrayList<Spec>();
   private List<Spec> pending = new ArrayList<Spec>();
@@ -44,9 +43,9 @@ class Block {
     if (previousBlock == null) {
       initEmptyBlock();
     } else {
-      this.disallowed = new HashSet<>(previousBlock.disallowed);
-      this.allowed = new HashSet<>(previousBlock.allowed);
-      this.dropped = new HashSet<>(previousBlock.dropped);
+      this.disallowed = new HashSet<EventSpec<? extends KompicsEvent>>(previousBlock.disallowed);
+      this.allowed = new HashSet<EventSpec<? extends KompicsEvent>>(previousBlock.allowed);
+      this.dropped = new HashSet<EventSpec<? extends KompicsEvent>>(previousBlock.dropped);
     }
   }
 
@@ -66,10 +65,6 @@ class Block {
 
   int getCurrentCount() {
     return currentCount;
-  }
-
-  int getStartState() {
-    return startState;
   }
 
   void iterationComplete() {
@@ -105,13 +100,12 @@ class Block {
   }
 
   boolean handle(EventSpec<? extends KompicsEvent> receivedSpec) {
-    //Testkit.logger.info("block try handle {}, {}", receivedSpec, pendingEventsToString());
     for (Iterator<Spec> iterator = pending.iterator(); iterator.hasNext();) {
       Spec spec = iterator.next();
       if (spec.match(receivedSpec)) {
         received.add(spec);
         iterator.remove();
-        Testkit.logger.trace("block handling {}, {}", receivedSpec, pendingEventsToString());
+        Testkit.logger.trace("Event {} was handled by block, status: {}", receivedSpec, status());
         receivedSpec.handle();
         return true;
       }
@@ -146,9 +140,9 @@ class Block {
   }
 
   private void initEmptyBlock() {
-    disallowed = new HashSet<>();
-    allowed = new HashSet<>();
-    dropped = new HashSet<>();
+    disallowed = new HashSet<EventSpec<? extends KompicsEvent>>();
+    allowed = new HashSet<EventSpec<? extends KompicsEvent>>();
+    dropped = new HashSet<EventSpec<? extends KompicsEvent>>();
   }
 
   void addDisallowedMessage(EventSpec<? extends KompicsEvent> eventSpec) {
