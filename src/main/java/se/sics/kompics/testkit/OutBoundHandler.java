@@ -61,8 +61,7 @@ class OutBoundHandler extends ProxyHandler {
     RequestPathElement pe = response.getTopPathElement();
     if (pe != null && pe.isChannel()) {
       ChannelCore<?> caller = pe.getChannel();
-      // // TODO: 2/21/17 isPositivePort does not belong in Kompics core
-      if (((PortCore)sourcePort).isPositivePort()) {
+      if (portStruct.isProvidedPort) {
         caller.forwardToNegative(response, 0);
       } else {
         caller.forwardToPositive(response, 0);

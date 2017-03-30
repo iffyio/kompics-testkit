@@ -10,6 +10,7 @@ import se.sics.kompics.KompicsEvent;
 import se.sics.kompics.Port;
 import se.sics.kompics.PortCore;
 import se.sics.kompics.PortType;
+import se.sics.kompics.Unsafe;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -21,12 +22,11 @@ import java.util.Set;
 
 
 class PortStructure {
-  private static final Logger logger = LoggerFactory.getLogger(PortStructure.class);
 
   private List<Port<? extends PortType>> connectedPorts = new ArrayList<Port<? extends PortType>>();
   private Port<? extends PortType> inboundPort, outboundPort;
 
-  private boolean isProvidedPort;
+  boolean isProvidedPort;
   private Proxy proxy;
   private Map<Port, Channel> portToChannel = new HashMap<>();
 
@@ -49,12 +49,14 @@ class PortStructure {
 
   private void addProxyHandlers() {
     PortType portType = inboundPort.getPortType();
+    Collection<Class<? extends KompicsEvent>> positiveEvents = Unsafe.getPositiveEvents(portType);
+    Collection<Class<? extends KompicsEvent>> negativeEvents = Unsafe.getNegativeEvents(portType);
     if (isProvidedPort) {
-      subscribeOutboundHandlersFor(portType.getPositiveEvents());
-      subscribeInboundHandlersFor(portType.getNegativeEvents());
+      subscribeOutboundHandlersFor(positiveEvents);
+      subscribeInboundHandlersFor(negativeEvents);
     } else {
-      subscribeInboundHandlersFor(portType.getPositiveEvents());
-      subscribeOutboundHandlersFor(portType.getNegativeEvents());
+      subscribeInboundHandlersFor(positiveEvents);
+      subscribeOutboundHandlersFor(negativeEvents);
     }
   }
 

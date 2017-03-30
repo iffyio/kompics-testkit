@@ -13,6 +13,7 @@ import se.sics.kompics.Port;
 import se.sics.kompics.PortType;
 import se.sics.kompics.Positive;
 import se.sics.kompics.Start;
+import se.sics.kompics.Unsafe;
 import se.sics.kompics.testkit.fsm.EventQueue;
 import se.sics.kompics.testkit.fsm.FSM;
 import se.sics.kompics.testkit.scheduler.CallingThreadScheduler;
@@ -109,11 +110,11 @@ public class Proxy<T extends ComponentDefinition> extends ComponentDefinition{
   }
 
   Map<Class<? extends PortType>, JavaPort<? extends PortType>> getCutPositivePorts() {
-    return ((JavaComponent) cut).positivePorts;
+    return Unsafe.getPositivePorts(((JavaComponent) cut));
   }
 
   Map<Class<? extends PortType>, JavaPort<? extends PortType>> getCutNegativePorts() {
-    return ((JavaComponent) cut).negativePorts;
+    return Unsafe.getNegativePorts(((JavaComponent) cut));
   }
 
   <P extends PortType> void doConnect(
