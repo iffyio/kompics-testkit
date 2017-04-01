@@ -3,7 +3,6 @@ package se.sics.kompics.testkit;
 import com.google.common.base.Function;
 import se.sics.kompics.KompicsEvent;
 
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -28,13 +27,13 @@ class StateTable {
   private final Map<Class<? extends KompicsEvent>, Function<? extends KompicsEvent, Action>> defaultActions =
           new TreeMap<Class<? extends KompicsEvent>, Function<? extends KompicsEvent, Action>>(eventComparator);
 
-  private Map<Integer, State> states = new HashMap<Integer, State>();
+  Map<Integer, State> states = new HashMap<Integer, State>();
 
   void registerExpectedEvent(int state, Spec spec, Block block) {
     states.put(state, new State(state, spec, block));
   }
 
-  void registerExpectedEvent(int state, List<Spec> expectUnordered, Block block) {
+  void registerExpectedEvent(int state, List<SingleEventSpec> expectUnordered, Block block) {
     states.put(state, new State(state, expectUnordered, block));
   }
 
@@ -120,18 +119,6 @@ class StateTable {
     return action;
   }
 
-  void printTable(int final_state) {
-    for (int i = 0; i <= final_state; i++) {
-      State state = states.get(i);
-      if (state != null) {
-        System.out.println(i);
-        for (Transition t : state.transitions.values()) {
-          System.out.println("\t\t" + t);
-        }
-        System.out.println("\t\t" + state);
-      }
-    }
-  }
 
   static class Transition {
     final EventSpec eventSpec;
@@ -166,16 +153,12 @@ class StateTable {
     }
   }
 
-  private class State {
+  class State {
     private final int state;
     private final Block block;
-    private PredicateSpec predicateSpec;
-    private EventSpec<? extends KompicsEvent> eventSpec;
-    private List<Spec> expectUnordered;
+    private Spec spec;
 
-    private List<Spec> pending;
-    private List<EventSpec<? extends KompicsEvent>> seen;
-    private final Map<EventSpec<? extends KompicsEvent>, Transition> transitions =
+    final Map<EventSpec<? extends KompicsEvent>, Transition> transitions =
             new HashMap<EventSpec<? extends KompicsEvent>, Transition>();
 
     private State(int state, Block block) {
@@ -186,18 +169,12 @@ class StateTable {
 
     State(int state, Spec spec, Block block) {
       this(state, block);
-      if (spec instanceof EventSpec) {
-        this.eventSpec = (EventSpec<? extends KompicsEvent>) spec;
-      } else {
-        this.predicateSpec = (PredicateSpec) spec;
-      }
+      this.spec = spec;
     }
 
-    State(int state, List<Spec> expectUnordered, Block block) {
+    State(int state, List<SingleEventSpec> expectUnordered, Block block) {
       this(state, block);
-      this.expectUnordered = expectUnordered;
-      seen = new ArrayList<EventSpec<? extends KompicsEvent>>(expectUnordered.size());
-      pending = new ArrayList<Spec>(expectUnordered);
+      spec = new UnorderedSpec(expectUnordered);
     }
 
     void addTransitions(Block block) {
@@ -218,38 +195,22 @@ class StateTable {
     }
 
     Transition onEvent(EventSpec<? extends KompicsEvent> receivedSpec) {
+      // // TODO: 3/30/17 avoid unnecessary checks
       if (block.handle(receivedSpec)) {
         return new Transition(receivedSpec, state);
       }
 
-      // single event or predicate transition
-      if ((eventSpec != null && eventSpec.match(receivedSpec)) ||
-          (predicateSpec != null && predicateSpec.match(receivedSpec))) {
-        receivedSpec.handle();
-        int nextState = state + 1;
-        return new Transition(receivedSpec, nextState);
-      }
-
-      // unordered events
-      if (expectUnordered != null && pending.contains(receivedSpec)) {
-        int index = pending.indexOf(receivedSpec);
-        seen.add(receivedSpec);
-        pending.remove(index);
-
-        if (!pending.isEmpty()) {
-          return new Transition(receivedSpec, state);
-        } else {
-          for (EventSpec<? extends KompicsEvent> e : seen) {
-            e.handle();
-          }
-          reset();
-          int nextState = state + 1;
-          return new Transition(receivedSpec, nextState);
+      // try match with spec
+      Transition transition = spec.getTransition(receivedSpec, state);
+      if (transition != null) {
+        if (transition.action == Action.HANDLE) {
+          receivedSpec.handle();
         }
+        return transition;
       }
 
       // other transitions
-      Transition transition = transitions.get(receivedSpec);
+      transition = transitions.get(receivedSpec);
       // default transition
       if (transition == null) {
         transition = defaultLookup(state, receivedSpec);
@@ -262,31 +223,10 @@ class StateTable {
       return transition;
     }
 
-    private void reset() {
-      for (Spec spec : expectUnordered) {
-        pending.add(spec);
-      }
-      seen.clear();
-    }
-
     public String toString() {
-      StringBuilder sb = new StringBuilder();
-      if (predicateSpec != null) {
-        sb.append(predicateSpec.toString());
-      } else if (eventSpec != null) {
-        sb.append(eventSpec.toString());
-      } else {
-        sb.append("Unordered<Seen(");
-        for (EventSpec e : seen) {
-          sb.append(" ").append(e);
-        }
-        sb.append(")Pending(");
-        for (Spec e : pending) {
-          sb.append(" ").append(e);
-        }
-        sb.append(")>");
-      }
-      return sb.append(" handle ").append(state + 1).toString();
+      StringBuilder sb = new StringBuilder("( ");
+      sb.append(spec).append(" ) ");
+      return sb.append(Action.HANDLE).append(" ").append(state + 1).toString();
     }
   }
 

@@ -26,10 +26,10 @@ class PortStructure {
   boolean isProvidedPort;
 
   private Proxy proxy;
-  private Map<Port, Channel> portToChannel = new HashMap<>();
+  private Map<Port<? extends PortType>, Channel> portToChannel = new HashMap<Port<? extends PortType>, Channel>();
 
-  private Set<InboundHandler> inboundHandlers = new HashSet<>();
-  private Set<OutBoundHandler> outBoundHandlers = new HashSet<>();
+  private Set<InboundHandler> inboundHandlers = new HashSet<InboundHandler>();
+  private Set<OutBoundHandler> outBoundHandlers = new HashSet<OutBoundHandler>();
 
   PortStructure(Proxy proxy, Port<? extends PortType> inboundPort,
                 Port<? extends PortType> outboundPort,

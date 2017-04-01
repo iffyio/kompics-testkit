@@ -166,6 +166,55 @@ public class TestContext<T extends ComponentDefinition> {
     return this;
   }
 
+  public TestContext<T> expectWithMapper() {
+    fsm.setExpectWithMapperMode();
+    return this;
+  }
+
+  public <E extends KompicsEvent, R extends KompicsEvent> TestContext<T> setMapperForNext(
+          int expectedEvents, Class<E> eventType, Function<E, R> mapper) {
+    Testkit.checkNotNull(eventType, mapper);
+    fsm.setMapperForNext(expectedEvents, eventType, mapper);
+    return this;
+  }
+
+  public TestContext<T> expect(
+          Port<? extends PortType> listenPort, Port<? extends PortType> responsePort) {
+    Testkit.checkNotNull(listenPort, responsePort);
+    checkValidPort(listenPort, Direction.OUTGOING);
+    fsm.addExpectWithMapper(listenPort, responsePort);
+    return this;
+  }
+
+  public <E extends KompicsEvent, R extends KompicsEvent> TestContext<T> expect(
+          Class<E> eventType, Port<? extends PortType> listenPort,
+          Port<? extends PortType> responsePort, Function<E, R> mapper) {
+    Testkit.checkNotNull(eventType, listenPort, responsePort, mapper);
+    checkValidPort(listenPort, Direction.OUTGOING);
+    fsm.addExpectWithMapper(eventType, listenPort, responsePort, mapper);
+    return this;
+  }
+
+  public TestContext<T> expectWithFuture() {
+    fsm.setExpectWithFutureMode();
+    return this;
+  }
+
+  public <E extends KompicsEvent, R extends KompicsEvent> TestContext<T> expect(
+          Class<E> eventType, Port<? extends PortType> listenPort, Future<E, R> future) {
+    Testkit.checkNotNull(eventType, listenPort, future);
+    checkValidPort(listenPort, Direction.OUTGOING);
+    fsm.addExpectWithFuture(eventType, listenPort, future);
+    return this;
+  }
+
+  public <E extends KompicsEvent, R extends KompicsEvent, P extends PortType> TestContext<T> trigger(
+          Port<P> responsePort, Future<E, R> future) {
+    Testkit.checkNotNull(responsePort, future);
+    fsm.addTrigger(responsePort, future);
+    return this;
+  }
+
   public <P extends PortType> TestContext<T> trigger(
           KompicsEvent event, Port<P> port) {
     Testkit.checkNotNull(event, port);
@@ -173,6 +222,7 @@ public class TestContext<T extends ComponentDefinition> {
     return this;
   }
 
+  // // TODO: 3/31/17 allow matching predicate
   public <P extends  PortType> TestContext<T> disallow(
             KompicsEvent event, Port<P> port, Direction direction) {
     Testkit.checkNotNull(event, port, direction);

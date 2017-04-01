@@ -3,7 +3,7 @@ package se.sics.kompics.testkit.pingpong;
 import se.sics.kompics.KompicsEvent;
 
 public class Pong implements KompicsEvent {
-  int count = 0;
+  public int count = 0;
 
   public Pong(int count) {
     this.count = count;

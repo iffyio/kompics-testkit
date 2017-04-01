@@ -15,13 +15,13 @@ public class Testkit {
   public static <T extends ComponentDefinition> TestContext<T> newTestContext(
          Class<T> definition, Init<T> initEvent) {
     checkNotNull(definition, initEvent);
-    return new TestContext<>(definition, initEvent);
+    return new TestContext<T>(definition, initEvent);
   }
 
   public static <T extends ComponentDefinition> TestContext<T> newTestContext(
           Class<T> definition, Init.None initEvent) {
     checkNotNull(definition, initEvent);
-    return new TestContext<>(definition, initEvent);
+    return new TestContext<T>(definition, initEvent);
   }
 
   static void checkNotNull(Object... objects) {

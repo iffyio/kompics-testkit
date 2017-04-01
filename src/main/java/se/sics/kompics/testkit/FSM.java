@@ -18,6 +18,7 @@ import se.sics.kompics.Component;
 import se.sics.kompics.ComponentCore;
 import se.sics.kompics.ComponentDefinition;
 import se.sics.kompics.Fault;
+import se.sics.kompics.JavaComponent;
 import se.sics.kompics.Kompics;
 import se.sics.kompics.PortType;
 import se.sics.kompics.Port;
@@ -28,6 +29,7 @@ class FSM<T extends ComponentDefinition> {
   static final Logger logger = Testkit.logger;
 
   private final T definitionUnderTest;
+  private final EventQueue eventQueue;
 
   static final int ERROR_STATE = -1;
   private String ERROR_MESSAGE = "";
@@ -41,8 +43,9 @@ class FSM<T extends ComponentDefinition> {
   private Map<Integer, Block> blockStart = new HashMap<Integer, Block>();
   private Map<Integer, Block> blockEnd = new HashMap<Integer, Block>();
 
-  private List<Spec> expectUnordered = new ArrayList<Spec>();
-  private final EventQueue eventQueue;
+  private List<SingleEventSpec> expectUnordered = new ArrayList<SingleEventSpec>();
+  private ExpectMapper expectMapper;
+  private ExpectFuture expectFuture;
 
   private Map<Integer, Trigger> triggeredEvents = new HashMap<Integer, Trigger>();
   private Map<Integer, Predicate<T>> componentPredicates = new HashMap<Integer, Predicate<T>>();
@@ -111,13 +114,56 @@ class FSM<T extends ComponentDefinition> {
   }
 
   void setUnorderedMode() {
-    checkInBodyAndNotUnorderedMode();
+    checkNewModeAllowed();
     currentBlock.mode = Block.MODE.UNORDERED;
-    expectUnordered = new ArrayList<Spec>();
+    expectUnordered = new ArrayList<SingleEventSpec>();
+  }
+
+  void setExpectWithMapperMode() {
+    checkNewModeAllowed();
+    currentBlock.mode = Block.MODE.EXPECT_MAPPER;
+    expectMapper = new ExpectMapper(proxyComponent);
+  }
+
+  <E extends KompicsEvent, R extends KompicsEvent> void setMapperForNext(
+          int expectedEvents, Class<E> eventType, Function<E, R> mapper) {
+    checkInExpectMapperMode();
+    expectMapper.setMapperForNext(expectedEvents, eventType, mapper);
+  }
+
+  void addExpectWithMapper(
+          Port<? extends PortType> listenPort, Port<? extends PortType> responsePort) {
+    checkInExpectMapperMode();
+    expectMapper.addExpectedEvent(listenPort, responsePort);
+  }
+
+  <E extends KompicsEvent, R extends KompicsEvent> void addExpectWithMapper(
+          Class<E> eventType, Port<? extends PortType> listenPort,
+          Port<? extends PortType> responsePort, Function<E, R> mapper) {
+    checkInExpectMapperMode();
+    expectMapper.addExpectedEvent(eventType, listenPort, responsePort, mapper);
+  }
+
+  void setExpectWithFutureMode() {
+    checkNewModeAllowed();
+    currentBlock.mode = Block.MODE.EXPECT_FUTURE;
+    expectFuture = new ExpectFuture(proxyComponent);
+  }
+
+  public <E extends KompicsEvent, R extends KompicsEvent> void addExpectWithFuture(
+          Class<E> eventType, Port<? extends PortType> listenPort, Future<E, R> future) {
+    checkInExpectFutureMode();
+    expectFuture.addExpectedEvent(eventType, listenPort, future);
+  }
+
+  public <E extends KompicsEvent, R extends KompicsEvent, P extends PortType> void addTrigger(
+          Port<P> responsePort, Future<E, R> future) {
+    checkInExpectFutureMode();
+    expectFuture.addTrigger(responsePort, future);
   }
 
   void addTrigger(KompicsEvent event, Port<? extends PortType> port) {
-    checkInBodyAndNotUnorderedMode();
+    checkNewModeAllowed();
     triggeredEvents.put(currentState, new Trigger(event, port));
     gotoNextState();
   }
@@ -138,10 +184,18 @@ class FSM<T extends ComponentDefinition> {
   }
 
   void end() {
-    if (inUnorderedMode()) {
-      endUnorderedMode();
-    } else {
-      endBlock();
+    switch (currentBlock.mode) {
+      case UNORDERED:
+        endUnorderedMode();
+        break;
+      case EXPECT_MAPPER:
+        endExpectWithMapperMode();
+        break;
+      case EXPECT_FUTURE:
+        endExpectWithFutureMode();
+        break;
+      default:
+        endBlock();
     }
   }
 
@@ -152,7 +206,7 @@ class FSM<T extends ComponentDefinition> {
 
   void addExpectedFault(
           Class<? extends Throwable> exceptionType, Fault.ResolveAction resolveAction) {
-    checkInBodyAndNotUnorderedMode();
+    checkNewModeAllowed();
     checkExpectedFaultHasMatchingClause();
     expectedFaults.put(currentState, new ExpectedFault(exceptionType, resolveAction));
     gotoNextState();
@@ -160,7 +214,7 @@ class FSM<T extends ComponentDefinition> {
 
   void addExpectedFault(
           Predicate<Throwable> exceptionPredicate, Fault.ResolveAction resolveAction) {
-    checkInBodyAndNotUnorderedMode();
+    checkNewModeAllowed();
     checkExpectedFaultHasMatchingClause();
     expectedFaults.put(currentState, new ExpectedFault(exceptionPredicate, resolveAction));
     gotoNextState();
@@ -199,7 +253,7 @@ class FSM<T extends ComponentDefinition> {
       STARTED = true;
       addFinalState();
       checkBalancedRepeatBlocks();
-      table.printTable(FINAL_STATE);
+      printTable(FINAL_STATE);
       run();
     }
     return currentState == FINAL_STATE + 1 ? FINAL_STATE : currentState;
@@ -247,8 +301,9 @@ class FSM<T extends ComponentDefinition> {
     repeat(1);
   }
 
-  private void registerSpec(Spec spec) {
-    if (inUnorderedMode()) {
+  // // TODO: 3/31/17 only allow in body, unordered mode
+  private void registerSpec(SingleEventSpec spec) {
+    if (currentBlock.mode == Block.MODE.UNORDERED) {
       expectUnordered.add(spec);
     } else {
       checkInBodyMode();
@@ -267,8 +322,31 @@ class FSM<T extends ComponentDefinition> {
     gotoNextState();
   }
 
+  private void endExpectWithMapperMode() {
+    currentBlock.mode = Block.MODE.BODY;
+    if (expectMapper.expected.isEmpty()) {
+      throw new IllegalStateException("No events were specified");
+    }
+
+    table.registerExpectedEvent(currentState, expectMapper, currentBlock);
+    gotoNextState();
+    expectMapper = null;
+  }
+
+  // // TODO: 4/1/17 merget with endWithExpectMapperMode
+  private void endExpectWithFutureMode() {
+    currentBlock.mode = Block.MODE.BODY;
+    if (expectFuture.expected.isEmpty()) {
+      throw new IllegalStateException("No events were specified");
+    }
+
+    table.registerExpectedEvent(currentState, expectFuture, currentBlock);
+    gotoNextState();
+    expectFuture = null;
+  }
+
   private void endBlock() {
-    checkInBodyAndNotUnorderedMode();
+    checkNewModeAllowed();
     if (balancedBlock.isEmpty()) {
       throw new IllegalStateException("matching repeat not found for end");
     }
@@ -279,7 +357,7 @@ class FSM<T extends ComponentDefinition> {
   }
 
   private void enterNewBlock(Block block) {
-    checkInBodyAndNotUnorderedMode();
+    checkNewModeAllowed();
     if (block.times <= 0) {
       throw new IllegalArgumentException("only positive value allowed for block");
     }
@@ -330,6 +408,16 @@ class FSM<T extends ComponentDefinition> {
       return false;
     }
     logger.debug("{}: Asserting Component", currentState);
+    JavaComponent cut = (JavaComponent) definitionUnderTest.getComponentCore();
+
+    // // TODO: 3/31/17 do not poll
+    while (cut.workCount.get() > 0) {
+      try {
+        Thread.sleep(100);
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+      }
+    }
     boolean successful = assertPred.apply(definitionUnderTest);
 
     if (!successful) {
@@ -444,27 +532,42 @@ class FSM<T extends ComponentDefinition> {
     }
   }
 
-  private void checkInBodyAndNotUnorderedMode() {
+  private void checkNewModeAllowed() {
+    if (currentBlock == null) {
+      return;
+    }
+
     checkInBodyMode();
-    if (inUnorderedMode()) {
-      throw new IllegalStateException("Not in unordered mode");
+
+    switch (currentBlock.mode) {
+      case UNORDERED:
+      case EXPECT_MAPPER:
+      case EXPECT_FUTURE:
+        throw new IllegalStateException(String.format("method not allowed in %s mode", currentBlock.mode));
+    }
+  }
+
+  private void checkMode(Block.MODE mode) {
+    if (currentBlock != null && currentBlock.mode != mode) {
+      throw new IllegalStateException(String.format("Expected mode [%s], Actual mode [%s]",
+                      mode, currentBlock.mode));
     }
   }
 
   private void checkInBodyMode() {
-    if (currentBlock != null && currentBlock.mode != Block.MODE.BODY) {
-      throw new IllegalStateException("Not in body mode");
-    }
+    checkMode(Block.MODE.BODY);
   }
 
   private void checkInHeaderMode() {
-    if (currentBlock.mode != Block.MODE.HEADER) {
-      throw new IllegalStateException("Not in header mode");
-    }
+    checkMode(Block.MODE.HEADER);
   }
 
-  private boolean inUnorderedMode() {
-    return currentBlock != null && currentBlock.mode == Block.MODE.UNORDERED;
+  private void checkInExpectMapperMode() {
+    checkMode(Block.MODE.EXPECT_MAPPER);
+  }
+
+  private void checkInExpectFutureMode() {
+    checkMode(Block.MODE.EXPECT_FUTURE);
   }
 
   private void gotoNextState() {
@@ -480,6 +583,26 @@ class FSM<T extends ComponentDefinition> {
     return eventQueue.poll();
   }
 
+  void printTable(int final_state) {
+    Testkit.logger.info("State\t\t\t\tTransitions");
+    for (int i = 0; i <= final_state; i++) {
+      StateTable.State state = table.states.get(i);
+      if (state != null) {
+        Testkit.logger.info("{}", i);
+        for (StateTable.Transition t : state.transitions.values()) {
+          Testkit.logger.info("\t\ton {}", t);
+        }
+        Testkit.logger.info("\t\ton {}", state);
+      } else if (blockStart.containsKey(i)) {
+        logger.info("{}\t\t{}",i, blockStart.get(i));
+      } else if (blockEnd.containsKey(i)) {
+        logger.info("{}\t\tend{}",i, blockEnd.get(i));
+      } else if (triggeredEvents.containsKey(i)) {
+        logger.info("{}\t\ttrigger({})", i, triggeredEvents.get(i));
+      }
+    }
+
+  }
   // // TODO: 2/17/17 switch to eventSpec?
   private class Trigger {
     private final KompicsEvent event;

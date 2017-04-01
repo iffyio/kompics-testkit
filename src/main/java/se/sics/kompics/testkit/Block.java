@@ -23,11 +23,11 @@ class Block {
   private Set<EventSpec<? extends KompicsEvent>> allowed;
   private Set<EventSpec<? extends KompicsEvent>> dropped;
 
-  private List<Spec> expected = new ArrayList<Spec>();
-  private List<Spec> pending = new ArrayList<Spec>();
-  private List<Spec> received = new ArrayList<Spec>();
+  private List<SingleEventSpec> expected = new ArrayList<SingleEventSpec>();
+  private List<SingleEventSpec> pending = new ArrayList<SingleEventSpec>();
+  private List<SingleEventSpec> received = new ArrayList<SingleEventSpec>();
 
-  enum MODE { HEADER, BODY, UNORDERED }
+  enum MODE { HEADER, BODY, UNORDERED, EXPECT_MAPPER, EXPECT_FUTURE}
   MODE mode = MODE.HEADER;
 
   Block(Block previousBlock, int times, int startState, BlockInit blockInit) {
@@ -83,7 +83,7 @@ class Block {
     return startState + 1;
   }
 
-  void expectWithinBlock(Spec spec) {
+  void expectWithinBlock(SingleEventSpec spec) {
     expected.add(spec);
   }
 
@@ -94,14 +94,14 @@ class Block {
 
     pending.clear();
     received.clear();
-    for (Spec spec : expected) {
+    for (SingleEventSpec spec : expected) {
       pending.add(spec);
     }
   }
 
   boolean handle(EventSpec<? extends KompicsEvent> receivedSpec) {
-    for (Iterator<Spec> iterator = pending.iterator(); iterator.hasNext();) {
-      Spec spec = iterator.next();
+    for (Iterator<SingleEventSpec> iterator = pending.iterator(); iterator.hasNext();) {
+      SingleEventSpec spec = iterator.next();
       if (spec.match(receivedSpec)) {
         received.add(spec);
         iterator.remove();
@@ -176,4 +176,8 @@ class Block {
     return dropped;
   }
 
+  @Override
+  public String toString() {
+    return "Repeat(" + times + ")";
+  }
 }

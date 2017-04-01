@@ -5,7 +5,7 @@ import se.sics.kompics.KompicsEvent;
 import se.sics.kompics.Port;
 import se.sics.kompics.PortType;
 
-class PredicateSpec extends Spec{
+class PredicateSpec extends SingleEventSpec{
 
   private final Class<? extends KompicsEvent> eventType;
   private final Predicate<? extends KompicsEvent> predicate;
