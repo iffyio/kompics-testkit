@@ -1,19 +1,17 @@
 package se.sics.kompics.testkit;
 
-import se.sics.kompics.KompicsEvent;
-
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 class EventQueue {
 
-  private final ConcurrentLinkedQueue<EventSpec<? extends KompicsEvent>> q = new ConcurrentLinkedQueue<EventSpec<? extends KompicsEvent>>();
+  private final ConcurrentLinkedQueue<EventSpec> q = new ConcurrentLinkedQueue<EventSpec>();
 
-  synchronized void offer(EventSpec<? extends KompicsEvent> event) {
+  synchronized void offer(EventSpec event) {
     q.offer(event);
     this.notifyAll();
   }
 
-  synchronized EventSpec<? extends KompicsEvent> poll() {
+  synchronized EventSpec poll() {
     while (q.peek() == null) {
       try {
         this.wait();

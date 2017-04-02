@@ -2,10 +2,10 @@ package se.sics.kompics.testkit;
 
 import se.sics.kompics.KompicsEvent;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
@@ -19,13 +19,13 @@ class Block {
   private BlockInit blockInit, iterationInit;
   Block previousBlock;
 
-  private Set<EventSpec<? extends KompicsEvent>> disallowed;
-  private Set<EventSpec<? extends KompicsEvent>> allowed;
-  private Set<EventSpec<? extends KompicsEvent>> dropped;
+  private Set<EventSpec> disallowed;
+  private Set<EventSpec> allowed;
+  private Set<EventSpec> dropped;
 
-  private List<SingleEventSpec> expected = new ArrayList<SingleEventSpec>();
-  private List<SingleEventSpec> pending = new ArrayList<SingleEventSpec>();
-  private List<SingleEventSpec> received = new ArrayList<SingleEventSpec>();
+  private List<SingleEventSpec> expected = new LinkedList<SingleEventSpec>();
+  private List<SingleEventSpec> pending = new LinkedList<SingleEventSpec>();
+  private List<SingleEventSpec> received = new LinkedList<SingleEventSpec>();
 
   enum MODE { HEADER, BODY, UNORDERED, EXPECT_MAPPER, EXPECT_FUTURE}
   MODE mode = MODE.HEADER;
@@ -43,9 +43,9 @@ class Block {
     if (previousBlock == null) {
       initEmptyBlock();
     } else {
-      this.disallowed = new HashSet<EventSpec<? extends KompicsEvent>>(previousBlock.disallowed);
-      this.allowed = new HashSet<EventSpec<? extends KompicsEvent>>(previousBlock.allowed);
-      this.dropped = new HashSet<EventSpec<? extends KompicsEvent>>(previousBlock.dropped);
+      this.disallowed = new HashSet<EventSpec>(previousBlock.disallowed);
+      this.allowed = new HashSet<EventSpec>(previousBlock.allowed);
+      this.dropped = new HashSet<EventSpec>(previousBlock.dropped);
     }
   }
 
@@ -99,7 +99,7 @@ class Block {
     }
   }
 
-  boolean handle(EventSpec<? extends KompicsEvent> receivedSpec) {
+  boolean handle(EventSpec receivedSpec) {
     for (Iterator<SingleEventSpec> iterator = pending.iterator(); iterator.hasNext();) {
       SingleEventSpec spec = iterator.next();
       if (spec.match(receivedSpec)) {
@@ -140,39 +140,39 @@ class Block {
   }
 
   private void initEmptyBlock() {
-    disallowed = new HashSet<EventSpec<? extends KompicsEvent>>();
-    allowed = new HashSet<EventSpec<? extends KompicsEvent>>();
-    dropped = new HashSet<EventSpec<? extends KompicsEvent>>();
+    disallowed = new HashSet<EventSpec>();
+    allowed = new HashSet<EventSpec>();
+    dropped = new HashSet<EventSpec>();
   }
 
-  void addDisallowedMessage(EventSpec<? extends KompicsEvent> eventSpec) {
+  void addDisallowedMessage(EventSpec eventSpec) {
     if (disallowed.add(eventSpec)) {
       allowed.remove(eventSpec);
       dropped.remove(eventSpec);
     }
   }
 
-  void addAllowedMessage(EventSpec<? extends KompicsEvent> eventSpec) {
+  void addAllowedMessage(EventSpec eventSpec) {
     if (allowed.add(eventSpec)) {
       disallowed.remove(eventSpec);
       dropped.remove(eventSpec);
     }
   }
 
-  void addDroppedMessage(EventSpec<? extends KompicsEvent> eventSpec) {
+  void addDroppedMessage(EventSpec eventSpec) {
     if (dropped.add(eventSpec)) {
       disallowed.remove(eventSpec);
       allowed.remove(eventSpec);
     }
   }
 
-  Collection<EventSpec<? extends KompicsEvent>> getDisallowedEvents() {
+  Collection<EventSpec> getDisallowedEvents() {
     return disallowed;
   }
-  Collection<EventSpec<? extends KompicsEvent>> getAllowedEvents() {
+  Collection<EventSpec> getAllowedEvents() {
     return allowed;
   }
-  Collection<EventSpec<? extends KompicsEvent>> getDroppedEvents() {
+  Collection<EventSpec> getDroppedEvents() {
     return dropped;
   }
 

@@ -55,7 +55,7 @@ class ExpectMapper extends Spec{
   }
 
   @Override
-  StateTable.Transition getTransition(EventSpec<? extends KompicsEvent> receivedSpec, int state) {
+  StateTable.Transition getTransition(EventSpec receivedSpec, int state) {
     MapperStruct nextMapper = expected.get(mapperIndex);
 
     if (nextMapper.map(receivedSpec)) {
@@ -111,7 +111,7 @@ class ExpectMapper extends Spec{
     final Port<? extends PortType> listenPort;
     final Port<? extends PortType> responsePort;
 
-    EventSpec<? extends KompicsEvent> receivedSpec;
+    EventSpec receivedSpec;
 
     MapperStruct(Class<? extends KompicsEvent> eventType,
                  Function<? extends KompicsEvent, ? extends KompicsEvent> mapper,
@@ -123,7 +123,7 @@ class ExpectMapper extends Spec{
       this.responsePort = responsePort;
     }
 
-    boolean map(EventSpec<? extends KompicsEvent> receivedSpec) {
+    boolean map(EventSpec receivedSpec) {
       if (eventType.isAssignableFrom(receivedSpec.getEvent().getClass())) {
         this.receivedSpec = receivedSpec;
         return true;

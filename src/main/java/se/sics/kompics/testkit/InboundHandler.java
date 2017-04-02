@@ -27,7 +27,7 @@ class InboundHandler extends ProxyHandler {
       request.pushPathElement(proxy.getComponentCore());
     }
 
-    EventSpec<? extends KompicsEvent> eventSpec = proxy.getFsm().newEventSpec(event, destPort, Direction.INCOMING);
+    EventSpec eventSpec = proxy.getFsm().newEventSpec(event, destPort, Direction.INCOMING);
     eventSpec.setHandler(this);
     eventQueue.offer(eventSpec);
   }

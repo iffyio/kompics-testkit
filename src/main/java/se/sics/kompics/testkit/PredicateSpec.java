@@ -18,7 +18,7 @@ class PredicateSpec extends SingleEventSpec{
     this.predicate = predicate;
   }
 
-  public boolean match(EventSpec<? extends KompicsEvent> receivedSpec) {
+  public boolean match(EventSpec receivedSpec) {
     KompicsEvent receivedEvent = receivedSpec.getEvent();
     return eventType.isAssignableFrom(receivedEvent.getClass()) &&
            matchHelper(predicate, receivedEvent);

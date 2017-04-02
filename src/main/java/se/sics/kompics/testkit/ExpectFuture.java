@@ -47,7 +47,7 @@ class ExpectFuture extends Spec{
   }
 
   @Override
-  StateTable.Transition getTransition(EventSpec<? extends KompicsEvent> receivedSpec, int state) {
+  StateTable.Transition getTransition(EventSpec receivedSpec, int state) {
     FutureStruct nextFuture = expected.get(futureIndex);
 
     if (nextFuture.map(receivedSpec)) {
@@ -83,7 +83,7 @@ class ExpectFuture extends Spec{
       this.future = future;
     }
 
-    boolean map(EventSpec<? extends KompicsEvent> receivedSpec) {
+    boolean map(EventSpec receivedSpec) {
       if (eventType.isAssignableFrom(receivedSpec.getEvent().getClass())) {
         mapHelper(receivedSpec, future);
         return true;
@@ -92,7 +92,7 @@ class ExpectFuture extends Spec{
     }
 
     <E extends KompicsEvent, R extends KompicsEvent> void mapHelper(
-            EventSpec<? extends KompicsEvent> receivedSpec, Future<E, R> future) {
+            EventSpec receivedSpec, Future<E, R> future) {
       future.set((E) receivedSpec.getEvent());
     }
 

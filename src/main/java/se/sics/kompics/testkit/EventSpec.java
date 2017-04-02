@@ -6,25 +6,25 @@ import se.sics.kompics.PortType;
 
 import java.util.Comparator;
 
-class EventSpec<E extends KompicsEvent> extends SingleEventSpec{
+class EventSpec extends SingleEventSpec{
 
-  private final E event;
-  private Comparator<E> comparator;
+  private final KompicsEvent event;
+  private final Comparator<? extends KompicsEvent> comparator;
   private ProxyHandler handler;
 
-  EventSpec(E event, Port<? extends PortType> port,
+  <E extends KompicsEvent> EventSpec(E event, Port<? extends PortType> port,
             Direction direction, Comparator<E> comparator) {
     super(port, direction);
     this.event = event;
     this.comparator = comparator;
   }
 
-  static <P extends  PortType, E extends KompicsEvent> EventSpec<? extends KompicsEvent> create(
+  static <P extends  PortType, E extends KompicsEvent> EventSpec create(
           Comparator<E> comparator, E event, Port<P> port, Direction direction) {
-    return new EventSpec<E>((E) event, port, direction, comparator);
+    return new EventSpec(event, port, direction, comparator);
   }
 
-  E getEvent() {
+  KompicsEvent getEvent() {
     return event;
   }
 
@@ -40,16 +40,12 @@ class EventSpec<E extends KompicsEvent> extends SingleEventSpec{
     this.handler = handler;
   }
 
-  void setComparator(Comparator<E> comparator) {
-    this.comparator = comparator;
-  }
-
   void handle() {
     handler.doHandle(event);
   }
 
   @Override
-  public boolean match(EventSpec<? extends KompicsEvent> receivedSpec) {
+  public boolean match(EventSpec receivedSpec) {
     return this.equals(receivedSpec);
   }
 
@@ -60,14 +56,15 @@ class EventSpec<E extends KompicsEvent> extends SingleEventSpec{
     EventSpec other = (EventSpec) o;
     KompicsEvent e = other.getEvent();
 
-    if (!e.getClass().equals(event.getClass())) {
-      return false;
-    }
-
-    return port.equals(other.getPort()) &&
+    return e.getClass() == event.getClass() &&
+           port.equals(other.getPort()) &&
            direction.equals(other.getDirection()) &&
            comparator == null? event.equals(e) :
-           comparator.compare(event, (E) e) == 0;
+           equalByComparator(comparator, e);
+  }
+
+  private <V extends KompicsEvent> boolean equalByComparator(Comparator<V> comp, KompicsEvent e) {
+    return event.getClass() == e.getClass() && comp.compare((V) event, (V) e) == 0;
   }
 
   @Override

@@ -89,7 +89,7 @@ class FSM<T extends ComponentDefinition> {
 
   <P extends PortType> void expectMessage(
           KompicsEvent event, Port<P> port, Direction direction) {
-    EventSpec<? extends KompicsEvent> eventSpec = newEventSpec(event, port, direction);
+    EventSpec eventSpec = newEventSpec(event, port, direction);
     registerSpec(eventSpec);
   }
 
@@ -101,7 +101,7 @@ class FSM<T extends ComponentDefinition> {
 
   <P extends PortType> void expectWithinBlock(
           KompicsEvent event, Port<P> port, Direction direction) {
-    EventSpec<? extends KompicsEvent> eventSpec = newEventSpec(event, port, direction);
+    EventSpec eventSpec = newEventSpec(event, port, direction);
     checkInHeaderMode();
     currentBlock.expectWithinBlock(eventSpec);
   }
@@ -150,13 +150,13 @@ class FSM<T extends ComponentDefinition> {
     expectFuture = new ExpectFuture(proxyComponent);
   }
 
-  public <E extends KompicsEvent, R extends KompicsEvent> void addExpectWithFuture(
+  <E extends KompicsEvent, R extends KompicsEvent> void addExpectWithFuture(
           Class<E> eventType, Port<? extends PortType> listenPort, Future<E, R> future) {
     checkInExpectFutureMode();
     expectFuture.addExpectedEvent(eventType, listenPort, future);
   }
 
-  public <E extends KompicsEvent, R extends KompicsEvent, P extends PortType> void addTrigger(
+  <E extends KompicsEvent, R extends KompicsEvent, P extends PortType> void addTrigger(
           Port<P> responsePort, Future<E, R> future) {
     checkInExpectFutureMode();
     expectFuture.addTrigger(responsePort, future);
@@ -184,15 +184,16 @@ class FSM<T extends ComponentDefinition> {
   }
 
   void end() {
-    switch (currentBlock.mode) {
+    Block.MODE mode = currentBlock.mode;
+    switch (mode) {
       case UNORDERED:
         endUnorderedMode();
         break;
       case EXPECT_MAPPER:
-        endExpectWithMapperMode();
+        endExpect(mode);
         break;
       case EXPECT_FUTURE:
-        endExpectWithFutureMode();
+        endExpect(mode);
         break;
       default:
         endBlock();
@@ -259,7 +260,7 @@ class FSM<T extends ComponentDefinition> {
     return currentState == FINAL_STATE + 1 ? FINAL_STATE : currentState;
   }
 
-  <P extends  PortType, E extends KompicsEvent> EventSpec<? extends KompicsEvent> newEventSpec(
+  <P extends  PortType, E extends KompicsEvent> EventSpec newEventSpec(
           KompicsEvent event, Port<P> port, Direction direction) {
     Comparator<E> c = (Comparator<E>) comparators.get(event.getClass());
     return EventSpec.create(c, (E) event, port, direction);
@@ -283,15 +284,9 @@ class FSM<T extends ComponentDefinition> {
         table.printExpectedEventAt(currentState);
         String expected = table.getExpectedSpecAt(currentState);
 
-        EventSpec<? extends KompicsEvent> received = removeEventFromQueue();
-        setComparatorForEvent(received);
-
+        EventSpec received = removeEventFromQueue();
         StateTable.Transition transition = table.lookup(currentState, received);
-
-        if (!transitionedToErrorState(expected, received.toString(), transition)) {
-          logger.debug("{}: Matched({}) with Transition({})", currentState, received, transition);
-          currentState = transition.nextState;
-        }
+        updateState(expected, received, transition);
       }
     }
     runFinalState();
@@ -322,27 +317,28 @@ class FSM<T extends ComponentDefinition> {
     gotoNextState();
   }
 
-  private void endExpectWithMapperMode() {
+  private void endExpect(Block.MODE mode) {
     currentBlock.mode = Block.MODE.BODY;
-    if (expectMapper.expected.isEmpty()) {
-      throw new IllegalStateException("No events were specified");
+    Spec expected;
+    boolean emptySpec;
+    switch (mode) {
+      case EXPECT_FUTURE:
+        expected = expectFuture;
+        emptySpec = expectFuture.expected.isEmpty();
+        break;
+      case EXPECT_MAPPER:
+        expected = expectMapper;
+        emptySpec = expectMapper.expected.isEmpty();
+        break;
+      default:
+        throw new IllegalStateException(String.format("Expected [%s] or [%s] mode",
+                Block.MODE.EXPECT_FUTURE, Block.MODE.EXPECT_MAPPER));
     }
-
-    table.registerExpectedEvent(currentState, expectMapper, currentBlock);
-    gotoNextState();
-    expectMapper = null;
-  }
-
-  // // TODO: 4/1/17 merget with endWithExpectMapperMode
-  private void endExpectWithFutureMode() {
-    currentBlock.mode = Block.MODE.BODY;
-    if (expectFuture.expected.isEmpty()) {
-      throw new IllegalStateException("No events were specified");
+    if (emptySpec) {
+      throw new IllegalStateException("No events were specified in " + mode + " mode");
     }
-
-    table.registerExpectedEvent(currentState, expectFuture, currentBlock);
+    table.registerExpectedEvent(currentState, expected, currentBlock);
     gotoNextState();
-    expectFuture = null;
   }
 
   private void endBlock() {
@@ -391,15 +387,19 @@ class FSM<T extends ComponentDefinition> {
             || assertedComponent() || expectedFault());
   }
 
-  private boolean transitionedToErrorState(
-          String expected, String received, StateTable.Transition transition) {
+  // returns true if state was updated to error state
+  private boolean updateState(
+          String expected, EventSpec receivedSpec, StateTable.Transition transition) {
     if (transition != null && transition.nextState != ERROR_STATE) {
-      return false;
+      logger.debug("{}: Transitioned on [{}]", currentState, transition);
+      currentState = transition.nextState;
+      return true;
     }
     String errorMessage = String.format("Received %s message <%s> while expecting <%s>",
-                            (transition == null? "unexpected" : "unwanted"), received, expected);
+                          (transition == null? "unexpected" : "unwanted"),
+                          receivedSpec.toString(), expected);
     gotoErrorState(errorMessage);
-    return true;
+    return false;
   }
 
   private boolean assertedComponent() {
@@ -447,11 +447,6 @@ class FSM<T extends ComponentDefinition> {
     return true;
   }
 
-  //@SuppressWarnings("unchecked")
-  private void setComparatorForEvent(EventSpec eventSpec) {
-    eventSpec.setComparator(comparators.get(eventSpec.getEvent().getClass()));
-  }
-
   private boolean triggeredAnEvent() {
     Trigger trigger = triggeredEvents.get(currentState);
     if (trigger == null) {
@@ -483,39 +478,29 @@ class FSM<T extends ComponentDefinition> {
 
     logger.debug("{}: end({})\t", currentState, block.times);
 
-    if (block.hasPendingEvents()) {
+    while (block.hasPendingEvents()) {
+      logger.debug("{}: Awaiting pending events in empty block: {}", currentState, block.pendingEventsToString());
+      EventSpec receivedSpec = removeEventFromQueue();
+      logger.debug("{}: Received ({})", currentState, receivedSpec);
 
-      while (block.hasPendingEvents()) {
-        logger.debug("Awaiting pending events in empty block: {}", block.pendingEventsToString());
-        EventSpec<? extends KompicsEvent> receivedSpec = removeEventFromQueue();
-        logger.debug("Received ({})", receivedSpec);
-
-        // match event
-        StateTable.Transition transition = table.lookupWithBlock(currentState, receivedSpec, block);
-
-        if (transitionedToErrorState(block.status(), receivedSpec.toString(), transition)) {
-          break;
-        }
-
-        logger.debug("{}: Matched({}) with Transition({})", currentState, receivedSpec, transition);
-
-        currentState = transition.nextState;
-      }
-    } else {
-      block.iterationComplete();
-
-      if (block.hasMoreIterations()) {
-        currentState = block.indexOfFirstState();
-      } else {
-        gotoNextState();
+      // match event
+      StateTable.Transition transition = table.lookupWithBlock(currentState, receivedSpec, block);
+      if (!updateState(block.status(), receivedSpec, transition)) {
+        break;
       }
     }
+    block.iterationComplete();
 
+    if (block.hasMoreIterations()) {
+      currentState = block.indexOfFirstState();
+    } else {
+      gotoNextState();
+    }
     return true;
   }
 
   private void runStartState() {
-    logger.debug("Sending Start to {} participant component(s)", participants.size());
+    logger.trace("Sending Start to {} participant component(s)", participants.size());
     for (Component child : participants) {
       child.getControl().doTrigger(Start.event, 0, proxyComponent);
     }
@@ -579,25 +564,25 @@ class FSM<T extends ComponentDefinition> {
     ERROR_MESSAGE = errorMessage;
   }
 
-  private EventSpec<? extends KompicsEvent> removeEventFromQueue() {
+  private EventSpec removeEventFromQueue() {
     return eventQueue.poll();
   }
 
-  void printTable(int final_state) {
+  private void printTable(int final_state) {
     Testkit.logger.info("State\t\t\t\tTransitions");
     for (int i = 0; i <= final_state; i++) {
       StateTable.State state = table.states.get(i);
-      if (state != null) {
+      if (state != null) { // expecting state
         Testkit.logger.info("{}", i);
         for (StateTable.Transition t : state.transitions.values()) {
           Testkit.logger.info("\t\ton {}", t);
         }
         Testkit.logger.info("\t\ton {}", state);
-      } else if (blockStart.containsKey(i)) {
+      } else if (blockStart.containsKey(i)) { // start of block
         logger.info("{}\t\t{}",i, blockStart.get(i));
-      } else if (blockEnd.containsKey(i)) {
+      } else if (blockEnd.containsKey(i)) { // end of block
         logger.info("{}\t\tend{}",i, blockEnd.get(i));
-      } else if (triggeredEvents.containsKey(i)) {
+      } else if (triggeredEvents.containsKey(i)) { // trigger state
         logger.info("{}\t\ttrigger({})", i, triggeredEvents.get(i));
       }
     }

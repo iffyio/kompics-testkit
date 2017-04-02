@@ -2,23 +2,23 @@ package se.sics.kompics.testkit;
 
 import se.sics.kompics.KompicsEvent;
 
-import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 
 class UnorderedSpec extends Spec{
 
   private final List<SingleEventSpec> expectUnordered;
   private List<SingleEventSpec> pending;
-  private List<EventSpec<? extends KompicsEvent>> seen;
+  private List<EventSpec> seen;
 
   UnorderedSpec(List<SingleEventSpec> expectUnordered) {
     this.expectUnordered = expectUnordered;
-    seen = new ArrayList<EventSpec<? extends KompicsEvent>>(expectUnordered.size());
-    pending = new ArrayList<SingleEventSpec>(expectUnordered);
+    seen = new LinkedList<EventSpec>();
+    pending = new LinkedList<SingleEventSpec>(expectUnordered);
   }
 
   @Override
-  StateTable.Transition getTransition(EventSpec<? extends KompicsEvent> receivedSpec, int state) {
+  StateTable.Transition getTransition(EventSpec receivedSpec, int state) {
     if (pending.contains(receivedSpec)) {
       int index = pending.indexOf(receivedSpec);
       seen.add(receivedSpec);
@@ -26,7 +26,7 @@ class UnorderedSpec extends Spec{
 
       int nextState = state;
       if (pending.isEmpty()) {
-        for (EventSpec<? extends KompicsEvent> e : seen) {
+        for (EventSpec e : seen) {
           e.handle();
         }
         reset();

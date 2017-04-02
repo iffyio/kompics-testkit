@@ -42,11 +42,10 @@ class StateTable {
   }
 
   void printExpectedEventAt(int state) {
-    FSM.logger.debug("{}: Expect\t{}", state, getExpectedSpecAt(state));
+    FSM.logger.debug("{}: Expect\t[{}]", state, getExpectedSpecAt(state));
   }
 
   String getExpectedSpecAt(int state) {
-    assert states.get(state) != null;
     return states.get(state).toString();
   }
 
@@ -54,18 +53,18 @@ class StateTable {
     return states.containsKey(state);
   }
 
-  Transition lookup(int state, EventSpec<? extends KompicsEvent> receivedSpec) {
+  Transition lookup(int state, EventSpec receivedSpec) {
     return states.get(state).onEvent(receivedSpec);
   }
 
-  StateTable.Transition lookupWithBlock(int state, EventSpec<? extends KompicsEvent> receivedSpec, Block block) {
+  StateTable.Transition lookupWithBlock(int state, EventSpec receivedSpec, Block block) {
     //// TODO: 3/23/17 merge with state onEvent lookup
     if (block.handle(receivedSpec)) {
       return new Transition(receivedSpec, state);
     }
     Testkit.logger.debug("{}: looking up {} with block {}", state, receivedSpec, block.pendingEventsToString());
 
-    for (EventSpec<? extends KompicsEvent> eventSpec : block.getAllowedEvents()) {
+    for (EventSpec eventSpec : block.getAllowedEvents()) {
       if (eventSpec.match(receivedSpec)) {
         StateTable.Transition transition = new StateTable.Transition(eventSpec, Action.HANDLE, state);
         receivedSpec.handle();
@@ -73,13 +72,13 @@ class StateTable {
       }
     }
 
-    for (EventSpec<? extends KompicsEvent> eventSpec : block.getDroppedEvents()) {
+    for (EventSpec eventSpec : block.getDroppedEvents()) {
       if (eventSpec.match(receivedSpec)) {
         return new StateTable.Transition(eventSpec, Action.DROP, state);
       }
     }
 
-    for (EventSpec<? extends KompicsEvent> eventSpec : block.getDisallowedEvents()) {
+    for (EventSpec eventSpec : block.getDisallowedEvents()) {
       if (eventSpec.match(receivedSpec)) {
         return new StateTable.Transition(eventSpec, Action.FAIL, FSM.ERROR_STATE);
       }
@@ -158,8 +157,8 @@ class StateTable {
     private final Block block;
     private Spec spec;
 
-    final Map<EventSpec<? extends KompicsEvent>, Transition> transitions =
-            new HashMap<EventSpec<? extends KompicsEvent>, Transition>();
+    final Map<EventSpec, Transition> transitions =
+            new HashMap<EventSpec, Transition>();
 
     private State(int state, Block block) {
       this.state = state;
@@ -178,23 +177,23 @@ class StateTable {
     }
 
     void addTransitions(Block block) {
-      for (EventSpec<? extends KompicsEvent> e : block.getDisallowedEvents()) {
+      for (EventSpec e : block.getDisallowedEvents()) {
         addTransition(e, Action.FAIL, FSM.ERROR_STATE);
       }
-      for (EventSpec<? extends KompicsEvent> e : block.getAllowedEvents()) {
+      for (EventSpec e : block.getAllowedEvents()) {
         addTransition(e, Action.HANDLE, state);
       }
-      for (EventSpec<? extends KompicsEvent> e : block.getDroppedEvents()) {
+      for (EventSpec e : block.getDroppedEvents()) {
         addTransition(e, Action.DROP, state);
       }
     }
 
-    private void addTransition(EventSpec<? extends KompicsEvent> onEvent, Action action, int nextState) {
+    private void addTransition(EventSpec onEvent, Action action, int nextState) {
       Transition transition = new Transition(onEvent, action, nextState);
       transitions.put(onEvent, transition);
     }
 
-    Transition onEvent(EventSpec<? extends KompicsEvent> receivedSpec) {
+    Transition onEvent(EventSpec receivedSpec) {
       // // TODO: 3/30/17 avoid unnecessary checks
       if (block.handle(receivedSpec)) {
         return new Transition(receivedSpec, state);
