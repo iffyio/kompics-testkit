@@ -1,6 +1,7 @@
 package se.sics.kompics.testkit;
 
 import com.google.common.base.Function;
+import com.google.common.base.Predicate;
 import org.junit.Before;
 import org.junit.Test;
 import se.sics.kompics.Component;
@@ -95,7 +96,7 @@ public class UnorderedEventsTest {
   public void expectWithinSingleBlockTest() {
     initExpectWithinBlock();
 
-    tc.expectWithinBlock(pong1, pingerPort, INCOMING).
+    tc.expectWithinBlock(Pong.class, predicateForPong(1), pingerPort, INCOMING).
        expectWithinBlock(pong2, pingerPort, INCOMING).
        body().
          trigger(ping, pingerPort.getPair()).
@@ -106,6 +107,20 @@ public class UnorderedEventsTest {
          expect(pong3, pingerPort, INCOMING);
 
     assertEquals(tc.check(), tc.getFinalState());
+  }
+
+  private Predicate<Pong> predicateForPong(final int count) {
+    return new Predicate<Pong>() {
+      @Override
+      public boolean apply(Pong pong) {
+        return pong.count == count;
+      }
+
+      @Override
+      public String toString() {
+        return "Predicate(Pong(" + count + "))";
+      }
+    };
   }
 
   private void initExpectWithinBlock() {
@@ -127,8 +142,8 @@ public class UnorderedEventsTest {
           trigger(ping, pingerPort.getPair()).
           expect(ping, pingerPort, OUTGOING).
           repeat(1).
-            expectWithinBlock(pong1, pingerPort, INCOMING).
-            expectWithinBlock(pong2, pingerPort, INCOMING).
+            expectWithinBlock(Pong.class, predicateForPong(1), pingerPort, INCOMING).
+            expectWithinBlock(Pong.class, predicateForPong(2), pingerPort, INCOMING).
             expectWithinBlock(pong3, pingerPort, INCOMING).
           body().
           end().
@@ -184,7 +199,7 @@ public class UnorderedEventsTest {
     };
 
     private void setTimer() {
-      long delay = random.nextInt(400);
+      long delay = random.nextInt(10);
       ScheduleTimeout st = new ScheduleTimeout(delay);
       RandomTimeout timeout = new RandomTimeout(st);
       st.setTimeoutEvent(timeout);

@@ -387,7 +387,7 @@ class FSM<T extends ComponentDefinition> {
             || assertedComponent() || expectedFault());
   }
 
-  // returns true if state was updated to error state
+  // returns false if state was updated to error state
   private boolean updateState(
           String expected, EventSpec receivedSpec, StateTable.Transition transition) {
     if (transition != null && transition.nextState != ERROR_STATE) {
@@ -479,14 +479,14 @@ class FSM<T extends ComponentDefinition> {
     logger.debug("{}: end({})\t", currentState, block.times);
 
     while (block.hasPendingEvents()) {
-      logger.debug("{}: Awaiting pending events in empty block: {}", currentState, block.pendingEventsToString());
+      logger.debug("{}: Awaiting events {}", currentState, block.status());
       EventSpec receivedSpec = removeEventFromQueue();
       logger.debug("{}: Received ({})", currentState, receivedSpec);
 
       // match event
-      StateTable.Transition transition = table.lookupWithBlock(currentState, receivedSpec, block);
+      StateTable.Transition transition = table.lookup(currentState, receivedSpec, block);
       if (!updateState(block.status(), receivedSpec, transition)) {
-        break;
+        return true;
       }
     }
     block.iterationComplete();

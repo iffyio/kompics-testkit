@@ -17,6 +17,6 @@ abstract class SingleEventSpec extends Spec{
 
   @Override
   StateTable.Transition getTransition(EventSpec receivedSpec, int state) {
-    return this.match(receivedSpec)? new StateTable.Transition(receivedSpec, state + 1) : null;
+    return this.match(receivedSpec)? new StateTable.Transition(receivedSpec, Action.HANDLE, state + 1) : null;
   }
 }

@@ -57,34 +57,9 @@ class StateTable {
     return states.get(state).onEvent(receivedSpec);
   }
 
-  StateTable.Transition lookupWithBlock(int state, EventSpec receivedSpec, Block block) {
-    //// TODO: 3/23/17 merge with state onEvent lookup
-    if (block.handle(receivedSpec)) {
-      return new Transition(receivedSpec, state);
-    }
-    Testkit.logger.debug("{}: looking up {} with block {}", state, receivedSpec, block.pendingEventsToString());
-
-    for (EventSpec eventSpec : block.getAllowedEvents()) {
-      if (eventSpec.match(receivedSpec)) {
-        StateTable.Transition transition = new StateTable.Transition(eventSpec, Action.HANDLE, state);
-        receivedSpec.handle();
-        return transition;
-      }
-    }
-
-    for (EventSpec eventSpec : block.getDroppedEvents()) {
-      if (eventSpec.match(receivedSpec)) {
-        return new StateTable.Transition(eventSpec, Action.DROP, state);
-      }
-    }
-
-    for (EventSpec eventSpec : block.getDisallowedEvents()) {
-      if (eventSpec.match(receivedSpec)) {
-        return new StateTable.Transition(eventSpec, Action.FAIL, FSM.ERROR_STATE);
-      }
-    }
-
-    return defaultLookup(state, receivedSpec);
+  Transition lookup(int state, EventSpec receivedSpec, Block block) {
+    Transition transition = block.getTransition(state, receivedSpec);
+    return transition != null? transition : defaultLookup(state, receivedSpec);
   }
 
   private Transition defaultLookup(int state, EventSpec eventSpec) {
@@ -118,7 +93,6 @@ class StateTable {
     return action;
   }
 
-
   static class Transition {
     final EventSpec eventSpec;
     final Action action;
@@ -130,11 +104,8 @@ class StateTable {
       this.nextState = nextState;
     }
 
-    Transition(EventSpec eventSpec, int nextState) {
-      this(eventSpec, Action.HANDLE, nextState);
-    }
-
-    // transitions are equal if they are for the same event
+    // transitions are for same events are equal
+    @Override
     public boolean equals(Object obj) {
       if (!(obj instanceof Transition)) {
         return false;
@@ -143,12 +114,14 @@ class StateTable {
       return this.eventSpec.equals(other.eventSpec);
     }
 
+    @Override
     public int hashCode() {
       return eventSpec.hashCode();
     }
 
+    @Override
     public String toString() {
-      return "( " + eventSpec + " ) " + action + " " + nextState;
+      return String.format("( %s ) %s %s", eventSpec, action, nextState);
     }
   }
 
@@ -163,7 +136,6 @@ class StateTable {
     private State(int state, Block block) {
       this.state = state;
       this.block = block;
-      addTransitions(block);
     }
 
     State(int state, Spec spec, Block block) {
@@ -176,56 +148,24 @@ class StateTable {
       spec = new UnorderedSpec(expectUnordered);
     }
 
-    void addTransitions(Block block) {
-      for (EventSpec e : block.getDisallowedEvents()) {
-        addTransition(e, Action.FAIL, FSM.ERROR_STATE);
-      }
-      for (EventSpec e : block.getAllowedEvents()) {
-        addTransition(e, Action.HANDLE, state);
-      }
-      for (EventSpec e : block.getDroppedEvents()) {
-        addTransition(e, Action.DROP, state);
-      }
-    }
-
-    private void addTransition(EventSpec onEvent, Action action, int nextState) {
-      Transition transition = new Transition(onEvent, action, nextState);
-      transitions.put(onEvent, transition);
-    }
-
     Transition onEvent(EventSpec receivedSpec) {
-      // // TODO: 3/30/17 avoid unnecessary checks
-      if (block.handle(receivedSpec)) {
-        return new Transition(receivedSpec, state);
-      }
-
-      // try match with spec
       Transition transition = spec.getTransition(receivedSpec, state);
-      if (transition != null) {
-        if (transition.action == Action.HANDLE) {
-          receivedSpec.handle();
-        }
-        return transition;
+      if (transition == null) {
+        transition = block.getTransition(state, receivedSpec);
       }
-
-      // other transitions
-      transition = transitions.get(receivedSpec);
-      // default transition
       if (transition == null) {
         transition = defaultLookup(state, receivedSpec);
       }
-
-      if (transition != null && transition.action == Action.HANDLE) {
+      if (transition != null  && transition.action == Action.HANDLE) {
         receivedSpec.handle();
       }
-
       return transition;
     }
 
     public String toString() {
-      StringBuilder sb = new StringBuilder("( ");
-      sb.append(spec).append(" ) ");
-      return sb.append(Action.HANDLE).append(" ").append(state + 1).toString();
+      String sb = "( " + spec + " ) " +
+              Action.HANDLE + " " + (state + 1);
+      return sb;
     }
   }
 

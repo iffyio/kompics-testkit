@@ -50,17 +50,29 @@ class EventSpec extends SingleEventSpec{
   }
 
   public boolean equals(Object o) {
-    if (!(o instanceof EventSpec)) {
-      return false;
+    if (o instanceof EventSpec) {
+      return equalEventSpec((EventSpec) o);
     }
-    EventSpec other = (EventSpec) o;
+    if (o instanceof PredicateSpec) {
+      return equalPredicateSpec((PredicateSpec) o);
+    }
+
+    return false;
+  }
+
+  private boolean equalPredicateSpec(PredicateSpec predicateSpec) {
+    return predicateSpec.match(this) &&
+           port.equals(predicateSpec.port) &&
+           direction.equals(predicateSpec.direction);
+  }
+
+  private boolean equalEventSpec(EventSpec other) {
     KompicsEvent e = other.getEvent();
 
     return e.getClass() == event.getClass() &&
            port.equals(other.getPort()) &&
            direction.equals(other.getDirection()) &&
-           comparator == null? event.equals(e) :
-           equalByComparator(comparator, e);
+           comparator == null? event.equals(e) : equalByComparator(comparator, e);
   }
 
   private <V extends KompicsEvent> boolean equalByComparator(Comparator<V> comp, KompicsEvent e) {

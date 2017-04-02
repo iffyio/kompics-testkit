@@ -1,5 +1,7 @@
 package se.sics.kompics.testkit;
 
+import com.google.common.collect.HashMultiset;
+import com.google.common.collect.Multiset;
 import se.sics.kompics.KompicsEvent;
 
 import java.util.Collection;
@@ -11,7 +13,6 @@ import java.util.Set;
 
 class Block {
 
-  // // TODO: 2/17/17 make this private
   final int times;
   private final int startState;
   private int currentCount;
@@ -24,8 +25,10 @@ class Block {
   private Set<EventSpec> dropped;
 
   private List<SingleEventSpec> expected = new LinkedList<SingleEventSpec>();
-  private List<SingleEventSpec> pending = new LinkedList<SingleEventSpec>();
-  private List<SingleEventSpec> received = new LinkedList<SingleEventSpec>();
+  //private List<SingleEventSpec> pending = new LinkedList<SingleEventSpec>();
+  private Multiset<SingleEventSpec> pending = HashMultiset.create();
+  //private List<SingleEventSpec> received = new LinkedList<SingleEventSpec>();
+  private Multiset<SingleEventSpec> received = HashMultiset.create();
 
   enum MODE { HEADER, BODY, UNORDERED, EXPECT_MAPPER, EXPECT_FUTURE}
   MODE mode = MODE.HEADER;
@@ -99,43 +102,46 @@ class Block {
     }
   }
 
-  boolean handle(EventSpec receivedSpec) {
-    for (Iterator<SingleEventSpec> iterator = pending.iterator(); iterator.hasNext();) {
-      SingleEventSpec spec = iterator.next();
-      if (spec.match(receivedSpec)) {
-        received.add(spec);
-        iterator.remove();
-        Testkit.logger.trace("Event {} was handled by block, status: {}", receivedSpec, status());
-        receivedSpec.handle();
-        return true;
-      }
+  StateTable.Transition getTransition(int state, EventSpec receivedSpec) {
+    //// TODO: 3/23/17 merge with state onEvent getTransition
+    if (handle(receivedSpec)) {
+      return new StateTable.Transition(receivedSpec, Action.HANDLE, state);
     }
-    return previousBlock != null && previousBlock.handle(receivedSpec);
+
+    Testkit.logger.debug("{}: looking up {} with block {}", state, receivedSpec, status());
+    if (allowed.contains(receivedSpec)) {
+      return new StateTable.Transition(receivedSpec, Action.HANDLE, state);
+    }
+    if (dropped.contains(receivedSpec)) {
+      return new StateTable.Transition(receivedSpec, Action.DROP, state);
+    }
+    if (disallowed.contains(receivedSpec)) {
+      return new StateTable.Transition(receivedSpec, Action.FAIL, FSM.ERROR_STATE);
+    }
+
+    return null;
+  }
+
+  boolean handle(EventSpec receivedSpec) {
+    int remaining = pending.count(receivedSpec);
+    if (remaining == 0) {
+      return previousBlock != null && previousBlock.handle(receivedSpec);
+    }
+
+    pending.remove(receivedSpec);
+    Testkit.logger.trace("Event {} will be handled by {}", receivedSpec, status());
+    return true;
   }
 
   boolean hasPendingEvents() {
     return !pending.isEmpty();
   }
 
-  String pendingEventsToString() {
-    StringBuilder sb = new StringBuilder("Pending<");
-    for (Spec spec : pending) {
-      sb.append("(").append(spec).append(") ");
-    }
-    sb.append(">");
-    return sb.toString();
-  }
-
   String status() {
-    StringBuilder sb = new StringBuilder("Block<Received(");
-    for (Spec spec : received) {
-      sb.append(spec).append(" ");
-    }
-    sb.append(")Pending(");
-    for (Spec spec : pending) {
-      sb.append(spec).append(" ");
-    }
-    sb.append(")>");
+    StringBuilder sb = new StringBuilder("Block[");
+    sb.append(times).append(" Received").append(received);
+    sb.append(" Pending").append(pending);
+    sb.append("]");
     return sb.toString();
   }
 

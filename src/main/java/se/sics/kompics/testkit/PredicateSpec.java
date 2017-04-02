@@ -7,8 +7,8 @@ import se.sics.kompics.PortType;
 
 class PredicateSpec extends SingleEventSpec{
 
-  private final Class<? extends KompicsEvent> eventType;
-  private final Predicate<? extends KompicsEvent> predicate;
+  final Class<? extends KompicsEvent> eventType;
+  final Predicate<? extends KompicsEvent> predicate;
 
   <E extends KompicsEvent> PredicateSpec(
           Class<E> eventType, Predicate<E> predicate,
@@ -20,7 +20,7 @@ class PredicateSpec extends SingleEventSpec{
 
   public boolean match(EventSpec receivedSpec) {
     KompicsEvent receivedEvent = receivedSpec.getEvent();
-    return eventType.isAssignableFrom(receivedEvent.getClass()) &&
+    return eventType.equals(receivedEvent.getClass()) &&
            matchHelper(predicate, receivedEvent);
   }
 
@@ -30,21 +30,20 @@ class PredicateSpec extends SingleEventSpec{
   }
 
   public boolean equals(Object o) {
-    if (!(o instanceof PredicateSpec)) {
+    if (!(o instanceof EventSpec)) { // only comparable with EventSpec (lookups for received events)
       return false;
     }
-    PredicateSpec other = (PredicateSpec) o;
+    EventSpec eventSpec = (EventSpec) o;
 
-    return eventType.equals(other.eventType) &&
-           port.equals(other.port) &&
-           direction.equals(other.direction);
+    return match(eventSpec) &&
+           port.equals(eventSpec.getPort()) &&
+           direction.equals(eventSpec.getDirection());
   }
 
   @Override
   public int hashCode() {
     int result = 31 * port.hashCode();
     result = 31 * result + direction.hashCode();
-    result = 31 * result + eventType.hashCode();
     return result;
   }
 
