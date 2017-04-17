@@ -129,7 +129,7 @@ public class TestContext<T extends ComponentDefinition> {
     return this;
   }
 
-  public TestContext<T> ignoreOrder() {
+  public TestContext<T> unordered() {
     fsm.setUnorderedMode();
     return this;
   }
@@ -150,7 +150,7 @@ public class TestContext<T extends ComponentDefinition> {
     return this;
   }
 
-  public <P extends  PortType> TestContext<T> expectWithinBlock(
+  public <P extends  PortType> TestContext<T> blockExpect(
           KompicsEvent event, Port<P> port, Direction direction) {
     Testkit.checkNotNull(event, port, direction);
     checkValidPort(port, direction);
@@ -158,7 +158,7 @@ public class TestContext<T extends ComponentDefinition> {
     return this;
   }
 
-  public <P extends  PortType, E extends KompicsEvent> TestContext<T> expectWithinBlock(
+  public <P extends  PortType, E extends KompicsEvent> TestContext<T> blockExpect(
           Class<E> eventType, Predicate<E> pred, Port<P> port, Direction direction) {
     Testkit.checkNotNull(eventType, pred, port, direction);
     checkValidPort(port, direction);
@@ -265,7 +265,7 @@ public class TestContext<T extends ComponentDefinition> {
     return cut.getComponentCore();
   }
 
-  public TestContext<T> assertComponentState(
+  public TestContext<T> inspect(
           Predicate<T> assertPred) {
     Testkit.checkNotNull(assertPred);
     fsm.addAssertComponent(assertPred);

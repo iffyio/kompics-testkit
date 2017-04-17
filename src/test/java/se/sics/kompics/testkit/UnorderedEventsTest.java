@@ -79,7 +79,7 @@ public class UnorderedEventsTest {
        trigger(ping, pingerPort.getPair()).
        expect(ping, pingerPort, OUTGOING).
 
-       ignoreOrder().
+            unordered().
             expect(pong1, pingerPort, INCOMING).
             expect(pong2, pingerPort, INCOMING).
             expect(pong3, pingerPort, INCOMING).
@@ -96,8 +96,8 @@ public class UnorderedEventsTest {
   public void expectWithinSingleBlockTest() {
     initExpectWithinBlock();
 
-    tc.expectWithinBlock(Pong.class, predicateForPong(1), pingerPort, INCOMING).
-       expectWithinBlock(pong2, pingerPort, INCOMING).
+    tc.blockExpect(Pong.class, predicateForPong(1), pingerPort, INCOMING).
+            blockExpect(pong2, pingerPort, INCOMING).
        body().
          trigger(ping, pingerPort.getPair()).
          expect(ping, pingerPort, OUTGOING).
@@ -142,9 +142,9 @@ public class UnorderedEventsTest {
           trigger(ping, pingerPort.getPair()).
           expect(ping, pingerPort, OUTGOING).
           repeat(1).
-            expectWithinBlock(Pong.class, predicateForPong(1), pingerPort, INCOMING).
-            expectWithinBlock(Pong.class, predicateForPong(2), pingerPort, INCOMING).
-            expectWithinBlock(pong3, pingerPort, INCOMING).
+            blockExpect(Pong.class, predicateForPong(1), pingerPort, INCOMING).
+            blockExpect(Pong.class, predicateForPong(2), pingerPort, INCOMING).
+            blockExpect(pong3, pingerPort, INCOMING).
           body().
           end().
         end();
@@ -157,15 +157,15 @@ public class UnorderedEventsTest {
     initExpectWithinBlock();
     tc.body().
        repeat(10).
-          expectWithinBlock(pong1, pingerPort, INCOMING).
+            blockExpect(pong1, pingerPort, INCOMING).
        body().
           trigger(ping, pingerPort.getPair()).
           repeat(1).
-             expectWithinBlock(pong2, pingerPort, INCOMING).
+            blockExpect(pong2, pingerPort, INCOMING).
           body().
              expect(ping, pingerPort, OUTGOING).
              repeat(1).
-                expectWithinBlock(pong3, pingerPort, INCOMING).
+            blockExpect(pong3, pingerPort, INCOMING).
              body().
              end().
           end().

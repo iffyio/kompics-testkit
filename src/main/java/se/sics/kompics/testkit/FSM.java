@@ -62,7 +62,7 @@ class FSM<T extends ComponentDefinition> {
     this.proxyComponent =  proxy.getComponentCore();
     this.definitionUnderTest = definitionUnderTest;
 
-    initializeFSM();
+    repeat(1);
   }
 
   void addParticipant(Component c) {
@@ -114,13 +114,13 @@ class FSM<T extends ComponentDefinition> {
   }
 
   void setUnorderedMode() {
-    checkNewModeAllowed();
+    checkInBodyMode();
     currentBlock.mode = Block.MODE.UNORDERED;
     expectUnordered = new ArrayList<SingleEventSpec>();
   }
 
   void setExpectWithMapperMode() {
-    checkNewModeAllowed();
+    checkInBodyMode();
     currentBlock.mode = Block.MODE.EXPECT_MAPPER;
     expectMapper = new ExpectMapper(proxyComponent);
   }
@@ -145,7 +145,7 @@ class FSM<T extends ComponentDefinition> {
   }
 
   void setExpectWithFutureMode() {
-    checkNewModeAllowed();
+    checkInBodyMode();
     currentBlock.mode = Block.MODE.EXPECT_FUTURE;
     expectFuture = new ExpectFuture(proxyComponent);
   }
@@ -163,7 +163,7 @@ class FSM<T extends ComponentDefinition> {
   }
 
   void addTrigger(KompicsEvent event, Port<? extends PortType> port) {
-    checkNewModeAllowed();
+    checkInBodyMode();
     triggeredEvents.put(currentState, new Trigger(event, port));
     gotoNextState();
   }
@@ -207,7 +207,7 @@ class FSM<T extends ComponentDefinition> {
 
   void addExpectedFault(
           Class<? extends Throwable> exceptionType, Fault.ResolveAction resolveAction) {
-    checkNewModeAllowed();
+    checkInBodyMode();
     checkExpectedFaultHasMatchingClause();
     expectedFaults.put(currentState, new ExpectedFault(exceptionType, resolveAction));
     gotoNextState();
@@ -215,7 +215,7 @@ class FSM<T extends ComponentDefinition> {
 
   void addExpectedFault(
           Predicate<Throwable> exceptionPredicate, Fault.ResolveAction resolveAction) {
-    checkNewModeAllowed();
+    checkInBodyMode();
     checkExpectedFaultHasMatchingClause();
     expectedFaults.put(currentState, new ExpectedFault(exceptionPredicate, resolveAction));
     gotoNextState();
@@ -292,10 +292,6 @@ class FSM<T extends ComponentDefinition> {
     runFinalState();
   }
 
-  private void initializeFSM() {
-    repeat(1);
-  }
-
   // // TODO: 3/31/17 only allow in body, unordered mode
   private void registerSpec(SingleEventSpec spec) {
     if (currentBlock.mode == Block.MODE.UNORDERED) {
@@ -342,7 +338,7 @@ class FSM<T extends ComponentDefinition> {
   }
 
   private void endBlock() {
-    checkNewModeAllowed();
+    checkInBodyMode();
     if (balancedBlock.isEmpty()) {
       throw new IllegalStateException("matching repeat not found for end");
     }
@@ -353,7 +349,7 @@ class FSM<T extends ComponentDefinition> {
   }
 
   private void enterNewBlock(Block block) {
-    checkNewModeAllowed();
+    checkInBodyMode();
     if (block.times <= 0) {
       throw new IllegalArgumentException("only positive value allowed for block");
     }
@@ -517,21 +513,6 @@ class FSM<T extends ComponentDefinition> {
     }
   }
 
-  private void checkNewModeAllowed() {
-    if (currentBlock == null) {
-      return;
-    }
-
-    checkInBodyMode();
-
-    switch (currentBlock.mode) {
-      case UNORDERED:
-      case EXPECT_MAPPER:
-      case EXPECT_FUTURE:
-        throw new IllegalStateException(String.format("method not allowed in %s mode", currentBlock.mode));
-    }
-  }
-
   private void checkMode(Block.MODE mode) {
     if (currentBlock != null && currentBlock.mode != mode) {
       throw new IllegalStateException(String.format("Expected mode [%s], Actual mode [%s]",
@@ -540,6 +521,9 @@ class FSM<T extends ComponentDefinition> {
   }
 
   private void checkInBodyMode() {
+    if (currentBlock == null) {
+      return;
+    }
     checkMode(Block.MODE.BODY);
   }
 

@@ -51,13 +51,13 @@ class Proxy<T extends ComponentDefinition> extends ComponentDefinition{
 
   <T extends ComponentDefinition> Component createSetupComponent(Class<T> cClass, Init<T> initEvent) {
     Component c = create(cClass, initEvent);
-    setupComponent(c);
+    c.getComponent().getComponentCore().setScheduler(null);
     return c;
   }
 
   <T extends ComponentDefinition> Component createSetupComponent(Class<T> cClass, Init.None initEvent) {
     Component c = create(cClass, initEvent);
-    setupComponent(c);
+    c.getComponent().getComponentCore().setScheduler(null);
     return c;
   }
 
@@ -118,10 +118,5 @@ class Proxy<T extends ComponentDefinition> extends ComponentDefinition{
     portConfig = new PortConfig(this);
     definitionUnderTest = (T) cut.getComponent();
     fsm = new FSM<T>(this, definitionUnderTest);
-  }
-
-  private void setupComponent(Component c) {
-    // only proxy is scheduled on calling thread
-    c.getComponent().getComponentCore().setScheduler(null);
   }
 }

@@ -22,9 +22,9 @@ public class AssertComponentTest {
     tc.body().
        repeat(100).body().
         expect(ping, pinger.getNegative(PingPongPort.class), outgoing).
-        assertComponentState(expectedPings).
+        inspect(expectedPings).
         expect(pong, pinger.getNegative(PingPongPort.class), incoming).
-        assertComponentState(expectedPongs).
+        inspect(expectedPongs).
        end();
 
     assertEquals(tc.check(), tc.getFinalState());

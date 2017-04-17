@@ -50,7 +50,7 @@ public class ExpectWithResponseTest {
                       expect(pingerPort, pingerPort).
                     end().
 
-                    assertComponentState(emptyIds).
+        inspect(emptyIds).
 
                     // same sequence, different groups
                     trigger(start, pinger.getPositive(TokenPort.class)).
@@ -64,7 +64,7 @@ public class ExpectWithResponseTest {
                       expect(pingerPort, pingerPort).
                     end().
 
-                    assertComponentState(emptyIds).
+        inspect(emptyIds).
             end();
 
     assertEquals(tc.check(), tc.getFinalState());
@@ -93,7 +93,7 @@ public class ExpectWithResponseTest {
                       trigger(pingerPort, future3).
                     end().
 
-                    assertComponentState(emptyIds).
+        inspect(emptyIds).
 
             end();
 

@@ -24,10 +24,10 @@ is a valid testcase albeit an empty one.
 Most methods are only allowed either in the header or body.  
   
 These methods are allowed exlusively within a header.  
-create, connect, allow, disallow, drop, addComparator, setDefaultAction, expectWithinBlock, onEachIteration  
+create, connect, allow, disallow, drop, addComparator, setDefaultAction, blockExpect, onEachIteration
   
 The others are allowed within a body only
-all expect variants (except for expectWithinBlock), all trigger variants, body, end, ignoreOrder, setMapperForNext, expectFault, assertComponentState
+all expect variants (except for blockExpect), all trigger variants, body, end, unordered, setMapperForNext, expectFault, inspect
 
 #### Keeping loop state
 The repeat() method takes a count and an option ```BlockInit``` object. This object has a single method ```init()``` that is
@@ -62,7 +62,7 @@ isn't possible (or necessary) to ```expect()``` an event that was triggered dire
 intercepted. Triggers are implemented as an entry in the state table to simply trigger on the port and move on to the next state.
 
 ### Expecting events
-All expect variants including those involving multiple events. are implemented as a single state. (except for expectWithinBlock which isn't implemented as a state itself).
+All expect variants including those involving multiple events. are implemented as a single state. (except for blockExpect which isn't implemented as a state itself).
 
 ### Expecting Single Events
 ```expect(KompicsEvent, Port, Direction)``` expects a single event. Direction is either incoming or outgoing from the
@@ -70,12 +70,12 @@ perspective of the component under test. Port should be the outside port of the 
 Alternatively, ```expect(Class<E>, Predicate<E>, Port, Direction)```  matches a received event if the predicate returns true.  
 
 #### Expecting unordered events
-Single event expect calls can be grouped within an ```ignoreOrder()``` and a matching ```end()``` block.  
+Single event expect calls can be grouped within an ```unordered()``` and a matching ```end()``` block.
 For example [see UnorderedTest.java](https://github.com/iffyio/kompics-testkit/blob/master/src/test/java/se/sics/kompics/testkit/UnorderedEventsTest.java)
 A matching ```end()``` is required. Order doesn't matter when expecting events within this block. This block can not be empty.
 
 #### Expecting within block
-```expectWithinBlock(KompicsEvent, Port, Direction)``` specifies that the event must be received exactly once 
+```blockExpect(KompicsEvent, Port, Direction)``` specifies that the event must be received exactly once
 within this (and possibly nested) block. It is allowed only inside headers of block since it is not a state itself.
 If some events have'nt yet been received by the end of the block, the test waits for new events and fails if the next
 received event doesn't match any pending events.
@@ -170,7 +170,7 @@ These constraints can be shadowed within nested blocks. For example
 In case of conflicting constraints, only the last placed constraint is valid.  
 
 ### Asserting component state
-Whitebox testing can be done on the component using the ```assertComponentState(Predicate<ComponentDefinition>)``` function.  
+Whitebox testing can be done on the component using the ```inspect(Predicate<ComponentDefinition>)``` function.
 This specifies a predicate that would eventually be called with the component under test. The (currently public only) fields of 
 the component may then be asserted. This is also implemented as a single state. All messages until that state would have 
 been handled before the predicate is called. That is, the component has no pending events to be handled. Returning false from this

@@ -6,7 +6,7 @@ import org.slf4j.LoggerFactory;
 import se.sics.kompics.ComponentDefinition;
 import se.sics.kompics.Init;
 
-public class Testkit {
+public abstract class Testkit {
 
   public static final Logger logger = LoggerFactory.getLogger("Testkit");
 

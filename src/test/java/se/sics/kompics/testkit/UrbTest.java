@@ -80,14 +80,14 @@ public class UrbTest {
             onEachIteration(incrementCount).
       body().
             trigger(new UrbBroadcast(counter), p.getPositive(UrbPort.class)).
-            ignoreOrder().
+            unordered().
               expect(bebMsg(pAddr, pAddr), p.getNegative(Network.class), outgoing).
               expect(bebMsg(pAddr, qAddr), p.getNegative(Network.class), outgoing).
               expect(bebMsg(pAddr, rAddr), p.getNegative(Network.class), outgoing).
               expect(bebMsg(pAddr, sAddr), p.getNegative(Network.class), outgoing).
             end().
 
-            ignoreOrder().
+            unordered().
               expect(bebMsg(pAddr, pAddr), p.getNegative(Network.class), incoming).
               expect(bebMsg(rAddr, pAddr), p.getNegative(Network.class), incoming).
               expect(bebMsg(qAddr, pAddr), p.getNegative(Network.class), incoming).

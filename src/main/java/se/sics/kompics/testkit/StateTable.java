@@ -34,7 +34,7 @@ class StateTable {
   }
 
   void registerExpectedEvent(int state, List<SingleEventSpec> expectUnordered, Block block) {
-    states.put(state, new State(state, expectUnordered, block));
+    states.put(state, new State(state, new UnorderedSpec(expectUnordered), block));
   }
 
   <E extends KompicsEvent> void setDefaultAction(Class<E> eventType, Function<E, Action> predicate) {
@@ -143,11 +143,6 @@ class StateTable {
       this.spec = spec;
     }
 
-    State(int state, List<SingleEventSpec> expectUnordered, Block block) {
-      this(state, block);
-      spec = new UnorderedSpec(expectUnordered);
-    }
-
     Transition onEvent(EventSpec receivedSpec) {
       Transition transition = spec.getTransition(receivedSpec, state);
       if (transition == null) {
@@ -163,9 +158,8 @@ class StateTable {
     }
 
     public String toString() {
-      String sb = "( " + spec + " ) " +
+      return "( " + spec + " ) " +
               Action.HANDLE + " " + (state + 1);
-      return sb;
     }
   }
 
