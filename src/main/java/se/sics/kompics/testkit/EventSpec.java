@@ -6,15 +6,18 @@ import se.sics.kompics.PortType;
 
 import java.util.Comparator;
 
-class EventSpec extends SingleEventSpec{
+class EventSpec implements SingleEventSpec{
 
   private final KompicsEvent event;
   private final Comparator<? extends KompicsEvent> comparator;
   private ProxyHandler handler;
+  private final Port<? extends PortType> port;
+  private final Direction direction;
 
   <E extends KompicsEvent> EventSpec(E event, Port<? extends PortType> port,
             Direction direction, Comparator<E> comparator) {
-    super(port, direction);
+    this.port = port;
+    this.direction = direction;
     this.event = event;
     this.comparator = comparator;
   }
@@ -50,7 +53,7 @@ class EventSpec extends SingleEventSpec{
   }
 
   public boolean equals(Object o) {
-    if (o instanceof EventSpec) {
+    if (getClass() == o.getClass()) {
       return equalEventSpec((EventSpec) o);
     }
     if (o instanceof PredicateSpec) {

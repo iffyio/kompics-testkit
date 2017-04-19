@@ -30,7 +30,7 @@ class Block {
   //private List<SingleEventSpec> received = new LinkedList<SingleEventSpec>();
   private Multiset<SingleEventSpec> received = HashMultiset.create();
 
-  enum MODE { HEADER, BODY, UNORDERED, EXPECT_MAPPER, EXPECT_FUTURE}
+  enum MODE { HEADER, BODY, UNORDERED, EXPECT_MAPPER, EXPECT_FUTURE, CONDITIONAL}
   MODE mode = MODE.HEADER;
 
   Block(Block previousBlock, int times, int startState, BlockInit blockInit) {

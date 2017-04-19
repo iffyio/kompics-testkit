@@ -153,7 +153,7 @@ public class UnorderedEventsTest {
 
   @Test
   public void ExpectWithinMultipleBlockTest() {
-    tc.setTimeout(Ponger.timeout);
+    tc.setTimeout(Ponger.timeout * 2);
     connectTimers();
     initExpectWithinBlock();
     tc.body().

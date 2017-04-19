@@ -1,11 +1,9 @@
 package se.sics.kompics.testkit;
 
-import se.sics.kompics.KompicsEvent;
-
 import java.util.LinkedList;
 import java.util.List;
 
-class UnorderedSpec extends Spec{
+class UnorderedSpec implements MultiEventSpec{
 
   private final List<SingleEventSpec> expectUnordered;
   private List<SingleEventSpec> pending;
@@ -18,24 +16,26 @@ class UnorderedSpec extends Spec{
   }
 
   @Override
-  StateTable.Transition getTransition(EventSpec receivedSpec, int state) {
+  public boolean match(EventSpec receivedSpec) {
     if (pending.contains(receivedSpec)) {
       int index = pending.indexOf(receivedSpec);
       seen.add(receivedSpec);
       pending.remove(index);
 
-      int nextState = state;
       if (pending.isEmpty()) {
         for (EventSpec e : seen) {
           e.handle();
         }
         reset();
-        nextState = state + 1;
       }
-      // // TODO: 3/31/17 use more descriptive action for DROP here
-      return new StateTable.Transition(receivedSpec, Action.DROP, nextState);
+      return true;
     }
-    return null;
+    return false;
+  }
+
+  @Override
+  public boolean isComplete() {
+    return seen.isEmpty();
   }
 
   private void reset() {

@@ -9,7 +9,7 @@ import se.sics.kompics.PortType;
 import java.util.ArrayList;
 import java.util.List;
 
-class ExpectMapper extends Spec{
+class ExpectMapper implements MultiEventSpec{
 
   final List<MapperStruct> expected = new ArrayList<MapperStruct>();
   private int mapperIndex = 0;
@@ -55,28 +55,28 @@ class ExpectMapper extends Spec{
   }
 
   @Override
-  StateTable.Transition getTransition(EventSpec receivedSpec, int state) {
+  public boolean match(EventSpec receivedSpec) {
     MapperStruct nextMapper = expected.get(mapperIndex);
 
     if (nextMapper.map(receivedSpec)) {
       mapperIndex++;
     } else {
-      return null;
+      return false;
     }
-
-    int nextState = state;
 
     // messages are not handled until all seen (optionally?)
     if (mapperIndex == expected.size()) {
       for (MapperStruct mapper : expected) {
         mapper.handle();
       }
-
       mapperIndex = 0;
-      nextState = state + 1;
     }
+    return true;
+  }
 
-    return new StateTable.Transition(receivedSpec, Action.DROP, nextState);
+  @Override
+  public boolean isComplete() {
+    return mapperIndex == 0;
   }
 
   private void addNewMapperStruct(

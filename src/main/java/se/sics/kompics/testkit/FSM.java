@@ -57,6 +57,8 @@ class FSM<T extends ComponentDefinition> {
   private Block currentBlock;
   private int currentState = 0;
 
+  private Conditional currentConditional;
+
   FSM(Proxy<T> proxy, T definitionUnderTest) {
     this.eventQueue = proxy.getEventQueue();
     this.proxyComponent =  proxy.getComponentCore();
@@ -90,7 +92,11 @@ class FSM<T extends ComponentDefinition> {
   <P extends PortType> void expectMessage(
           KompicsEvent event, Port<P> port, Direction direction) {
     EventSpec eventSpec = newEventSpec(event, port, direction);
-    registerSpec(eventSpec);
+    if (currentBlock.mode == Block.MODE.CONDITIONAL) {
+      currentConditional.addChild(eventSpec);
+    } else {
+      registerSpec(eventSpec);
+    }
   }
 
   <P extends PortType, E extends KompicsEvent> void expectMessage(
@@ -168,6 +174,34 @@ class FSM<T extends ComponentDefinition> {
     gotoNextState();
   }
 
+
+  void either() {
+    if (currentBlock.mode == Block.MODE.BODY) {
+      currentConditional = new Conditional(null);
+      currentBlock.mode = Block.MODE.CONDITIONAL;
+    } else {
+      checkMode(Block.MODE.CONDITIONAL);
+      Conditional child = new Conditional(currentConditional);
+      currentConditional.addChild(child);
+      currentConditional = child;
+    }
+  }
+
+  void or() {
+    checkMode(Block.MODE.CONDITIONAL);
+    currentConditional.or();
+  }
+
+  private void endConditional() {
+    currentConditional.end();
+    if (currentConditional.isMain()) {
+      currentBlock.mode = Block.MODE.BODY;
+      currentState = currentConditional.resolve(currentState, table, currentBlock, NullSpec);
+    } else {
+      currentConditional = currentConditional.parent;
+    }
+  }
+
   void repeat(int times) {
     Block block = new Block(currentBlock, times, currentState);
     enterNewBlock(block);
@@ -194,6 +228,9 @@ class FSM<T extends ComponentDefinition> {
         break;
       case EXPECT_FUTURE:
         endExpect(mode);
+        break;
+      case CONDITIONAL:
+        endConditional();
         break;
       default:
         endBlock();
@@ -295,7 +332,7 @@ class FSM<T extends ComponentDefinition> {
       expectUnordered.add(spec);
     } else {
       checkInBodyMode();
-      table.registerExpectedEvent(currentState, spec, currentBlock);
+      table.addTransition(currentState, currentState + 1, spec, currentBlock);
       gotoNextState();
     }
   }
@@ -306,7 +343,8 @@ class FSM<T extends ComponentDefinition> {
       throw new IllegalStateException("No events were specified in unordered mode");
     }
 
-    table.registerExpectedEvent(currentState, expectUnordered, currentBlock);
+    table.addTransition(currentState, currentState + 1,
+        new UnorderedSpec(expectUnordered), currentBlock);
     gotoNextState();
   }
 
@@ -330,7 +368,7 @@ class FSM<T extends ComponentDefinition> {
     if (emptySpec) {
       throw new IllegalStateException("No events were specified in " + mode + " mode");
     }
-    table.registerExpectedEvent(currentState, expected, currentBlock);
+    table.addTransition(currentState, currentState + 1, expected, currentBlock);
     gotoNextState();
   }
 
@@ -384,7 +422,7 @@ class FSM<T extends ComponentDefinition> {
   private boolean updateState(
           String expected, EventSpec receivedSpec, StateTable.Transition transition) {
     if (transition != null && transition.nextState != ERROR_STATE) {
-      logger.debug("{}: Transitioned on [{}]", currentState, transition);
+      logger.debug("{}: Transitioned on {}", currentState, transition);
       currentState = transition.nextState;
       return true;
     }
@@ -488,16 +526,30 @@ class FSM<T extends ComponentDefinition> {
 
   private boolean handleNextEvent(String expected, Block block) {
     EventSpec received = removeEventFromQueue();
+    StateTable.Transition transition;
     if (received == null) {
-      gotoErrorState("timed-out expecting " + expected);
-      return false;
+      received = NullSpec;
     }
     logger.debug("{}: Received ({})", currentState, received);
-    StateTable.Transition transition;
+/*    if (received == null) {
+      transition = table.lookup(currentState, NullSpec);
+      if (transition == null) {
+        gotoErrorState("timed-out expecting " + expected);
+        return false;
+      } else {
+        return true;
+      }
+    }*/
     if (block == null) {
       transition = table.lookup(currentState, received);
+      //if (tra)
     } else {
       transition = table.lookup(currentState, received, block);
+    }
+    logger.debug("Transition = {}", transition);
+    if (transition == null && received == NullSpec) {
+        gotoErrorState("timed-out expecting " + expected);
+        return false;
     }
     return updateState(expected, received, transition);
   }
@@ -564,11 +616,8 @@ class FSM<T extends ComponentDefinition> {
     for (int i = 0; i <= final_state; i++) {
       StateTable.State state = table.states.get(i);
       if (state != null) { // expecting state
-        Testkit.logger.info("{}", i);
-        for (StateTable.Transition t : state.transitions.values()) {
-          Testkit.logger.info("\t\ton {}", t);
-        }
-        Testkit.logger.info("\t\ton {}", state);
+        logger.info("{}", i);
+        logger.info("\t\t {}", state);
       } else if (blockStart.containsKey(i)) { // start of block
         logger.info("{}\t\t{}",i, blockStart.get(i));
       } else if (blockEnd.containsKey(i)) { // end of block
@@ -611,4 +660,34 @@ class FSM<T extends ComponentDefinition> {
       comparators.put(eventType, comparator);
     }
   }
+
+  private static class NullEventSpec extends EventSpec {
+    static class Foo implements KompicsEvent{}
+    <E extends KompicsEvent> NullEventSpec() {
+      super(new Foo(), null, null, null);
+    }
+    @Override
+    public boolean match(EventSpec receivedSpec) {
+      return receivedSpec == NullSpec;
+    }
+
+    @Override
+    public int hashCode() {
+      return System.identityHashCode(this);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      return this == o;
+    }
+
+    @Override
+    public String toString() {
+      return "NULL EVENT";
+    }
+    @Override
+    void handle() {
+    }
+  }
+  static final NullEventSpec NullSpec = new NullEventSpec();
 }

@@ -10,7 +10,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-class ExpectFuture extends Spec{
+class ExpectFuture implements MultiEventSpec{
 
   List<FutureStruct> expected = new ArrayList<FutureStruct>();
   Map<Future<? extends KompicsEvent, ? extends KompicsEvent>, FutureStruct> futures =
@@ -47,27 +47,27 @@ class ExpectFuture extends Spec{
   }
 
   @Override
-  StateTable.Transition getTransition(EventSpec receivedSpec, int state) {
+  public boolean match(EventSpec receivedSpec) {
     FutureStruct nextFuture = expected.get(futureIndex);
 
     if (nextFuture.map(receivedSpec)) {
       futureIndex++;
     } else {
-      return null;
+      return false;
     }
-
-    int nextState = state;
 
     if (futureIndex == expected.size()) {
       for (FutureStruct futureStruct : trigger) {
         futureStruct.handle();
       }
-
       futureIndex = 0;
-      nextState = state + 1;
     }
+    return true;
+  }
 
-    return new StateTable.Transition(receivedSpec, Action.DROP, nextState);
+  @Override
+  public boolean isComplete() {
+    return futureIndex == 0;
   }
 
   private class FutureStruct {

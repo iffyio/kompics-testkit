@@ -215,6 +215,16 @@ public class TestContext<T extends ComponentDefinition> {
     return this;
   }
 
+  public TestContext<T> either() {
+    fsm.either();
+    return this;
+  }
+
+  public TestContext<T> or() {
+    fsm.or();
+    return this;
+  }
+
   public <P extends PortType> TestContext<T> trigger(
           KompicsEvent event, Port<P> port) {
     Testkit.checkNotNull(event, port);

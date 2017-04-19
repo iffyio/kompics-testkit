@@ -5,7 +5,6 @@ import se.sics.kompics.KompicsEvent;
 
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -29,12 +28,17 @@ class StateTable {
 
   Map<Integer, State> states = new HashMap<Integer, State>();
 
-  void registerExpectedEvent(int state, Spec spec, Block block) {
-    states.put(state, new State(state, spec, block));
+  void addTransition(int state, int nextState, Spec spec, Block block) {
+    getState(state, block).addTransition(spec, nextState);
   }
 
-  void registerExpectedEvent(int state, List<SingleEventSpec> expectUnordered, Block block) {
-    states.put(state, new State(state, new UnorderedSpec(expectUnordered), block));
+  private State getState(int state, Block block) {
+    State stateObj = states.get(state);
+    if (stateObj == null) {
+      stateObj = new State(state, block);
+      states.put(state, stateObj);
+    }
+    return stateObj;
   }
 
   <E extends KompicsEvent> void setDefaultAction(Class<E> eventType, Function<E, Action> predicate) {
@@ -128,23 +132,38 @@ class StateTable {
   class State {
     private final int state;
     private final Block block;
-    private Spec spec;
 
-    final Map<EventSpec, Transition> transitions =
-            new HashMap<EventSpec, Transition>();
+    Map<Spec, Integer> transitions = new HashMap<Spec, Integer>();
 
     private State(int state, Block block) {
       this.state = state;
       this.block = block;
     }
 
-    State(int state, Spec spec, Block block) {
-      this(state, block);
-      this.spec = spec;
+    void addTransition(Spec spec, int nextState) {
+      transitions.put(spec, nextState);
     }
 
     Transition onEvent(EventSpec receivedSpec) {
-      Transition transition = spec.getTransition(receivedSpec, state);
+      Transition transition = null;
+
+      for (Spec spec : transitions.keySet()) {
+        boolean matched = spec.match(receivedSpec);
+        if (matched) {
+          if (spec instanceof MultiEventSpec) {
+            MultiEventSpec mSpec = (MultiEventSpec) spec;
+            int nextState = state;
+            if (mSpec.isComplete()) {
+              nextState = transitions.get(spec);
+            }
+            transition = new Transition(receivedSpec, Action.DROP, nextState);
+          } else {
+            transition = new Transition(receivedSpec, Action.HANDLE, transitions.get(spec));
+          }
+          break;
+        }
+      }
+
       if (transition == null) {
         transition = block.getTransition(state, receivedSpec);
       }
@@ -157,9 +176,22 @@ class StateTable {
       return transition;
     }
 
+    @Override
     public String toString() {
-      return "( " + spec + " ) " +
-              Action.HANDLE + " " + (state + 1);
+      StringBuilder sb = new StringBuilder("[");
+      sb.append(state).append(" {");
+      boolean first = true;
+      for (Spec spec : transitions.keySet()) {
+        if (!first) {
+          sb.append(",");
+        } else {
+          first = false;
+        }
+        sb.append(spec).append(" -> ")
+          .append(transitions.get(spec));
+      }
+      sb.append("}]");
+      return sb.toString();
     }
   }
 
