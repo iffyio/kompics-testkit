@@ -290,6 +290,11 @@ public class TestContext<T extends ComponentDefinition> {
     return fsm.getFinalState();
   }
 
+  public TestContext<T> setTimeout(long timeoutMS) {
+    proxy.eventQueue.setTimeout(timeoutMS);
+    return this;
+  }
+
   public int check() {
     if (checked) {
       throw new IllegalStateException("test has previously been run");

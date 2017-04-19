@@ -153,6 +153,7 @@ public class UnorderedEventsTest {
 
   @Test
   public void ExpectWithinMultipleBlockTest() {
+    tc.setTimeout(Ponger.timeout);
     connectTimers();
     initExpectWithinBlock();
     tc.body().
@@ -175,6 +176,7 @@ public class UnorderedEventsTest {
 
   public static class Ponger extends ComponentDefinition {
 
+    private static long timeout = 10;
     private Random random = new Random(System.nanoTime());
     private Positive<Timer> timer = requires(Timer.class);
     private Negative<PingPongPort> ppPort = provides(PingPongPort.class);
@@ -199,7 +201,7 @@ public class UnorderedEventsTest {
     };
 
     private void setTimer() {
-      long delay = random.nextInt(10);
+      long delay = random.nextInt((int) timeout);
       ScheduleTimeout st = new ScheduleTimeout(delay);
       RandomTimeout timeout = new RandomTimeout(st);
       st.setTimeoutEvent(timeout);

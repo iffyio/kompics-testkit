@@ -283,10 +283,7 @@ class FSM<T extends ComponentDefinition> {
       if (expectingAnEvent()) {
         table.printExpectedEventAt(currentState);
         String expected = table.getExpectedSpecAt(currentState);
-
-        EventSpec received = removeEventFromQueue();
-        StateTable.Transition transition = table.lookup(currentState, received);
-        updateState(expected, received, transition);
+        handleNextEvent(expected, null);
       }
     }
     runFinalState();
@@ -471,17 +468,11 @@ class FSM<T extends ComponentDefinition> {
     if (block == null) { // not end of block
       return false;
     }
-
     logger.debug("{}: end({})\t", currentState, block.times);
 
     while (block.hasPendingEvents()) {
       logger.debug("{}: Awaiting events {}", currentState, block.status());
-      EventSpec receivedSpec = removeEventFromQueue();
-      logger.debug("{}: Received ({})", currentState, receivedSpec);
-
-      // match event
-      StateTable.Transition transition = table.lookup(currentState, receivedSpec, block);
-      if (!updateState(block.status(), receivedSpec, transition)) {
+      if (!handleNextEvent(block.status(), block)) {
         return true;
       }
     }
@@ -493,6 +484,22 @@ class FSM<T extends ComponentDefinition> {
       gotoNextState();
     }
     return true;
+  }
+
+  private boolean handleNextEvent(String expected, Block block) {
+    EventSpec received = removeEventFromQueue();
+    if (received == null) {
+      gotoErrorState("timed-out expecting " + expected);
+      return false;
+    }
+    logger.debug("{}: Received ({})", currentState, received);
+    StateTable.Transition transition;
+    if (block == null) {
+      transition = table.lookup(currentState, received);
+    } else {
+      transition = table.lookup(currentState, received, block);
+    }
+    return updateState(expected, received, transition);
   }
 
   private void runStartState() {

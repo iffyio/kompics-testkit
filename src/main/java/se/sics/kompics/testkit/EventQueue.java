@@ -1,24 +1,31 @@
 package se.sics.kompics.testkit;
 
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 class EventQueue {
 
-  private final ConcurrentLinkedQueue<EventSpec> q = new ConcurrentLinkedQueue<EventSpec>();
+  private long timeoutMS = 1000;
+  private final BlockingQueue<EventSpec> q = new LinkedBlockingQueue<EventSpec>();
 
-  synchronized void offer(EventSpec event) {
-    q.offer(event);
-    this.notifyAll();
+  void setTimeout(long timeout) {
+    if (timeout < 0) {
+      throw new IllegalStateException("Negative timeout");
+    }
+    this.timeoutMS = timeout;
   }
 
-  synchronized EventSpec poll() {
-    while (q.peek() == null) {
-      try {
-        this.wait();
-      } catch (InterruptedException e) {
-        throw new RuntimeException(e);
-      }
+  void offer(EventSpec event) {
+    q.offer(event);
+  }
+
+  EventSpec poll() {
+    try {
+      return q.poll(timeoutMS, TimeUnit.MILLISECONDS);
+    } catch (InterruptedException e) {
+      e.printStackTrace();
+      return null;
     }
-    return q.poll();
   }
 }

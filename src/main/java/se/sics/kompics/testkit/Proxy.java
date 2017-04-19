@@ -16,7 +16,7 @@ import java.util.Map;
 
 class Proxy<T extends ComponentDefinition> extends ComponentDefinition{
 
-  private final EventQueue eventQueue = new EventQueue();
+  final EventQueue eventQueue = new EventQueue();
 
   private T definitionUnderTest;
   private PortConfig portConfig;
