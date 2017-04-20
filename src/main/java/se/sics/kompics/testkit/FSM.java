@@ -196,7 +196,7 @@ class FSM<T extends ComponentDefinition> {
     currentConditional.end();
     if (currentConditional.isMain()) {
       currentBlock.mode = Block.MODE.BODY;
-      currentState = currentConditional.resolve(currentState, table, currentBlock, NullSpec);
+      currentState = currentConditional.resolve(currentState, table, currentBlock);
     } else {
       currentConditional = currentConditional.parent;
     }
@@ -527,27 +527,36 @@ class FSM<T extends ComponentDefinition> {
   private boolean handleNextEvent(String expected, Block block) {
     EventSpec received = removeEventFromQueue();
     StateTable.Transition transition;
+
+    // if no event received, try e-transition for state
     if (received == null) {
-      received = NullSpec;
+      received = EventSpec.EPSILON;
     }
     logger.debug("{}: Received ({})", currentState, received);
-/*    if (received == null) {
-      transition = table.lookup(currentState, NullSpec);
-      if (transition == null) {
-        gotoErrorState("timed-out expecting " + expected);
-        return false;
-      } else {
-        return true;
-      }
-    }*/
+
+    // use block for lookup if given
     if (block == null) {
       transition = table.lookup(currentState, received);
-      //if (tra)
     } else {
       transition = table.lookup(currentState, received, block);
     }
+
+    // if transition not found for normal event, try any e-transitions before failing
+    if (received != EventSpec.EPSILON) {
+      // take e-transition to next state and lookup event
+      while (transition == null) {
+        transition = table.lookup(currentState, EventSpec.EPSILON);
+        if (transition != null) {
+          currentState = transition.nextState;
+          transition = table.lookup(currentState, received);
+        } else {
+          break;
+        }
+      }
+    }
+
     logger.debug("Transition = {}", transition);
-    if (transition == null && received == NullSpec) {
+    if (transition == null && received == EventSpec.EPSILON) {
         gotoErrorState("timed-out expecting " + expected);
         return false;
     }
@@ -642,6 +651,7 @@ class FSM<T extends ComponentDefinition> {
       port.doTrigger(event, 0, port.getOwner());
     }
 
+    @Override
     public String toString() {
       return event.toString();
     }
@@ -660,34 +670,4 @@ class FSM<T extends ComponentDefinition> {
       comparators.put(eventType, comparator);
     }
   }
-
-  private static class NullEventSpec extends EventSpec {
-    static class Foo implements KompicsEvent{}
-    <E extends KompicsEvent> NullEventSpec() {
-      super(new Foo(), null, null, null);
-    }
-    @Override
-    public boolean match(EventSpec receivedSpec) {
-      return receivedSpec == NullSpec;
-    }
-
-    @Override
-    public int hashCode() {
-      return System.identityHashCode(this);
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      return this == o;
-    }
-
-    @Override
-    public String toString() {
-      return "NULL EVENT";
-    }
-    @Override
-    void handle() {
-    }
-  }
-  static final NullEventSpec NullSpec = new NullEventSpec();
 }

@@ -93,4 +93,29 @@ class EventSpec implements SingleEventSpec{
   public String toString() {
     return direction + " " + event;
   }
+
+  static final EventSpec EPSILON = new EventSpec(new KompicsEvent() { }, null, null, null) {
+    @Override
+    public boolean match(EventSpec receivedSpec) {
+      return this == receivedSpec;
+    }
+
+    @Override
+    public int hashCode() {
+      return System.identityHashCode(this);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      return this == o;
+    }
+
+    @Override
+    public String toString() {
+      return "EPSILON";
+    }
+
+    @Override
+    void handle() { }
+  };
 }

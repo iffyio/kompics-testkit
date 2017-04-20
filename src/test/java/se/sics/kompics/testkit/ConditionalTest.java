@@ -3,7 +3,6 @@ package se.sics.kompics.testkit;
 import org.junit.Test;
 import se.sics.kompics.Component;
 import se.sics.kompics.ComponentDefinition;
-import se.sics.kompics.Handler;
 import se.sics.kompics.Init;
 import se.sics.kompics.Negative;
 import se.sics.kompics.PortType;
@@ -123,6 +122,78 @@ public class ConditionalTest {
     nestedExpect();
   }
 
+  @Test
+  public void nestedEither4() {
+    tc
+        .body()
+        .trigger(pong(0), pongerPort.getPair())
+        .trigger(pong(1), pongerPort.getPair())
+        .trigger(pong(2), pongerPort.getPair())
+        .trigger(pong(3), pongerPort.getPair())
+        .trigger(ping(11), pingerPort.getPair())
+        .trigger(ping(6), pingerPort.getPair());
+
+    nestedExpect();
+  }
+
+  @Test
+  public void nestedOrTest1() {
+    tc
+        .body()
+        .trigger(pong(0), pongerPort.getPair())
+        .trigger(pong(1), pongerPort.getPair())
+        .trigger(pong(2), pongerPort.getPair())
+        .trigger(ping(3), pingerPort.getPair())
+        .trigger(pong(5), pongerPort.getPair())
+        .trigger(pong(6), pongerPort.getPair())
+        .trigger(ping(6), pingerPort.getPair());
+
+    nestedExpect();
+  }
+
+  @Test
+  public void nestedOrTest2() {
+    tc
+        .body()
+        .trigger(pong(0), pongerPort.getPair())
+        .trigger(pong(1), pongerPort.getPair())
+        .trigger(pong(2), pongerPort.getPair())
+        .trigger(ping(3), pingerPort.getPair())
+        .trigger(ping(4), pingerPort.getPair())
+        .trigger(pong(6), pongerPort.getPair())
+        .trigger(ping(6), pingerPort.getPair());
+
+    nestedExpect();
+  }
+
+  @Test
+  public void nestedOrTest3() {
+    tc
+        .body()
+        .trigger(pong(0), pongerPort.getPair())
+        .trigger(pong(1), pongerPort.getPair())
+        .trigger(pong(2), pongerPort.getPair())
+        .trigger(ping(5), pingerPort.getPair())
+        .trigger(pong(6), pongerPort.getPair())
+        .trigger(ping(6), pingerPort.getPair());
+
+    nestedExpect();
+  }
+
+  @Test
+  public void nestedOrTest4() {
+    tc
+        .body()
+        .trigger(pong(0), pongerPort.getPair())
+        .trigger(pong(1), pongerPort.getPair())
+        .trigger(pong(2), pongerPort.getPair())
+        .trigger(ping(6), pingerPort.getPair())
+        .trigger(pong(6), pongerPort.getPair())
+        .trigger(ping(6), pingerPort.getPair());
+
+    nestedExpect();
+  }
+
   private void nestedExpect() {
     tc.expect(pong(0), pingerPort, INCOMING);
 
@@ -142,12 +213,21 @@ public class ConditionalTest {
         .end()
     .or()
         .expect(pong(1), pingerPort, INCOMING)
-        .expect(ping(2), pingerPort, OUTGOING)
+        .expect(pong(2), pingerPort, INCOMING)
         .either()
-            .expect(ping(3), pingerPort, OUTGOING)
+            .either()
+                .expect(ping(3), pingerPort, OUTGOING)
+                .expect(pong(5), pingerPort, INCOMING)
+            .or()
+                .expect(ping(3), pingerPort, OUTGOING)
+                .expect(ping(4), pingerPort, OUTGOING)
+            .end()
         .or()
-            .expect(ping(5), pingerPort, OUTGOING)
-            .expect(ping(6), pingerPort, OUTGOING)
+            .either()
+                .expect(ping(5), pingerPort, OUTGOING)
+            .or()
+                .expect(ping(6), pingerPort, OUTGOING)
+            .end()
         .end()
         .expect(pong(6), pingerPort, INCOMING)
     .end();
@@ -158,7 +238,7 @@ public class ConditionalTest {
   }
 
   @Test
-  public void foo() {
+  public void basicNestedLoopTest() {
 
     tc.body();
     tc.trigger(pong(3), pongerPort.getPair())

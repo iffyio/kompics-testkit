@@ -79,13 +79,12 @@ class Conditional {
     inEitherBlock = false;
   }
 
-  int resolve(int startStateNum, StateTable table, Block block, Spec nullSpec) {
+  int resolve(int startStateNum, StateTable table, Block block) {
     if (!isMain()) {
-      return main.resolve(startStateNum, table, block, nullSpec);
+      return main.resolve(startStateNum, table, block);
     } else {
-      Testkit.logger.error("resolving...");
-      Statement finalStmt = new Statement(nextid(), nullSpec);
-      finalStmt.addTransition(nullSpec, finalStmt);
+      Statement finalStmt = new Statement(nextid(), EventSpec.EPSILON);
+      finalStmt.addTransition(EventSpec.EPSILON, finalStmt);
       resolve(finalStmt);
       return convert(startStateNum, table, block);
     }
@@ -98,12 +97,11 @@ class Conditional {
     stateMap.put(firstStmt, nextAvailState++);
     stateMap.put(finalStmt, startState + numMergedStates); // return final state id is next available state
     LinkedList<Statement> pending = new LinkedList<Statement>(Collections.singletonList(firstStmt));
-    HashSet<Statement> visited = new HashSet<Statement>();
+    HashSet<Statement> visited = new HashSet<Statement>(Collections.singletonList(finalStmt));
 
     while (!pending.isEmpty()) {
       Statement currentStmt = pending.removeFirst();
       visited.add(currentStmt);
-      visited.add(finalStmt);
       int currentState = stateMap.get(currentStmt);
       for (Map.Entry<Spec, Statement> entry : currentStmt.transitions.entrySet()) {
         Spec spec = entry.getKey();
@@ -251,14 +249,7 @@ class Conditional {
       id = new ID(number);
       globalStmts.put(id, this);
       this.spec = spec;
-      assert number != 6;
     }
-
-/*
-    private void setSpec(Spec spec) {
-      this.spec = spec;
-    }
-*/
 
     private Statement getNextStateOn(Spec spec) {
       return transitions.get(spec);
@@ -266,14 +257,6 @@ class Conditional {
 
     @Override
     public String toString() {
-/*      StringBuilder sb = new StringBuilder(id.toString());
-      sb.append(" [");
-      for (Spec spec : transitions.keySet()) {
-        sb.append(spec).append(" -> ")
-            .append(transitions.get(spec).id).append(" ");
-      }
-      sb.append("]");
-      return sb.toString();*/
       return id.toString();
     }
 
