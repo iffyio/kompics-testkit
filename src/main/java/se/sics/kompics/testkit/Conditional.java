@@ -1,5 +1,8 @@
 package se.sics.kompics.testkit;
 
+import com.google.common.base.Predicate;
+import se.sics.kompics.ComponentDefinition;
+
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -54,17 +57,19 @@ class Conditional {
   void addChild(Spec eventSpec) {
     Statement stmt = new Statement(main.nextid(), eventSpec);
     stmts.put(index++, stmt);
-
-    if (inEitherBlock) {
-      numEitherItems++;
-    } else {
-      numOrItems++;
-    }
+    incrementItems();
   }
 
   void addChild(Conditional child) {
     conditionals.put(index++, child);
+    incrementItems();
+  }
 
+  <T extends ComponentDefinition> void addChild(Predicate<T> inspectPredicate) {
+
+  }
+
+  private void incrementItems() {
     if (inEitherBlock) {
       numEitherItems++;
     } else {
@@ -169,8 +174,8 @@ class Conditional {
       Statement currentStmt = pending.removeFirst();
       visited.add(currentStmt);
 
+      HashSet<Statement> reachable = new HashSet<Statement>();
       for (Spec spec : input) {
-        HashSet<Statement> reachable = new HashSet<Statement>();
         for (Statement child : currentStmt.children) {
           Statement r = child.getNextStateOn(spec);
           if (r != null) {
@@ -188,6 +193,7 @@ class Conditional {
             pending.add(nextStmt);
           }
         }
+        reachable.clear();
       }
     }
 

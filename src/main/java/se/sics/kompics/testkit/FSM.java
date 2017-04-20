@@ -275,9 +275,14 @@ class FSM<T extends ComponentDefinition> {
     incrementState();
   }
 
-  void addAssertComponent(Predicate<T> assertPred) {
-    componentPredicates.put(currentState, assertPred);
-    incrementState();
+  void inspect(Predicate<T> inspectPredicate) {
+    if (currentBlock.mode == CONDITIONAL) {
+      currentConditional.addChild(inspectPredicate);
+    } else {
+      checkInBodyMode();
+      componentPredicates.put(currentState, inspectPredicate);
+      incrementState();
+    }
   }
 
   <E extends KompicsEvent> void addComparator(

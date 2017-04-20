@@ -278,7 +278,7 @@ public class TestContext<T extends ComponentDefinition> {
   public TestContext<T> inspect(
           Predicate<T> assertPred) {
     Testkit.checkNotNull(assertPred);
-    fsm.addAssertComponent(assertPred);
+    fsm.inspect(assertPred);
     return this;
   }
 
