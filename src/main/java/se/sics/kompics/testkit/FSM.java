@@ -25,6 +25,9 @@ import se.sics.kompics.Port;
 import se.sics.kompics.KompicsEvent;
 import se.sics.kompics.Start;
 
+import static se.sics.kompics.testkit.Block.MODE;
+import static se.sics.kompics.testkit.Block.MODE.*;
+
 class FSM<T extends ComponentDefinition> {
   static final Logger logger = Testkit.logger;
 
@@ -92,7 +95,7 @@ class FSM<T extends ComponentDefinition> {
   <P extends PortType> void expectMessage(
           KompicsEvent event, Port<P> port, Direction direction) {
     EventSpec eventSpec = newEventSpec(event, port, direction);
-    if (currentBlock.mode == Block.MODE.CONDITIONAL) {
+    if (currentBlock.mode == CONDITIONAL) {
       currentConditional.addChild(eventSpec);
     } else {
       registerSpec(eventSpec);
@@ -120,14 +123,24 @@ class FSM<T extends ComponentDefinition> {
   }
 
   void setUnorderedMode() {
-    checkInBodyMode();
-    currentBlock.mode = Block.MODE.UNORDERED;
+    if (currentBlock.mode == CONDITIONAL) {
+      currentBlock.previousMode = CONDITIONAL;
+    } else {
+      checkInBodyMode();
+      currentBlock.previousMode = BODY;
+    }
+    currentBlock.mode = UNORDERED;
     expectUnordered = new ArrayList<SingleEventSpec>();
   }
 
   void setExpectWithMapperMode() {
-    checkInBodyMode();
-    currentBlock.mode = Block.MODE.EXPECT_MAPPER;
+    if (currentBlock.mode == CONDITIONAL) {
+      currentBlock.previousMode = CONDITIONAL;
+    } else {
+      checkInBodyMode();
+      currentBlock.previousMode = BODY;
+    }
+    currentBlock.mode = EXPECT_MAPPER;
     expectMapper = new ExpectMapper(proxyComponent);
   }
 
@@ -151,8 +164,13 @@ class FSM<T extends ComponentDefinition> {
   }
 
   void setExpectWithFutureMode() {
-    checkInBodyMode();
-    currentBlock.mode = Block.MODE.EXPECT_FUTURE;
+    if (currentBlock.mode == CONDITIONAL) {
+      currentBlock.previousMode = CONDITIONAL;
+    } else {
+      checkInBodyMode();
+      currentBlock.previousMode = BODY;
+    }
+    currentBlock.mode = EXPECT_FUTURE;
     expectFuture = new ExpectFuture(proxyComponent);
   }
 
@@ -171,16 +189,15 @@ class FSM<T extends ComponentDefinition> {
   void addTrigger(KompicsEvent event, Port<? extends PortType> port) {
     checkInBodyMode();
     triggeredEvents.put(currentState, new Trigger(event, port));
-    gotoNextState();
+    incrementState();
   }
 
-
   void either() {
-    if (currentBlock.mode == Block.MODE.BODY) {
+    if (currentBlock.mode == BODY) {
       currentConditional = new Conditional(null);
-      currentBlock.mode = Block.MODE.CONDITIONAL;
+      currentBlock.mode = CONDITIONAL;
     } else {
-      checkMode(Block.MODE.CONDITIONAL);
+      checkMode(CONDITIONAL);
       Conditional child = new Conditional(currentConditional);
       currentConditional.addChild(child);
       currentConditional = child;
@@ -188,14 +205,14 @@ class FSM<T extends ComponentDefinition> {
   }
 
   void or() {
-    checkMode(Block.MODE.CONDITIONAL);
+    checkMode(CONDITIONAL);
     currentConditional.or();
   }
 
   private void endConditional() {
     currentConditional.end();
     if (currentConditional.isMain()) {
-      currentBlock.mode = Block.MODE.BODY;
+      currentBlock.mode = BODY;
       currentState = currentConditional.resolve(currentState, table, currentBlock);
     } else {
       currentConditional = currentConditional.parent;
@@ -214,11 +231,11 @@ class FSM<T extends ComponentDefinition> {
 
   void body() {
     checkInHeaderMode();
-    currentBlock.mode = Block.MODE.BODY;
+    currentBlock.mode = BODY;
   }
 
   void end() {
-    Block.MODE mode = currentBlock.mode;
+    MODE mode = currentBlock.mode;
     switch (mode) {
       case UNORDERED:
         endUnorderedMode();
@@ -247,7 +264,7 @@ class FSM<T extends ComponentDefinition> {
     checkInBodyMode();
     checkExpectedFaultHasMatchingClause();
     expectedFaults.put(currentState, new ExpectedFault(exceptionType, resolveAction));
-    gotoNextState();
+    incrementState();
   }
 
   void addExpectedFault(
@@ -255,12 +272,12 @@ class FSM<T extends ComponentDefinition> {
     checkInBodyMode();
     checkExpectedFaultHasMatchingClause();
     expectedFaults.put(currentState, new ExpectedFault(exceptionPredicate, resolveAction));
-    gotoNextState();
+    incrementState();
   }
 
   void addAssertComponent(Predicate<T> assertPred) {
     componentPredicates.put(currentState, assertPred);
-    gotoNextState();
+    incrementState();
   }
 
   <E extends KompicsEvent> void addComparator(
@@ -328,48 +345,55 @@ class FSM<T extends ComponentDefinition> {
 
   // // TODO: 3/31/17 only allow in body, unordered mode
   private void registerSpec(SingleEventSpec spec) {
-    if (currentBlock.mode == Block.MODE.UNORDERED) {
+    if (currentBlock.mode == UNORDERED) {
       expectUnordered.add(spec);
     } else {
       checkInBodyMode();
       table.addTransition(currentState, currentState + 1, spec, currentBlock);
-      gotoNextState();
+      incrementState();
     }
   }
 
   private void endUnorderedMode() {
-    currentBlock.mode = Block.MODE.BODY;
     if (expectUnordered.isEmpty()) {
       throw new IllegalStateException("No events were specified in unordered mode");
     }
 
-    table.addTransition(currentState, currentState + 1,
-        new UnorderedSpec(expectUnordered), currentBlock);
-    gotoNextState();
+    UnorderedSpec spec = new UnorderedSpec(expectUnordered);
+    if (currentBlock.previousMode == BODY) {
+      table.addTransition(currentState, currentState + 1,
+          spec, currentBlock);
+      incrementState();
+    } else {
+      assert currentBlock.previousMode == CONDITIONAL;
+      currentConditional.addChild(spec);
+    }
+    currentBlock.mode = currentBlock.previousMode;
   }
 
-  private void endExpect(Block.MODE mode) {
-    currentBlock.mode = Block.MODE.BODY;
-    Spec expected;
+  private void endExpect(MODE mode) {
+    Spec spec;
     boolean emptySpec;
-    switch (mode) {
-      case EXPECT_FUTURE:
-        expected = expectFuture;
-        emptySpec = expectFuture.expected.isEmpty();
-        break;
-      case EXPECT_MAPPER:
-        expected = expectMapper;
-        emptySpec = expectMapper.expected.isEmpty();
-        break;
-      default:
-        throw new IllegalStateException(String.format("Expected [%s] or [%s] mode",
-                Block.MODE.EXPECT_FUTURE, Block.MODE.EXPECT_MAPPER));
+    if (mode == EXPECT_FUTURE) {
+      spec = expectFuture;
+      emptySpec = expectFuture.expected.isEmpty();
+    } else if (mode == EXPECT_MAPPER) {
+      spec = expectMapper;
+      emptySpec = expectMapper.expected.isEmpty();
+    } else {
+      throw new IllegalStateException(String.format("Expected [%s] or [%s] mode",
+          EXPECT_FUTURE, EXPECT_MAPPER));
     }
     if (emptySpec) {
       throw new IllegalStateException("No events were specified in " + mode + " mode");
     }
-    table.addTransition(currentState, currentState + 1, expected, currentBlock);
-    gotoNextState();
+    if (currentBlock.previousMode == CONDITIONAL) {
+      currentConditional.addChild(spec);
+    } else {
+      table.addTransition(currentState, currentState + 1, spec, currentBlock);
+      incrementState();
+    }
+    currentBlock.mode = currentBlock.previousMode;
   }
 
   private void endBlock() {
@@ -379,8 +403,11 @@ class FSM<T extends ComponentDefinition> {
     }
 
     blockEnd.put(currentState, currentBlock);
-    restorePreviousBlock();
-    gotoNextState();
+    // restore previous block
+    if (!balancedBlock.isEmpty()) {
+      currentBlock = balancedBlock.pop().previousBlock;
+    }
+    incrementState();
   }
 
   private void enterNewBlock(Block block) {
@@ -392,13 +419,7 @@ class FSM<T extends ComponentDefinition> {
     currentBlock = block;
     balancedBlock.push(currentBlock);
     blockStart.put(currentState, block);
-    gotoNextState();
-  }
-
-  private void restorePreviousBlock() {
-    if (!balancedBlock.isEmpty()) {
-      currentBlock = balancedBlock.pop().previousBlock;
-    }
+    incrementState();
   }
 
   private void addFinalState() {
@@ -454,7 +475,7 @@ class FSM<T extends ComponentDefinition> {
     if (!successful) {
       gotoErrorState("Component assertion failed");
     } else {
-      gotoNextState();
+      incrementState();
     }
     return true;
   }
@@ -471,7 +492,7 @@ class FSM<T extends ComponentDefinition> {
 
     if (result.succeeded) {
       logger.debug(assertMessage);
-      gotoNextState();
+      incrementState();
     } else {
       gotoErrorState(assertMessage);
     }
@@ -485,7 +506,7 @@ class FSM<T extends ComponentDefinition> {
     }
     logger.debug("{}: triggeredAnEvent({})\t", currentState, trigger);
     trigger.doTrigger();
-    gotoNextState();
+    incrementState();
     return true;
   }
 
@@ -496,7 +517,7 @@ class FSM<T extends ComponentDefinition> {
     } else {
       block.initialize();
       logger.debug("{}: repeat({})\t", currentState, block.getCurrentCount());
-      gotoNextState();
+      incrementState();
       return true;
     }
   }
@@ -519,7 +540,7 @@ class FSM<T extends ComponentDefinition> {
     if (block.hasMoreIterations()) {
       currentState = block.indexOfFirstState();
     } else {
-      gotoNextState();
+      incrementState();
     }
     return true;
   }
@@ -581,7 +602,7 @@ class FSM<T extends ComponentDefinition> {
     }
   }
 
-  private void checkMode(Block.MODE mode) {
+  private void checkMode(MODE mode) {
     if (currentBlock != null && currentBlock.mode != mode) {
       throw new IllegalStateException(String.format("Expected mode [%s], Actual mode [%s]",
                       mode, currentBlock.mode));
@@ -592,22 +613,22 @@ class FSM<T extends ComponentDefinition> {
     if (currentBlock == null) {
       return;
     }
-    checkMode(Block.MODE.BODY);
+    checkMode(BODY);
   }
 
   private void checkInHeaderMode() {
-    checkMode(Block.MODE.HEADER);
+    checkMode(HEADER);
   }
 
   private void checkInExpectMapperMode() {
-    checkMode(Block.MODE.EXPECT_MAPPER);
+    checkMode(EXPECT_MAPPER);
   }
 
   private void checkInExpectFutureMode() {
-    checkMode(Block.MODE.EXPECT_FUTURE);
+    checkMode(EXPECT_FUTURE);
   }
 
-  private void gotoNextState() {
+  private void incrementState() {
     currentState++;
   }
   

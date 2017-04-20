@@ -51,7 +51,7 @@ class Conditional {
     return isMain()? stateIDs++ : main.nextid();
   }
 
-  void addChild(EventSpec eventSpec) {
+  void addChild(Spec eventSpec) {
     Statement stmt = new Statement(main.nextid(), eventSpec);
     stmts.put(index++, stmt);
 

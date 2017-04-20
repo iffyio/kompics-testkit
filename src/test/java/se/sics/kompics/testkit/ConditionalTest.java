@@ -1,5 +1,6 @@
 package se.sics.kompics.testkit;
 
+import com.google.common.base.Function;
 import org.junit.Test;
 import se.sics.kompics.Component;
 import se.sics.kompics.ComponentDefinition;
@@ -30,8 +31,7 @@ public class ConditionalTest {
 
   @Test
   public void basicEitherTest() {
-    tc
-        .body()
+    tc.body().repeat(10).body()
         .trigger(pong(0), pongerPort.getPair())
         .trigger(pong(1), pongerPort.getPair())
         .trigger(pong(2), pongerPort.getPair())
@@ -44,8 +44,7 @@ public class ConditionalTest {
 
   @Test
   public void basicOrTest() {
-    tc
-        .body()
+    tc.body().repeat(10).body()
         .trigger(pong(0), pongerPort.getPair())
         .trigger(pong(1), pongerPort.getPair())
         .trigger(ping(2), pingerPort.getPair())
@@ -75,15 +74,14 @@ public class ConditionalTest {
         .expect(pong(1), pingerPort, INCOMING)
     .end();
 
-    tc.expect(ping(6), pingerPort, OUTGOING);
+    tc.expect(ping(6), pingerPort, OUTGOING).end(); // end repeat
 
     assertEquals(tc.check(), tc.getFinalState());
   }
 
   @Test
   public void nestedEither1() {
-    tc
-        .body()
+    tc.body().repeat(10).body()
         .trigger(pong(0), pongerPort.getPair())
         .trigger(pong(1), pongerPort.getPair())
         .trigger(pong(2), pongerPort.getPair())
@@ -97,8 +95,7 @@ public class ConditionalTest {
 
   @Test
   public void nestedEither2() {
-    tc
-        .body()
+    tc.body().repeat(10).body()
         .trigger(pong(0), pongerPort.getPair())
         .trigger(pong(1), pongerPort.getPair())
         .trigger(pong(2), pongerPort.getPair())
@@ -111,8 +108,7 @@ public class ConditionalTest {
 
   @Test
   public void nestedEither3() {
-    tc
-        .body()
+    tc.body().repeat(10).body()
         .trigger(pong(0), pongerPort.getPair())
         .trigger(pong(1), pongerPort.getPair())
         .trigger(pong(2), pongerPort.getPair())
@@ -124,8 +120,7 @@ public class ConditionalTest {
 
   @Test
   public void nestedEither4() {
-    tc
-        .body()
+    tc.body().repeat(10).body()
         .trigger(pong(0), pongerPort.getPair())
         .trigger(pong(1), pongerPort.getPair())
         .trigger(pong(2), pongerPort.getPair())
@@ -138,8 +133,7 @@ public class ConditionalTest {
 
   @Test
   public void nestedOrTest1() {
-    tc
-        .body()
+    tc.body().repeat(10).body()
         .trigger(pong(0), pongerPort.getPair())
         .trigger(pong(1), pongerPort.getPair())
         .trigger(pong(2), pongerPort.getPair())
@@ -153,8 +147,7 @@ public class ConditionalTest {
 
   @Test
   public void nestedOrTest2() {
-    tc
-        .body()
+    tc.body().repeat(10).body()
         .trigger(pong(0), pongerPort.getPair())
         .trigger(pong(1), pongerPort.getPair())
         .trigger(pong(2), pongerPort.getPair())
@@ -168,8 +161,7 @@ public class ConditionalTest {
 
   @Test
   public void nestedOrTest3() {
-    tc
-        .body()
+    tc.body().repeat(10).body()
         .trigger(pong(0), pongerPort.getPair())
         .trigger(pong(1), pongerPort.getPair())
         .trigger(pong(2), pongerPort.getPair())
@@ -182,8 +174,7 @@ public class ConditionalTest {
 
   @Test
   public void nestedOrTest4() {
-    tc
-        .body()
+    tc.body().repeat(10).body()
         .trigger(pong(0), pongerPort.getPair())
         .trigger(pong(1), pongerPort.getPair())
         .trigger(pong(2), pongerPort.getPair())
@@ -232,7 +223,7 @@ public class ConditionalTest {
         .expect(pong(6), pingerPort, INCOMING)
     .end();
 
-    tc.expect(ping(6), pingerPort, OUTGOING);
+    tc.expect(ping(6), pingerPort, OUTGOING).end(); // end repeat
 
     assertEquals(tc.check(), tc.getFinalState());
   }
@@ -241,22 +232,157 @@ public class ConditionalTest {
   public void basicNestedLoopTest() {
 
     tc.body();
-    tc.trigger(pong(3), pongerPort.getPair())
+    tc.trigger(pong(3), pongerPort.getPair());
 
+    tc.either()
+        .expect(pong(3), pingerPort, INCOMING)
         .either()
-            .expect(pong(3), pingerPort, INCOMING)
-            .either()
-                .expect(pong(9), pingerPort, INCOMING)
-                .expect(ping(10), pingerPort, OUTGOING)
-            .or()
-                .expect(ping(11), pingerPort, OUTGOING)
-            .end()
+            .expect(pong(9), pingerPort, INCOMING)
+            .expect(ping(10), pingerPort, OUTGOING)
         .or()
-            .expect(pong(3), pingerPort, INCOMING)
-        .end();
+            .expect(ping(11), pingerPort, OUTGOING)
+        .end()
+    .or()
+        .expect(pong(3), pingerPort, INCOMING)
+    .end();
+    assertEquals(tc.check(), tc.getFinalState());
+  }
+
+  @Test
+  public void conditionalUnorderedEitherTest() {
+    tc.body().repeat(10).body()
+        .trigger(pong(2), pongerPort.getPair())
+        .trigger(pong(1), pongerPort.getPair())
+        .trigger(ping(6), pingerPort.getPair())
+        .trigger(pong(4), pongerPort.getPair())
+        .trigger(ping(5), pingerPort.getPair())
+        .trigger(pong(1), pongerPort.getPair())
+        .trigger(pong(2), pongerPort.getPair());
+
+    conditionalUnorderedTest();
+  }
+
+  @Test
+  public void conditionalUnorderedOrTest() {
+    tc.body().repeat(10).body()
+        .trigger(pong(2), pongerPort.getPair())
+        .trigger(pong(1), pongerPort.getPair())
+        .trigger(ping(1), pingerPort.getPair())
+        .trigger(pong(2), pongerPort.getPair())
+        .trigger(ping(3), pingerPort.getPair())
+        .trigger(pong(2), pongerPort.getPair());
+
+    conditionalUnorderedTest();
+  }
+
+  private void conditionalUnorderedTest() {
+    tc.expect(pong(2), pingerPort, INCOMING);
+    tc.either()
+        .expect(pong(1), pingerPort, INCOMING)
+        .unordered()
+            .expect(pong(4), pingerPort, INCOMING)
+            .expect(ping(5), pingerPort, OUTGOING)
+            .expect(ping(6), pingerPort, OUTGOING)
+        .end()
+        .expect(pong(1), pingerPort, INCOMING)
+    .or()
+        .expect(pong(1), pingerPort, INCOMING)
+        .unordered()
+            .expect(ping(3), pingerPort, OUTGOING)
+            .expect(ping(1), pingerPort, OUTGOING)
+            .expect(pong(2), pingerPort, INCOMING)
+        .end()
+    .end();
+    tc.expect(pong(2), pingerPort, INCOMING).end(); // end repeat
 
     assertEquals(tc.check(), tc.getFinalState());
   }
+
+  @Test
+  public void conditionalExpectMapperTest() {
+    tc.body();
+    tc
+        .trigger(ping(1), pingerPort.getPair())
+        .trigger(ping(4), pingerPort.getPair())
+        .trigger(ping(2), pingerPort.getPair())
+        .trigger(ping(3), pingerPort.getPair())
+        .trigger(ping(3), pingerPort.getPair())
+        .trigger(ping(5), pingerPort.getPair())
+        .trigger(pong(9), pongerPort.getPair());
+
+    conditionalExpectWithResponse();
+  }
+
+  @Test
+  public void conditionalExpectFutureTest() {
+    tc.body();
+    tc
+        .trigger(ping(1), pingerPort.getPair())
+        .trigger(ping(6), pingerPort.getPair())
+        .trigger(ping(2), pingerPort.getPair())
+        .trigger(ping(3), pingerPort.getPair())
+        .trigger(ping(3), pingerPort.getPair())
+        .trigger(ping(7), pingerPort.getPair())
+        .trigger(pong(9), pongerPort.getPair());
+
+    conditionalExpectWithResponse();
+  }
+
+  private void conditionalExpectWithResponse() {
+
+    tc.expect(ping(1), pingerPort, OUTGOING);
+    tc.either()
+        .expect(ping(4), pingerPort, OUTGOING)
+
+        .expectWithMapper()
+            .setMapperForNext(2, Ping.class, pingPongMapper)
+            .expect(pingerPort, pingerPort)
+            .expect(Ping.class, pingerPort, pingerPort, pingPongMapper)
+            .expect(pingerPort, pingerPort)
+        .end()
+
+        .expect(ping(5), pingerPort, OUTGOING)
+    .or()
+        .expect(ping(6), pingerPort, OUTGOING)
+
+        .expectWithFuture()
+            .expect(Ping.class, pingerPort, future1)
+            .expect(Ping.class, pingerPort, future2)
+            .expect(Ping.class, pingerPort, future3)
+        .end()
+
+        .expect(ping(7), pingerPort, OUTGOING)
+    .end();
+    tc.expect(pong(9), pingerPort, INCOMING);
+
+    assertEquals(tc.check(), tc.getFinalState());
+  }
+
+  private PFuture future1 = new PFuture();
+  private PFuture future2 = new PFuture();
+  private PFuture future3 = new PFuture();
+
+  private class PFuture extends Future<Ping, Pong> {
+    Pong pong;
+
+    @Override
+    public void set(Ping request) {
+      pong = pingPongMapper.apply(request);
+    }
+
+    @Override
+    public Pong get() {
+      return pong;
+    }
+  };
+
+  private Function<Ping, Pong> pingPongMapper = new Function<Ping, Pong>() {
+    @Override
+    public Pong apply(Ping ping) {
+      return new Pong(ping.count);
+    }
+  };
+
 
   public static Ping ping(int i) {
     return new Ping(i);

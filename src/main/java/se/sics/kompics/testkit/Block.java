@@ -18,20 +18,19 @@ class Block {
   private int currentCount;
 
   private BlockInit blockInit, iterationInit;
-  Block previousBlock;
+  final Block previousBlock;
 
   private Set<EventSpec> disallowed;
   private Set<EventSpec> allowed;
   private Set<EventSpec> dropped;
 
   private List<SingleEventSpec> expected = new LinkedList<SingleEventSpec>();
-  //private List<SingleEventSpec> pending = new LinkedList<SingleEventSpec>();
   private Multiset<SingleEventSpec> pending = HashMultiset.create();
-  //private List<SingleEventSpec> received = new LinkedList<SingleEventSpec>();
   private Multiset<SingleEventSpec> received = HashMultiset.create();
 
   enum MODE { HEADER, BODY, UNORDERED, EXPECT_MAPPER, EXPECT_FUTURE, CONDITIONAL}
   MODE mode = MODE.HEADER;
+  MODE previousMode;
 
   Block(Block previousBlock, int times, int startState, BlockInit blockInit) {
     this(previousBlock, times, startState);
@@ -170,16 +169,6 @@ class Block {
       disallowed.remove(eventSpec);
       allowed.remove(eventSpec);
     }
-  }
-
-  Collection<EventSpec> getDisallowedEvents() {
-    return disallowed;
-  }
-  Collection<EventSpec> getAllowedEvents() {
-    return allowed;
-  }
-  Collection<EventSpec> getDroppedEvents() {
-    return dropped;
   }
 
   @Override
