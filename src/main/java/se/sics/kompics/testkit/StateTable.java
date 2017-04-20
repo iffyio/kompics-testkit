@@ -8,6 +8,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
 
+import static se.sics.kompics.testkit.Action.DROP;
+
 class StateTable {
 
   private final Comparator<Class<? extends KompicsEvent>> eventComparator = new Comparator<Class<? extends KompicsEvent>>() {
@@ -32,6 +34,14 @@ class StateTable {
     getState(state, block).addTransition(spec, nextState);
   }
 
+  Transition performInternalTransition(int state) {
+    State stateObj = states.get(state);
+    if (stateObj != null) {
+      return stateObj.performInternalTransition();
+    }
+    return null;
+  }
+
   private State getState(int state, Block block) {
     State stateObj = states.get(state);
     if (stateObj == null) {
@@ -53,7 +63,7 @@ class StateTable {
     return states.get(state).toString();
   }
 
-  boolean isExpectState(int state) {
+  boolean hasState(int state) {
     return states.containsKey(state);
   }
 
@@ -75,11 +85,11 @@ class StateTable {
         Action action = actionFor(event, registeredType);
         switch (action) {
           case HANDLE:
-            return new Transition(eventSpec, Action.HANDLE, state);
+            return new Transition(Action.HANDLE, state);
           case DROP:
-            return new Transition(eventSpec, Action.DROP, state);
+            return new Transition(DROP, state);
           default:
-            return new Transition(eventSpec, Action.FAIL, FSM.ERROR_STATE);
+            return new Transition(Action.FAIL, FSM.ERROR_STATE);
         }
       }
     }
@@ -98,34 +108,23 @@ class StateTable {
   }
 
   static class Transition {
-    final EventSpec eventSpec;
     final Action action;
     final int nextState;
+    final String errorMessage;
 
-    Transition(EventSpec eventSpec, Action action, int nextState) {
-      this.eventSpec = eventSpec;
+    Transition(Action action, int nextState) {
+      this(action, nextState, null);
+    }
+
+    Transition(Action action, int nextState, String errorMessage) {
       this.action = action;
       this.nextState = nextState;
-    }
-
-    // transitions are for same events are equal
-    @Override
-    public boolean equals(Object obj) {
-      if (!(obj instanceof Transition)) {
-        return false;
-      }
-      Transition other = (Transition) obj;
-      return this.eventSpec.equals(other.eventSpec);
-    }
-
-    @Override
-    public int hashCode() {
-      return eventSpec.hashCode();
+      this.errorMessage = errorMessage;
     }
 
     @Override
     public String toString() {
-      return String.format("( %s ) %s %s", eventSpec, action, nextState);
+      return String.format("%s -> %s", action, nextState);
     }
   }
 
@@ -133,6 +132,8 @@ class StateTable {
     private final int state;
     private final Block block;
 
+    boolean isInternalState;
+    InternalEventSpec internalSpec;
     Map<Spec, Integer> transitions = new HashMap<Spec, Integer>();
 
     private State(int state, Block block) {
@@ -142,6 +143,10 @@ class StateTable {
 
     void addTransition(Spec spec, int nextState) {
       transitions.put(spec, nextState);
+      if (spec instanceof InternalEventSpec) {
+        internalSpec = (InternalEventSpec) spec;
+      }
+      isInternalState = transitions.size() == 1 && spec instanceof InternalEventSpec;
     }
 
     Transition onEvent(EventSpec receivedSpec) {
@@ -156,9 +161,9 @@ class StateTable {
             if (mSpec.isComplete()) {
               nextState = transitions.get(spec);
             }
-            transition = new Transition(receivedSpec, Action.DROP, nextState);
+            transition = new Transition(DROP, nextState);
           } else {
-            transition = new Transition(receivedSpec, Action.HANDLE, transitions.get(spec));
+            transition = new Transition(Action.HANDLE, transitions.get(spec));
           }
           break;
         }
@@ -174,6 +179,15 @@ class StateTable {
         receivedSpec.handle();
       }
       return transition;
+    }
+
+    Transition performInternalTransition() {
+      if (!isInternalState) {
+        return null;
+      }
+      String errorMessage = internalSpec.performInternalEvent();
+      int nextState = errorMessage == null? transitions.get(internalSpec) : FSM.ERROR_STATE;
+      return new Transition(DROP, nextState, errorMessage);
     }
 
     @Override

@@ -6,7 +6,7 @@ import se.sics.kompics.*;
 
 import static junit.framework.Assert.assertEquals;
 
-public class AssertComponentTest {
+public class InspectTest {
 
   private TestContext<Pinger> tc = Testkit.newTestContext(Pinger.class, Init.NONE);
   private Component pinger = tc.getComponentUnderTest();
@@ -35,13 +35,6 @@ public class AssertComponentTest {
     @Override
     public boolean apply(Pinger pinger) {
       return pinger.pingsSent == ++expectedPingsSent;
-    }
-  };
-
-  private Predicate<Ponger> pongerPredicate = new Predicate<Ponger>() {
-    @Override
-    public boolean apply(Ponger ponger) {
-      return true;
     }
   };
 

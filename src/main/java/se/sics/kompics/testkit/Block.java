@@ -102,20 +102,19 @@ class Block {
   }
 
   StateTable.Transition getTransition(int state, EventSpec receivedSpec) {
-    //// TODO: 3/23/17 merge with state onEvent getTransition
     if (handle(receivedSpec)) {
-      return new StateTable.Transition(receivedSpec, Action.HANDLE, state);
+      return new StateTable.Transition(Action.HANDLE, state);
     }
 
     Testkit.logger.debug("{}: looking up {} with block {}", state, receivedSpec, status());
     if (allowed.contains(receivedSpec)) {
-      return new StateTable.Transition(receivedSpec, Action.HANDLE, state);
+      return new StateTable.Transition(Action.HANDLE, state);
     }
     if (dropped.contains(receivedSpec)) {
-      return new StateTable.Transition(receivedSpec, Action.DROP, state);
+      return new StateTable.Transition(Action.DROP, state);
     }
     if (disallowed.contains(receivedSpec)) {
-      return new StateTable.Transition(receivedSpec, Action.FAIL, FSM.ERROR_STATE);
+      return new StateTable.Transition(Action.FAIL, FSM.ERROR_STATE);
     }
 
     return null;

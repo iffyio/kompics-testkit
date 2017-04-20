@@ -18,7 +18,6 @@ import se.sics.kompics.Component;
 import se.sics.kompics.ComponentCore;
 import se.sics.kompics.ComponentDefinition;
 import se.sics.kompics.Fault;
-import se.sics.kompics.JavaComponent;
 import se.sics.kompics.Kompics;
 import se.sics.kompics.PortType;
 import se.sics.kompics.Port;
@@ -50,8 +49,6 @@ class FSM<T extends ComponentDefinition> {
   private ExpectMapper expectMapper;
   private ExpectFuture expectFuture;
 
-  private Map<Integer, Trigger> triggeredEvents = new HashMap<Integer, Trigger>();
-  private Map<Integer, Predicate<T>> componentPredicates = new HashMap<Integer, Predicate<T>>();
   private Map<Integer, ExpectedFault> expectedFaults = new HashMap<Integer, ExpectedFault>();
 
   private ComparatorMap comparators = new ComparatorMap();
@@ -188,7 +185,8 @@ class FSM<T extends ComponentDefinition> {
 
   void addTrigger(KompicsEvent event, Port<? extends PortType> port) {
     checkInBodyMode();
-    triggeredEvents.put(currentState, new Trigger(event, port));
+    table.addTransition(currentState, currentState + 1, new InternalEventSpec(event, port), currentBlock);
+    //triggeredEvents.put(currentState, new Trigger(event, port));
     incrementState();
   }
 
@@ -259,7 +257,7 @@ class FSM<T extends ComponentDefinition> {
     currentBlock.setIterationInit(iterationInit);
   }
 
-  void addExpectedFault(
+  void expectFault(
           Class<? extends Throwable> exceptionType, Fault.ResolveAction resolveAction) {
     checkInBodyMode();
     checkExpectedFaultHasMatchingClause();
@@ -267,7 +265,7 @@ class FSM<T extends ComponentDefinition> {
     incrementState();
   }
 
-  void addExpectedFault(
+  void expectFault(
           Predicate<Throwable> exceptionPredicate, Fault.ResolveAction resolveAction) {
     checkInBodyMode();
     checkExpectedFaultHasMatchingClause();
@@ -280,7 +278,7 @@ class FSM<T extends ComponentDefinition> {
       currentConditional.addChild(inspectPredicate);
     } else {
       checkInBodyMode();
-      componentPredicates.put(currentState, inspectPredicate);
+      table.addTransition(currentState, currentState + 1, new InternalEventSpec(definitionUnderTest, inspectPredicate), currentBlock);
       incrementState();
     }
   }
@@ -433,15 +431,16 @@ class FSM<T extends ComponentDefinition> {
   }
 
   private void checkExpectedFaultHasMatchingClause() {
+    //// TODO: 4/21/17 not necessarily previous if conditional
     int previousState = currentState - 1;
-    if (!(table.isExpectState(previousState) || triggeredEvents.containsKey(previousState))) {
+    if (!(table.hasState(previousState))) {
       throw new IllegalStateException("expected fault must be preceded by an expect or trigger");
     }
   }
 
   private boolean expectingAnEvent() {
-    return !(isStartOfBlock() || isEndOfBlock() || triggeredAnEvent()
-            || assertedComponent() || expectedFault());
+    return !(isStartOfBlock() || isEndOfBlock()
+            || performedInternalTransition() || expectedFault());
   }
 
   // returns false if state was updated to error state
@@ -459,28 +458,15 @@ class FSM<T extends ComponentDefinition> {
     return false;
   }
 
-  private boolean assertedComponent() {
-    Predicate<T> assertPred = componentPredicates.get(currentState);
-    if (assertPred == null) {
+  private boolean performedInternalTransition() {
+    StateTable.Transition transition = table.performInternalTransition(currentState);
+    if (transition == null) {
       return false;
     }
-    logger.debug("{}: Asserting Component", currentState);
-    JavaComponent cut = (JavaComponent) definitionUnderTest.getComponentCore();
-
-    // // TODO: 3/31/17 do not poll
-    while (cut.workCount.get() > 0) {
-      try {
-        Thread.sleep(100);
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-      }
-    }
-    boolean successful = assertPred.apply(definitionUnderTest);
-
-    if (!successful) {
-      gotoErrorState("Component assertion failed");
+    if (transition.errorMessage != null) {
+      gotoErrorState(transition.errorMessage);
     } else {
-      incrementState();
+      currentState = transition.nextState;
     }
     return true;
   }
@@ -501,17 +487,6 @@ class FSM<T extends ComponentDefinition> {
     } else {
       gotoErrorState(assertMessage);
     }
-    return true;
-  }
-
-  private boolean triggeredAnEvent() {
-    Trigger trigger = triggeredEvents.get(currentState);
-    if (trigger == null) {
-      return false;
-    }
-    logger.debug("{}: triggeredAnEvent({})\t", currentState, trigger);
-    trigger.doTrigger();
-    incrementState();
     return true;
   }
 
@@ -657,8 +632,6 @@ class FSM<T extends ComponentDefinition> {
         logger.info("{}\t\t{}",i, blockStart.get(i));
       } else if (blockEnd.containsKey(i)) { // end of block
         logger.info("{}\t\tend{}",i, blockEnd.get(i));
-      } else if (triggeredEvents.containsKey(i)) { // trigger state
-        logger.info("{}\t\ttrigger({})", i, triggeredEvents.get(i));
       }
     }
 

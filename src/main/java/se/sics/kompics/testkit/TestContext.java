@@ -285,14 +285,14 @@ public class TestContext<T extends ComponentDefinition> {
   public TestContext<T> expectFault(
           Class<? extends Throwable> exceptionType, Fault.ResolveAction resolveAction) {
     Testkit.checkNotNull(exceptionType, resolveAction);
-    fsm.addExpectedFault(exceptionType, resolveAction);
+    fsm.expectFault(exceptionType, resolveAction);
     return this;
   }
 
   public TestContext<T> expectFault(
           Predicate<Throwable> exceptionPredicate, Fault.ResolveAction resolveAction) {
     Testkit.checkNotNull(exceptionPredicate, resolveAction);
-    fsm.addExpectedFault(exceptionPredicate, resolveAction);
+    fsm.expectFault(exceptionPredicate, resolveAction);
     return this;
   }
 
