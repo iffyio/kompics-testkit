@@ -37,7 +37,7 @@ class InternalEventSpec implements Spec {
 
   String performInternalEvent() {
     if (inspect) {
-      return inspectComponent();
+      return doInspect();
     }
     if (trigger) {
       return doTrigger();
@@ -51,8 +51,8 @@ class InternalEventSpec implements Spec {
     return null;
   }
 
-  private String inspectComponent() {
-    Testkit.logger.debug("Asserting Component");
+  private String doInspect() {
+    Testkit.logger.debug("Inspecting Component");
     JavaComponent cut = (JavaComponent) definitionUnderTest.getComponentCore();
 
     // // TODO: 3/31/17 do not poll
@@ -63,12 +63,12 @@ class InternalEventSpec implements Spec {
         e.printStackTrace();
       }
     }
-    boolean successful = inspectComponentHelper(definitionUnderTest, inspectPredicate);
+    boolean successful = inspect(definitionUnderTest, inspectPredicate);
 
     return successful? null : "Component assertion failed";
   }
 
-  private <T extends ComponentDefinition> boolean inspectComponentHelper(
+  private <T extends ComponentDefinition> boolean inspect(
       ComponentDefinition definitionUnderTest, Predicate<T> inspectPredicate) {
     return inspectPredicate.apply((T) definitionUnderTest);
   }

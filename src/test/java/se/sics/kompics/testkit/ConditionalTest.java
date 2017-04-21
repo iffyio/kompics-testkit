@@ -1,9 +1,11 @@
 package se.sics.kompics.testkit;
 
 import com.google.common.base.Function;
+import com.google.common.base.Predicate;
 import org.junit.Test;
 import se.sics.kompics.Component;
 import se.sics.kompics.ComponentDefinition;
+import se.sics.kompics.Handler;
 import se.sics.kompics.Init;
 import se.sics.kompics.Negative;
 import se.sics.kompics.PortType;
@@ -327,7 +329,6 @@ public class ConditionalTest {
   }
 
   private void conditionalExpectWithResponse() {
-
     tc.expect(ping(1), pingerPort, OUTGOING);
     tc.either()
         .expect(ping(4), pingerPort, OUTGOING)
@@ -396,6 +397,54 @@ public class ConditionalTest {
     assertEquals(tc.check(), tc.getFinalState());
   }
 
+  @Test
+  public void conditionalInspectEitherTest() {
+    tc.body();
+    tc.trigger(pong(0), pongerPort.getPair());
+    conditionalInspect();
+  }
+
+  @Test
+  public void conditionalInspectOrTest() {
+    tc.body();
+    tc.trigger(pong(1), pongerPort.getPair());
+    conditionalInspect();
+  }
+
+  private void conditionalInspect() {
+    Pong pong = pong(2);
+    tc.either()
+        .expect(pong(0), pingerPort, INCOMING)
+        .trigger(pong, pingerPort)
+        .trigger(pong, pingerPort)
+        .inspect(new Predicate<Pinger>() {
+          @Override
+          public boolean apply(Pinger pinger) {
+            System.out.println(pinger.pongsReceived);
+            return pinger.pongsReceived == 3;
+          }
+        })
+        .trigger(pong, pingerPort)
+        .inspect(new Predicate<Pinger>() {
+          @Override
+          public boolean apply(Pinger pinger) {
+            return pinger.pongsReceived == 4;
+          }
+        })
+    .or()
+        .expect(pong(1), pingerPort, INCOMING)
+        .trigger(pong, pingerPort)
+        .inspect(new Predicate<Pinger>() {
+          @Override
+          public boolean apply(Pinger pinger) {
+            return pinger.pongsReceived == 2;
+          }
+        })
+    .end();
+
+    assertEquals(tc.check(), tc.getFinalState());
+  }
+
   private PFuture future1 = new PFuture();
   private PFuture future2 = new PFuture();
   private PFuture future3 = new PFuture();
@@ -431,7 +480,20 @@ public class ConditionalTest {
   }
 
   public static class Pinger extends ComponentDefinition {
-    {requires(PingPongPort.class);}
+
+    int pongsReceived;
+    Positive<PingPongPort> pPort = requires(PingPongPort.class);
+
+    Handler<Pong> pongHandler = new Handler<Pong>() {
+      @Override
+      public void handle(Pong event) {
+        pongsReceived++;
+      }
+    };
+
+    {
+      subscribe(pongHandler, pPort);
+    }
   }
 
   public static class Ponger extends ComponentDefinition {
