@@ -300,8 +300,7 @@ public class ConditionalTest {
 
   @Test
   public void conditionalExpectMapperTest() {
-    tc.body();
-    tc
+    tc.body().repeat(10).body()
         .trigger(ping(1), pingerPort.getPair())
         .trigger(ping(4), pingerPort.getPair())
         .trigger(ping(2), pingerPort.getPair())
@@ -315,8 +314,7 @@ public class ConditionalTest {
 
   @Test
   public void conditionalExpectFutureTest() {
-    tc.body();
-    tc
+    tc.body().repeat(10).body()
         .trigger(ping(1), pingerPort.getPair())
         .trigger(ping(6), pingerPort.getPair())
         .trigger(ping(2), pingerPort.getPair())
@@ -349,12 +347,52 @@ public class ConditionalTest {
             .expect(Ping.class, pingerPort, future1)
             .expect(Ping.class, pingerPort, future2)
             .expect(Ping.class, pingerPort, future3)
+            .trigger(pingerPort, future2)
+            .trigger(pingerPort, future1)
+            .trigger(pingerPort, future3)
         .end()
 
         .expect(ping(7), pingerPort, OUTGOING)
     .end();
-    tc.expect(pong(9), pingerPort, INCOMING);
+    tc.expect(pong(9), pingerPort, INCOMING).end(); // end repeat
 
+    assertEquals(tc.check(), tc.getFinalState());
+  }
+
+  @Test
+  public void conditionalTriggerSelectAnyTransitionTest() {
+    tc.body();
+    tc.trigger(pong(4), pongerPort.getPair());
+    tc.trigger(pong(3), pongerPort.getPair());
+    conditionalTrigger();
+  }
+
+  @Test
+  public void conditionalTriggerInternalTransitionTest() {
+    tc.body();
+    tc.trigger(pong(4), pongerPort.getPair());
+    conditionalTrigger();
+  }
+
+  private void conditionalTrigger() {
+    tc.either()
+        .expect(pong(4), pingerPort, INCOMING)
+        .expect(pong(3), pingerPort, INCOMING)
+        .either()
+            .trigger(pong(5), pongerPort.getPair())
+            .expect(pong(5), pingerPort, INCOMING)
+        .or()
+            .trigger(pong(6), pongerPort.getPair())
+            .expect(pong(6), pingerPort, INCOMING)
+        .end()
+        .trigger(pong(9), pongerPort.getPair())
+    .or()
+        .expect(pong(4), pingerPort, INCOMING)
+        .trigger(pong(7), pongerPort.getPair())
+        .expect(pong(7), pingerPort, INCOMING)
+        .trigger(pong(9), pongerPort.getPair())
+    .end();
+    tc.expect(pong(9), pingerPort, INCOMING);
     assertEquals(tc.check(), tc.getFinalState());
   }
 

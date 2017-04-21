@@ -34,10 +34,10 @@ class StateTable {
     getState(state, block).addTransition(spec, nextState);
   }
 
-  Transition performInternalTransition(int state) {
+  Transition performInternalTransition(int state, boolean ignoreOtherTransitions) {
     State stateObj = states.get(state);
     if (stateObj != null) {
-      return stateObj.performInternalTransition();
+      return stateObj.performInternalTransition(ignoreOtherTransitions);
     }
     return null;
   }
@@ -132,7 +132,6 @@ class StateTable {
     private final int state;
     private final Block block;
 
-    boolean isInternalState;
     InternalEventSpec internalSpec;
     Map<Spec, Integer> transitions = new HashMap<Spec, Integer>();
 
@@ -143,10 +142,11 @@ class StateTable {
 
     void addTransition(Spec spec, int nextState) {
       transitions.put(spec, nextState);
-      if (spec instanceof InternalEventSpec) {
+      boolean internal = spec instanceof InternalEventSpec;
+      if (internal) {
         internalSpec = (InternalEventSpec) spec;
       }
-      isInternalState = transitions.size() == 1 && spec instanceof InternalEventSpec;
+      //isInternalState = transitions.size() == 1 && internal;
     }
 
     Transition onEvent(EventSpec receivedSpec) {
@@ -181,10 +181,20 @@ class StateTable {
       return transition;
     }
 
-    Transition performInternalTransition() {
-      if (!isInternalState) {
+    Transition performInternalTransition(boolean ignoreOtherTransitions) {
+      return internalSpec != null && (ignoreOtherTransitions || transitions.size() == 1)?
+          doInternalTransition() : null;
+    }
+
+    // state merged with external event and internal events (eg {expect 2, trigger 3})
+    Transition tryPerformInternalTransition() {
+      if (internalSpec == null) {
         return null;
       }
+      return doInternalTransition();
+    }
+
+    Transition doInternalTransition() {
       String errorMessage = internalSpec.performInternalEvent();
       int nextState = errorMessage == null? transitions.get(internalSpec) : FSM.ERROR_STATE;
       return new Transition(DROP, nextState, errorMessage);

@@ -177,17 +177,21 @@ class FSM<T extends ComponentDefinition> {
     expectFuture.addExpectedEvent(eventType, listenPort, future);
   }
 
-  <E extends KompicsEvent, R extends KompicsEvent, P extends PortType> void addTrigger(
+  <E extends KompicsEvent, R extends KompicsEvent, P extends PortType> void trigger(
           Port<P> responsePort, Future<E, R> future) {
     checkInExpectFutureMode();
     expectFuture.addTrigger(responsePort, future);
   }
 
-  void addTrigger(KompicsEvent event, Port<? extends PortType> port) {
-    checkInBodyMode();
-    table.addTransition(currentState, currentState + 1, new InternalEventSpec(event, port), currentBlock);
-    //triggeredEvents.put(currentState, new Trigger(event, port));
-    incrementState();
+  void trigger(KompicsEvent event, Port<? extends PortType> port) {
+    InternalEventSpec spec = new InternalEventSpec(event, port);
+    if (currentBlock.mode == CONDITIONAL) {
+      currentConditional.addChild(spec);
+    } else {
+      checkInBodyMode();
+      table.addTransition(currentState, currentState + 1, spec, currentBlock);
+      incrementState();
+    }
   }
 
   void either() {
@@ -274,11 +278,12 @@ class FSM<T extends ComponentDefinition> {
   }
 
   void inspect(Predicate<T> inspectPredicate) {
+    InternalEventSpec spec = new InternalEventSpec(definitionUnderTest, inspectPredicate);
     if (currentBlock.mode == CONDITIONAL) {
-      currentConditional.addChild(inspectPredicate);
+      currentConditional.addChild(spec);
     } else {
       checkInBodyMode();
-      table.addTransition(currentState, currentState + 1, new InternalEventSpec(definitionUnderTest, inspectPredicate), currentBlock);
+      table.addTransition(currentState, currentState + 1, spec, currentBlock);
       incrementState();
     }
   }
@@ -459,7 +464,7 @@ class FSM<T extends ComponentDefinition> {
   }
 
   private boolean performedInternalTransition() {
-    StateTable.Transition transition = table.performInternalTransition(currentState);
+    StateTable.Transition transition = table.performInternalTransition(currentState, false);
     if (transition == null) {
       return false;
     }
@@ -529,12 +534,26 @@ class FSM<T extends ComponentDefinition> {
     EventSpec received = removeEventFromQueue();
     StateTable.Transition transition;
 
-    // if no event received, try e-transition for state
+    // if no event received -
+    // try perform an internal event transition in-case current state -
+    // is a merged with a normal spec
+    // if not, try an e-transition for state
     if (received == null) {
+      transition = table.performInternalTransition(currentState, true);
+      if (transition != null) {
+        if (transition.errorMessage != null) {
+          gotoErrorState(transition.errorMessage);
+          return false;
+        } else {
+          currentState = transition.nextState;
+          return true;
+        }
+      }
       received = EventSpec.EPSILON;
     }
-    logger.debug("{}: Received ({})", currentState, received);
+    logger.debug("{}: Received {}", currentState, received);
 
+    //// TODO: 4/21/17 separate block use case
     // use block for lookup if given
     if (block == null) {
       transition = table.lookup(currentState, received);
@@ -543,7 +562,7 @@ class FSM<T extends ComponentDefinition> {
     }
 
     // if transition not found for normal event, try any e-transitions before failing
-    if (received != EventSpec.EPSILON) {
+    if (received != EventSpec.EPSILON && block == null) {
       // take e-transition to next state and lookup event
       while (transition == null) {
         transition = table.lookup(currentState, EventSpec.EPSILON);

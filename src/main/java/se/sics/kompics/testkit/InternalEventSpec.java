@@ -46,7 +46,7 @@ class InternalEventSpec implements Spec {
   }
 
   private String doTrigger() {
-    Testkit.logger.debug("{}: triggeredAnEvent({})\t", event);
+    Testkit.logger.debug("triggered({})\t", event);
     port.doTrigger(event, 0, port.getOwner());
     return null;
   }
@@ -71,16 +71,6 @@ class InternalEventSpec implements Spec {
   private <T extends ComponentDefinition> boolean inspectComponentHelper(
       ComponentDefinition definitionUnderTest, Predicate<T> inspectPredicate) {
     return inspectPredicate.apply((T) definitionUnderTest);
-  }
-
-  @Override
-  public int hashCode() {
-    return getClass().hashCode();
-  }
-
-  @Override
-  public boolean equals(Object obj) {
-    return obj != null && getClass() == obj.getClass();
   }
 
   @Override

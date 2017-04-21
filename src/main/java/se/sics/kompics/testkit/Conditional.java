@@ -65,10 +65,6 @@ class Conditional {
     incrementItems();
   }
 
-  <T extends ComponentDefinition> void addChild(Predicate<T> inspectPredicate) {
-
-  }
-
   private void incrementItems() {
     if (inEitherBlock) {
       numEitherItems++;
@@ -175,6 +171,7 @@ class Conditional {
       visited.add(currentStmt);
 
       HashSet<Statement> reachable = new HashSet<Statement>();
+      // // TODO: 4/21/17 quicker merge than checking each input X statement pair
       for (Spec spec : input) {
         for (Statement child : currentStmt.children) {
           Statement r = child.getNextStateOn(spec);

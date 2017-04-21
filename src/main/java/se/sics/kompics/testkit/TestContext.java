@@ -211,7 +211,7 @@ public class TestContext<T extends ComponentDefinition> {
   public <E extends KompicsEvent, R extends KompicsEvent, P extends PortType> TestContext<T> trigger(
           Port<P> responsePort, Future<E, R> future) {
     Testkit.checkNotNull(responsePort, future);
-    fsm.addTrigger(responsePort, future);
+    fsm.trigger(responsePort, future);
     return this;
   }
 
@@ -228,7 +228,7 @@ public class TestContext<T extends ComponentDefinition> {
   public <P extends PortType> TestContext<T> trigger(
           KompicsEvent event, Port<P> port) {
     Testkit.checkNotNull(event, port);
-    fsm.addTrigger(event, port);
+    fsm.trigger(event, port);
     return this;
   }
 
