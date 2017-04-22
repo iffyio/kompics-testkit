@@ -4,9 +4,9 @@ import se.sics.kompics.Handler;
 import se.sics.kompics.KompicsEvent;
 
 abstract class ProxyHandler extends Handler {
-  final Proxy proxy;
-  final PortStructure portStruct;
-  final EventQueue eventQueue;
+  Proxy proxy;
+  PortStructure portStruct;
+  EventQueue eventQueue;
 
   ProxyHandler(
           Proxy proxy, PortStructure portStruct, Class<? extends KompicsEvent> eventType) {
@@ -16,5 +16,15 @@ abstract class ProxyHandler extends Handler {
     this.portStruct = portStruct;
   }
 
+  private ProxyHandler() { }
+
   abstract void doHandle(KompicsEvent event);
+
+  static ProxyHandler faultHandler = new ProxyHandler() {
+    @Override
+    void doHandle(KompicsEvent event) { }
+
+    @Override
+    public void handle(KompicsEvent event) { }
+  };
 }

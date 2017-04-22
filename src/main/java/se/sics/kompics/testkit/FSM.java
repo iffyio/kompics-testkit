@@ -49,8 +49,6 @@ class FSM<T extends ComponentDefinition> {
   private ExpectMapper expectMapper;
   private ExpectFuture expectFuture;
 
-  private Map<Integer, ExpectedFault> expectedFaults = new HashMap<Integer, ExpectedFault>();
-
   private ComparatorMap comparators = new ComparatorMap();
   private StateTable table = new StateTable();
 
@@ -107,15 +105,15 @@ class FSM<T extends ComponentDefinition> {
 
   <P extends PortType> void expectWithinBlock(
           KompicsEvent event, Port<P> port, Direction direction) {
-    EventSpec eventSpec = newEventSpec(event, port, direction);
     checkInHeaderMode();
+    EventSpec eventSpec = newEventSpec(event, port, direction);
     currentBlock.expectWithinBlock(eventSpec);
   }
 
   <P extends PortType, E extends KompicsEvent> void expectWithinBlock(
           Class<E> eventType, Predicate<E> predicate, Port<P> port, Direction direction) {
-    PredicateSpec predicateSpec = new PredicateSpec(eventType, predicate, port, direction);
     checkInHeaderMode();
+    PredicateSpec predicateSpec = new PredicateSpec(eventType, predicate, port, direction);
     currentBlock.expectWithinBlock(predicateSpec);
   }
 
@@ -261,19 +259,23 @@ class FSM<T extends ComponentDefinition> {
     currentBlock.setIterationInit(iterationInit);
   }
 
+  // // TODO: 4/22/17 remove resolveAction if not needed later on
   void expectFault(
           Class<? extends Throwable> exceptionType, Fault.ResolveAction resolveAction) {
     checkInBodyMode();
     checkExpectedFaultHasMatchingClause();
-    expectedFaults.put(currentState, new ExpectedFault(exceptionType, resolveAction));
+    FaultSpec spec = new FaultSpec(definitionUnderTest.getControlPort(), exceptionType);
+    table.addTransition(currentState, currentState + 1, spec, currentBlock);
     incrementState();
   }
 
+  // // TODO: 4/22/17 remove resolveAction if not needed later on
   void expectFault(
           Predicate<Throwable> exceptionPredicate, Fault.ResolveAction resolveAction) {
     checkInBodyMode();
     checkExpectedFaultHasMatchingClause();
-    expectedFaults.put(currentState, new ExpectedFault(exceptionPredicate, resolveAction));
+    FaultSpec spec = new FaultSpec(definitionUnderTest.getControlPort(), exceptionPredicate);
+    table.addTransition(currentState, currentState + 1, spec, currentBlock);
     incrementState();
   }
 
@@ -326,16 +328,6 @@ class FSM<T extends ComponentDefinition> {
           KompicsEvent event, Port<P> port, Direction direction) {
     Comparator<E> c = (Comparator<E>) comparators.get(event.getClass());
     return EventSpec.create(c, (E) event, port, direction);
-  }
-
-  ExpectedFault getExpectedFault() {
-    // // TODO: 3/21/17 use view with (expect, fault) pair
-    int initialState = currentState;
-    ExpectedFault expectedFault = expectedFaults.get(initialState);
-    if (expectedFault == null) { // try next state
-      expectedFault = expectedFaults.get(initialState + 1);
-    }
-    return expectedFault;
   }
 
   private void run() {
@@ -445,7 +437,7 @@ class FSM<T extends ComponentDefinition> {
 
   private boolean expectingAnEvent() {
     return !(isStartOfBlock() || isEndOfBlock()
-            || performedInternalTransition() || expectedFault());
+            || performedInternalTransition());
   }
 
   // returns false if state was updated to error state
@@ -472,25 +464,6 @@ class FSM<T extends ComponentDefinition> {
       gotoErrorState(transition.errorMessage);
     } else {
       currentState = transition.nextState;
-    }
-    return true;
-  }
-
-  private boolean expectedFault() {
-    ExpectedFault expectedFault = this.expectedFaults.get(currentState);
-    if (expectedFault == null) {
-      return false;
-    }
-    logger.info("Expect fault matching {}", expectedFault.strReprOfExpectedException());
-
-    ExpectedFault.Result result = expectedFault.getResult();
-    String assertMessage = result.message;
-
-    if (result.succeeded) {
-      logger.debug(assertMessage);
-      incrementState();
-    } else {
-      gotoErrorState(assertMessage);
     }
     return true;
   }
@@ -654,25 +627,6 @@ class FSM<T extends ComponentDefinition> {
       }
     }
 
-  }
-  // // TODO: 2/17/17 switch to eventSpec?
-  private class Trigger {
-    private final KompicsEvent event;
-    private final Port<? extends PortType> port;
-
-    Trigger(KompicsEvent event, Port<? extends PortType> port) {
-      this.event = event;
-      this.port = port;
-    }
-
-    void doTrigger() {
-      port.doTrigger(event, 0, port.getOwner());
-    }
-
-    @Override
-    public String toString() {
-      return event.toString();
-    }
   }
 
   private class ComparatorMap {
