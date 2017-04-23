@@ -1,8 +1,5 @@
 package se.sics.kompics.testkit;
 
-import com.google.common.base.Predicate;
-import se.sics.kompics.ComponentDefinition;
-
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;

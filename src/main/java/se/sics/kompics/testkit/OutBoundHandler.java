@@ -1,7 +1,5 @@
 package se.sics.kompics.testkit;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import se.sics.kompics.ChannelCore;
 import se.sics.kompics.KompicsEvent;
 import se.sics.kompics.Port;

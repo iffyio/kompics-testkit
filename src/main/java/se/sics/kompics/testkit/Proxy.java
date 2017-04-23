@@ -23,7 +23,8 @@ class Proxy<T extends ComponentDefinition> extends ComponentDefinition{
   private T definitionUnderTest;
   private PortConfig portConfig;
   private Component cut;
-  private FSM<T> fsm;
+  //private FSM<T> fsm;
+  private NFA<T> fsm;
 
   Proxy() {
     getComponentCore().setScheduler(new CallingThreadScheduler());
@@ -39,7 +40,7 @@ class Proxy<T extends ComponentDefinition> extends ComponentDefinition{
     return definitionUnderTest;
   }
 
-  FSM<T> getFsm() {
+  NFA<T> getFsm() {
     return fsm;
   }
 
@@ -114,6 +115,7 @@ class Proxy<T extends ComponentDefinition> extends ComponentDefinition{
 
     portConfig = new PortConfig(this);
     definitionUnderTest = (T) cut.getComponent();
-    fsm = new FSM<T>(this, definitionUnderTest);
+    //fsm = new FSM<T>(this, definitionUnderTest);
+    fsm = new NFA<T>(this, definitionUnderTest);
   }
 }

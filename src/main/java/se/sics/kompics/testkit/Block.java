@@ -14,7 +14,7 @@ import java.util.Set;
 class Block {
 
   final int times;
-  private final int startState;
+  private int startState;
   private int currentCount;
 
   private BlockInit blockInit, iterationInit;
@@ -35,11 +35,11 @@ class Block {
   Block(Block previousBlock, int times, int startState, BlockInit blockInit) {
     this(previousBlock, times, startState);
     this.blockInit = blockInit;
+    throw new UnsupportedOperationException("deprecate start state");
   }
 
-  Block(Block previousBlock, int times, int startState) {
-    this.times = times;
-    this.startState = startState;
+  Block(Block previousBlock) {
+    this.times = 0;
     this.previousBlock = previousBlock;
 
     if (previousBlock == null) {
@@ -49,6 +49,12 @@ class Block {
       this.allowed = new HashSet<EventSpec>(previousBlock.allowed);
       this.dropped = new HashSet<EventSpec>(previousBlock.dropped);
     }
+  }
+
+  Block(Block previousBlock, int times, int startState) {
+    this(previousBlock);
+    this.startState = startState;
+    throw new UnsupportedOperationException("deprecate block");
   }
 
   void initialize() {
@@ -168,6 +174,17 @@ class Block {
       disallowed.remove(eventSpec);
       allowed.remove(eventSpec);
     }
+  }
+
+  Collection<EventSpec> getAllowedSpecs() {
+    return allowed;
+  }
+
+  Collection<EventSpec> getDisallowedSpecs() {
+    return disallowed;
+  }
+  Collection<EventSpec> getDroppedSpecs() {
+    return dropped;
   }
 
   @Override

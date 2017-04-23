@@ -28,7 +28,8 @@ public class TestContext<T extends ComponentDefinition> {
   private final Proxy<T> proxy;
   private final ComponentCore proxyComponent;
   private T cut;
-  private FSM<T> fsm;
+  //private FSM<T> fsm;
+  private NFA<T> fsm;
   private Scheduler scheduler;
   private boolean checked;
 
@@ -310,9 +311,20 @@ public class TestContext<T extends ComponentDefinition> {
       throw new IllegalStateException("test has previously been run");
     } else {
       checked = true;
-      int errorCode = fsm.start();
+      int errorCode = -1;//= fsm.start();
       scheduler.shutdown();
       return errorCode;
+    }
+  }
+
+  public boolean check_() {
+    if (checked) {
+      throw new IllegalStateException("test has previously been run");
+    } else {
+      checked = true;
+      boolean success = fsm.start_();
+      scheduler.shutdown();
+      return success;
     }
   }
 
