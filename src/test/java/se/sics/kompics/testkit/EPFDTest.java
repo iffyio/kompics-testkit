@@ -74,7 +74,7 @@ public class EPFDTest {
         expect(st, epfd.getNegative(Timer.class), outgoing).
     end();
 
-    assertEquals(tc.check(), tc.getFinalState());
+    assert tc.check_();
   }
 
   @Test
@@ -104,7 +104,7 @@ public class EPFDTest {
     triggerTimeoutExpectPingAndSchedTimeout();
 
     // drop Pongs within scope, then timeout and suspect
-    tc.repeat(100).
+    tc.repeat(10).
             drop(pong, epfd.getNegative(Network.class), incoming).
             body().
             trigger(timeout, epfd.getNegative(Timer.class)).
@@ -113,12 +113,7 @@ public class EPFDTest {
             expect(st, epfd.getNegative(Timer.class), outgoing);
     tc.end();
 
-    // expectUntil restore?
-/*    tc.expect(pong, epfd.getNegative(Network.class), incoming);
-    tc.expect(restore, epfd.getPositive(EPFDPort.class), outgoing);*/
-
-
-    assertEquals(tc.check(), tc.getFinalState());
+    assert tc.check_();
   }
 
   private void triggerTimeoutExpectPingAndSchedTimeout() {

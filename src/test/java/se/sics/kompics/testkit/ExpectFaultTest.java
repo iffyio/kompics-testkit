@@ -75,7 +75,8 @@ public class ExpectFaultTest {
           end().
         end();
 
-    assertEquals(tc.check(), tc.getFinalState());
+    //assertEquals(tc.check(), tc.getFinalState());
+    assert tc.check_();
   }
 
   @Test
@@ -106,7 +107,8 @@ public class ExpectFaultTest {
           matchNegativePong(matchByClass);
       tc.end();
 
-    assertEquals(tc.check(), tc.getFinalState());
+    //assertEquals(tc.check(), tc.getFinalState());
+    assert tc.check_();
   }
 
   private void matchNegativePong(boolean matchByClass) {

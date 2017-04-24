@@ -17,49 +17,42 @@ public class PredicateTest {
 
   @Test
   public void mixComparatorsAndPredicates() {
-    Negative pingerNegative = pinger.getNegative(PingPongPort.class);
-    Positive pongerPositive = ponger.getPositive(PingPongPort.class);
+    Negative pingerPort = pinger.getNegative(PingPongPort.class);
+    Positive pongerPort = ponger.getPositive(PingPongPort.class);
 
-    tc.connect(pingerNegative, pongerPositive);
+    Ping allowedPing = ping(10);
+    tc.connect(pingerPort, pongerPort);
     tc.
       addComparator(Pong.class, new PongComparator()).
       addComparator(Ping.class, new PingComparator()).
-      disallow(new Pong(1), pingerNegative, incoming).
-      allow(new Pong(3), pingerNegative, incoming).
+      //disallow(new Pong(1), pingerPort, incoming).
+      allow(allowedPing, pingerPort, outgoing).
 
-      body().
-        expect(new Ping(1), pingerNegative, outgoing).
-        expect(Pong.class, pongPredicate(2), pingerNegative, incoming).
-        expect(Ping.class, pingPredicate(2), pingerNegative, outgoing).
-        expect(new Pong(3), pingerNegative, incoming).
+      body()
+          .trigger(ping(0), pingerPort.getPair())
+          .trigger(allowedPing, pingerPort.getPair())
+          .trigger(pong(0), pongerPort.getPair())
 
-        repeat(1).
+          .trigger(ping(1), pingerPort.getPair())
+          .trigger(allowedPing, pingerPort.getPair())
+          .trigger(pong(1), pongerPort.getPair())
 
-          disallow(new Pong(5), pingerNegative, incoming).
-          disallow(new Pong(15), pingerNegative, incoming).
-          drop(new Pong(60), pingerNegative, incoming).
+          .expect(ping(0), pingerPort, outgoing)
+          .expect(Pong.class, pongPredicate(0), pingerPort, incoming)
+          .expect(Ping.class, pingPredicate(1), pingerPort, outgoing)
+          .expect(pong(1), pingerPort, incoming)
 
-          body().
-              repeat(1).
-                allow(new Pong(5), pingerNegative, incoming).
-                allow(new Pong(15), pingerNegative, incoming).
-                body().
+    ;
+    //assertEquals(tc.check(), tc.getFinalState());
+    assert tc.check_();
+  }
 
-                trigger(new Pong(5), pongerPositive.getPair()).
-                trigger(new Pong(6), pongerPositive.getPair()).
-                expect(Pong.class, pongPredicate(6), pingerNegative, incoming).
-                trigger(new Pong(15), pongerPositive.getPair()).
-                expect(Ping.class, pingPredicate(6), pingerNegative, outgoing).
-                expect(new Pong(7), pingerNegative, incoming).
-              end().
-          trigger(new Pong(8), pongerPositive.getPair()).
-          expect(new Pong(8), pingerNegative, incoming).
-          expect(new Ping(8), pingerNegative, outgoing).
-          expect(Pong.class, pongPredicate(9), pingerNegative, incoming).
-          trigger(new Pong(15), pongerPositive.getPair()).
-        end();
+  private Ping ping(int count) {
+    return new Ping(count);
+  }
 
-    assertEquals(tc.check(), tc.getFinalState());
+  private Pong pong(int count) {
+    return new Pong(count);
   }
 
   private Predicate<Pong> pongPredicate(final int count) {
@@ -107,46 +100,12 @@ public class PredicateTest {
   }
 
   public static class Pinger extends ComponentDefinition {
-    Positive<PingPongPort> ppPort = requires(PingPongPort.class);
-    static int k = 0;
-    int i = 0;
-    Handler<Pong> pongHandler = new Handler<Pong>() {
-      @Override
-      public void handle(Pong pong) {
-        //Kompics.logger.error("pinger: Received Pong! {}", pong);
-        if (pong.count % 2 == 0)
-          trigger(new Ping(pong.count), ppPort);
-      }
-    };
-
-    Handler<Start> startHandler = new Handler<Start>() {
-      @Override
-      public void handle(Start event) {
-        //Kompics.logger.info("pinger {}: ", getComponentCore().getComponent().id());
-        trigger(new Ping(1), ppPort);
-      }
-    };
-
-    {
-      subscribe(pongHandler, ppPort);
-      subscribe(startHandler, control);
-    }
+    { requires(PingPongPort.class); }
   }
 
   public static class Ponger extends ComponentDefinition {
-    Negative<PingPongPort> pingPongPort = provides(PingPongPort.class);
+    { provides(PingPongPort.class); }
 
-    Handler<Ping> pingHandler = new Handler<Ping>() {
-      @Override
-      public void handle(Ping ping) {
-        //System.out.println("Ponger: received " + ping);
-        trigger(new Pong(ping.count + 1), pingPongPort);
-      }
-    };
-
-    {
-      subscribe(pingHandler, pingPongPort);
-    }
   }
 
   public static class PingPongPort extends PortType {

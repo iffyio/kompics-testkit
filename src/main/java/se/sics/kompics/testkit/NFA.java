@@ -1,9 +1,11 @@
 package se.sics.kompics.testkit;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 
@@ -47,6 +49,9 @@ class NFA<T extends ComponentDefinition> {
   private ExpectMapper expectMapper;
   private ExpectFuture expectFuture;*/
 
+  private ExpectMapper expectMapper;
+  private ExpectFuture expectFuture;
+  private List<SingleEventSpec> expectUnordered = new ArrayList<SingleEventSpec>();
   private ComparatorMap comparators = new ComparatorMap();
   //private StateTable table = new StateTable();
 
@@ -100,29 +105,30 @@ class NFA<T extends ComponentDefinition> {
 
   <P extends PortType, E extends KompicsEvent> void expectMessage(
       Class<E> eventType, Predicate<E> predicate, Port<P> port, Direction direction) {
-    throw new UnsupportedOperationException("");
-/*    PredicateSpec predicateSpec = new PredicateSpec(eventType, predicate, port, direction);
-    registerSpec(predicateSpec);*/
+    PredicateSpec predicateSpec = new PredicateSpec(eventType, predicate, port, direction);
+    registerSpec(predicateSpec);
   }
 
   <P extends PortType> void expectWithinBlock(
       KompicsEvent event, Port<P> port, Direction direction) {
-    throw new UnsupportedOperationException("");
-/*    checkInHeaderMode();
+    assertMode(HEADER);
     EventSpec eventSpec = newEventSpec(event, port, direction);
-    currentBlock.expectWithinBlock(eventSpec);*/
+    currentBlock.expect(eventSpec);
   }
 
   <P extends PortType, E extends KompicsEvent> void expectWithinBlock(
       Class<E> eventType, Predicate<E> predicate, Port<P> port, Direction direction) {
-    throw new UnsupportedOperationException("");
-/*    checkInHeaderMode();
+    assertMode(HEADER);
     PredicateSpec predicateSpec = new PredicateSpec(eventType, predicate, port, direction);
-    currentBlock.expectWithinBlock(predicateSpec);*/
+    currentBlock.expect(predicateSpec);
   }
 
   void setUnorderedMode() {
-    throw new UnsupportedOperationException("");
+    previousMode.push(currentMode);
+    assertMode(BODY);
+    setMode(UNORDERED);
+    expectUnordered = new ArrayList<SingleEventSpec>();
+    balancedEnd++;
 /*    if (currentBlock.mode == CONDITIONAL) {
       currentBlock.previousMode = CONDITIONAL;
     } else {
@@ -134,7 +140,11 @@ class NFA<T extends ComponentDefinition> {
   }
 
   void setExpectWithMapperMode() {
-    throw new UnsupportedOperationException("");
+    assertMode(BODY);
+    previousMode.push(currentMode);
+    setMode(EXPECT_MAPPER);
+    balancedEnd++;
+    expectMapper = new ExpectMapper(proxyComponent);
 /*    if (currentBlock.mode == CONDITIONAL) {
       currentBlock.previousMode = CONDITIONAL;
     } else {
@@ -147,28 +157,30 @@ class NFA<T extends ComponentDefinition> {
 
   <E extends KompicsEvent, R extends KompicsEvent> void setMapperForNext(
       int expectedEvents, Class<E> eventType, Function<E, R> mapper) {
-    throw new UnsupportedOperationException("");
-/*    checkInExpectMapperMode();
-    expectMapper.setMapperForNext(expectedEvents, eventType, mapper);*/
+    assertMode(EXPECT_MAPPER);
+    expectMapper.setMapperForNext(expectedEvents, eventType, mapper);
   }
 
   void addExpectWithMapper(
       Port<? extends PortType> listenPort, Port<? extends PortType> responsePort) {
-    throw new UnsupportedOperationException("");
-/*    checkInExpectMapperMode();
-    expectMapper.addExpectedEvent(listenPort, responsePort);*/
+    assertMode(EXPECT_MAPPER);
+    expectMapper.addExpectedEvent(listenPort, responsePort);
   }
 
   <E extends KompicsEvent, R extends KompicsEvent> void addExpectWithMapper(
       Class<E> eventType, Port<? extends PortType> listenPort,
       Port<? extends PortType> responsePort, Function<E, R> mapper) {
-    throw new UnsupportedOperationException("");
-/*    checkInExpectMapperMode();
-    expectMapper.addExpectedEvent(eventType, listenPort, responsePort, mapper);*/
+    assertMode(EXPECT_MAPPER);
+    expectMapper.addExpectedEvent(eventType, listenPort, responsePort, mapper);
   }
 
   void setExpectWithFutureMode() {
-    throw new UnsupportedOperationException("");
+    assertMode(BODY);
+    previousMode.push(currentMode);
+    setMode(EXPECT_FUTURE);
+    //// TODO: 4/25/17 move to decrement function
+    balancedEnd++;
+    expectFuture = new ExpectFuture(proxyComponent);
 /*    if (currentBlock.mode == CONDITIONAL) {
       currentBlock.previousMode = CONDITIONAL;
     } else {
@@ -181,16 +193,14 @@ class NFA<T extends ComponentDefinition> {
 
   <E extends KompicsEvent, R extends KompicsEvent> void addExpectWithFuture(
       Class<E> eventType, Port<? extends PortType> listenPort, Future<E, R> future) {
-    throw new UnsupportedOperationException("");
-/*    checkInExpectFutureMode();
-    expectFuture.addExpectedEvent(eventType, listenPort, future);*/
+    assertMode(EXPECT_FUTURE);
+    expectFuture.addExpectedEvent(eventType, listenPort, future);
   }
 
   <E extends KompicsEvent, R extends KompicsEvent, P extends PortType> void trigger(
       Port<P> responsePort, Future<E, R> future) {
-    throw new UnsupportedOperationException("");
-/*    checkInExpectFutureMode();
-    expectFuture.addTrigger(responsePort, future);*/
+    assertMode(EXPECT_FUTURE);
+    expectFuture.addTrigger(responsePort, future);
   }
 
   void trigger(KompicsEvent event, Port<? extends PortType> port) {
@@ -248,10 +258,9 @@ class NFA<T extends ComponentDefinition> {
     enterNewBlock(count, block);
   }
 
-  void repeat(int times, BlockInit init) {
-    throw new UnsupportedOperationException("");
-/*    Block block = new Block(currentBlock, times, currentState, init);
-    enterNewBlock(block);*/
+  void repeat(int count, BlockInit init) {
+    Block block = new Block(currentBlock,  init);
+    enterNewBlock(count, block);
   }
 
   void body() {
@@ -286,15 +295,16 @@ class NFA<T extends ComponentDefinition> {
   }
 
   void setIterationInit(BlockInit iterationInit) {
-    throw new UnsupportedOperationException("");
-/*    checkInHeaderMode();
-    currentBlock.setIterationInit(iterationInit);*/
+    assertMode(HEADER);
+    currentBlock.setIterationInit(iterationInit);
   }
 
   // // TODO: 4/22/17 remove resolveAction if not needed later on
   void expectFault(
       Class<? extends Throwable> exceptionType, Fault.ResolveAction resolveAction) {
-    throw new UnsupportedOperationException("");
+    assertMode(BODY);
+    FaultSpec spec = new FaultSpec(definitionUnderTest.getControlPort(), exceptionType);
+    table.addSpec(spec);
 /*    checkInBodyMode();
     checkExpectedFaultHasMatchingClause();
     FaultSpec spec = new FaultSpec(definitionUnderTest.getControlPort(), exceptionType);
@@ -305,7 +315,9 @@ class NFA<T extends ComponentDefinition> {
   // // TODO: 4/22/17 remove resolveAction if not needed later on
   void expectFault(
       Predicate<Throwable> exceptionPredicate, Fault.ResolveAction resolveAction) {
-    throw new UnsupportedOperationException("");
+    assertMode(BODY);
+    FaultSpec spec = new FaultSpec(definitionUnderTest.getControlPort(), exceptionPredicate);
+    table.addSpec(spec);
 /*    checkInBodyMode();
     checkExpectedFaultHasMatchingClause();
     FaultSpec spec = new FaultSpec(definitionUnderTest.getControlPort(), exceptionPredicate);
@@ -314,7 +326,9 @@ class NFA<T extends ComponentDefinition> {
   }
 
   void inspect(Predicate<T> inspectPredicate) {
-    throw new UnsupportedOperationException("");
+    InternalEventSpec spec = new InternalEventSpec(definitionUnderTest, inspectPredicate);
+    assertMode(BODY);
+    table.addSpec(spec);
 /*    InternalEventSpec spec = new InternalEventSpec(definitionUnderTest, inspectPredicate);
     if (currentBlock.mode == CONDITIONAL) {
       currentConditional.addChild(spec);
@@ -327,16 +341,14 @@ class NFA<T extends ComponentDefinition> {
 
   <E extends KompicsEvent> void addComparator(
       Class<E> eventType, Comparator<E> comparator) {
-    throw new UnsupportedOperationException("");
-/*    checkInInitialHeader();
-    comparators.put(eventType, comparator);*/
+    checkInInitialHeader();
+    comparators.put(eventType, comparator);
   }
 
   <E extends KompicsEvent> void setDefaultAction(
       Class<E> eventType, Function<E, Action> function) {
-    throw new UnsupportedOperationException("");
-/*    checkInInitialHeader();
-    table.setDefaultAction(eventType, function);*/
+    checkInInitialHeader();
+    table.setDefaultAction(eventType, function);
   }
 
   public int getFinalState() {
@@ -396,8 +408,16 @@ class NFA<T extends ComponentDefinition> {
   }
 
   private void registerSpec(SingleEventSpec spec) {
-    assertMode(BODY);
-    table.addSpec(spec);
+    switch (currentMode) {
+      case BODY:
+        table.addSpec(spec);
+        break;
+      case UNORDERED:
+        expectUnordered.add(spec);
+        break;
+      default:
+        fail(BODY);
+    }
     //throw new UnsupportedOperationException("");
 /*    if (currentBlock.mode == UNORDERED) {
       expectUnordered.add(spec);
@@ -410,10 +430,15 @@ class NFA<T extends ComponentDefinition> {
   }
 
   private void endUnorderedMode() {
-    throw new UnsupportedOperationException("");
-/*    if (expectUnordered.isEmpty()) {
+    if (expectUnordered.isEmpty()) {
       throw new IllegalStateException("No events were specified in unordered mode");
     }
+    UnorderedSpec spec = new UnorderedSpec(expectUnordered);
+    table.addSpec(spec);
+    currentMode = previousMode.pop();
+    balancedEnd--;
+
+    /*
 
     UnorderedSpec spec = new UnorderedSpec(expectUnordered);
     if (currentBlock.previousMode == BODY) {
@@ -428,7 +453,24 @@ class NFA<T extends ComponentDefinition> {
   }
 
   private void endExpect(MODE mode) {
-    throw new UnsupportedOperationException("");
+    Spec spec;
+    boolean emptySpec;
+    balancedEnd--;
+    currentMode = previousMode.pop();
+    if (mode == EXPECT_FUTURE) {
+      spec = expectFuture;
+      emptySpec = expectFuture.expected.isEmpty();
+    } else if (mode == EXPECT_MAPPER) {
+      spec = expectMapper;
+      emptySpec = expectMapper.expected.isEmpty();
+    } else {
+      throw new IllegalStateException(String.format("Expected [%s] or [%s] mode",
+          EXPECT_FUTURE, EXPECT_MAPPER));
+    }
+    if (emptySpec) {
+      throw new IllegalStateException("No events were specified in " + mode + " mode");
+    }
+    table.addSpec(spec);
 /*    Spec spec;
     boolean emptySpec;
     if (mode == EXPECT_FUTURE) {
@@ -455,7 +497,7 @@ class NFA<T extends ComponentDefinition> {
 
   private void endRepeat() {
     balancedEnd--;
-    if (balancedEnd != 0) {
+    if (balancedEnd < 0) {
       throw new IllegalStateException("No matching block for end operation");
     }
 
@@ -507,8 +549,8 @@ class NFA<T extends ComponentDefinition> {
     }
 
     // mode
-    setMode(HEADER);
     previousMode.push(currentMode);
+    setMode(HEADER);
 
     // blocks
     balancedEnd++;
@@ -554,7 +596,7 @@ class NFA<T extends ComponentDefinition> {
 
   private void setMode(MODE mode) {
     currentMode = mode;
-    previousMode.push(currentMode);
+    //previousMode.push(currentMode);
   }
 
 /*  private void addFinalState() {

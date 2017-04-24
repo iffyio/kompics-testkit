@@ -1,10 +1,15 @@
 package se.sics.kompics.testkit;
 
+import com.google.common.base.Function;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
 import org.slf4j.Logger;
 import se.sics.kompics.ComponentDefinition;
+import se.sics.kompics.KompicsEvent;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -12,11 +17,28 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
+import java.util.TreeMap;
 
 import static se.sics.kompics.testkit.Action.*;
 
 class Table {
   private int stateIDs = 0;
+
+  private final Comparator<Class<? extends KompicsEvent>> eventComparator = new Comparator<Class<? extends KompicsEvent>>() {
+    @Override
+    public int compare(Class<? extends KompicsEvent> e1, Class<? extends KompicsEvent> e2) {
+      if (e1 == e2) {
+        return 0;
+      } else if (e1.isAssignableFrom(e2)) {
+        return 1;
+      } else {
+        return -1;
+      }
+    }
+  };
+
+  private final Map<Class<? extends KompicsEvent>, Function<? extends KompicsEvent, Action>> defaultActions =
+      new TreeMap<Class<? extends KompicsEvent>, Function<? extends KompicsEvent, Action>>(eventComparator);
 
   private final NFA<? extends ComponentDefinition> nfa;
   private RepeatFA repeatMain;
@@ -38,6 +60,45 @@ class Table {
     return stateIDs++;
   }
 
+  <E extends KompicsEvent> void setDefaultAction(Class<E> eventType, Function<E, Action> predicate) {
+    defaultActions.put(eventType, predicate);
+  }
+
+  private Transition defaultLookup(EventSpec receivedSpec) {
+    if (receivedSpec == null) {
+      return null;
+    }
+
+    KompicsEvent event = receivedSpec.getEvent();
+    Class<? extends KompicsEvent> eventType = event.getClass();
+
+    for (Class<? extends KompicsEvent> registeredType : defaultActions.keySet()) {
+      if (registeredType.isAssignableFrom(eventType)) {
+        Action action = actionFor(event, registeredType);
+        switch (action) {
+          case HANDLE:
+            return new Transition(receivedSpec, currentState, HANDLE);
+          case DROP:
+            return new Transition(receivedSpec, currentState, DROP);
+          default:
+            return new Transition(receivedSpec, currentState, FAIL);
+        }
+      }
+    }
+    return null;
+  }
+
+  private <E extends KompicsEvent> Action actionFor(
+      KompicsEvent event, Class<? extends KompicsEvent> registeredType) {
+    Function<E, Action> function = (Function<E, Action>) defaultActions.get(registeredType);
+    Action action = function.apply((E) event);
+    if (action == null) {
+      throw new NullPointerException(String.format("(default handler for %s returned null for event '%s')",
+          registeredType, event));
+    }
+    return action;
+  }
+
   void addSpec(Spec spec) {
     currentFA.addSpec(spec);
   }
@@ -53,13 +114,15 @@ class Table {
     if (faStack.isEmpty()) {
       throw new IllegalStateException("no matching block for end repeat");
     }
-    currentFA = faStack.peek();
+    currentFA.end();
+    currentFA = faStack.peek(); // previous
     currentFA.addFA(child);
   }
 
   void build() {
     BaseFA finalFA = new BaseFA(repeatMain.block);
     assert repeatMain == currentFA;
+    repeatMain.end();
     repeatMain.build(finalFA);
     assignNumbersToStates();
     currentState = repeatMain.startState;
@@ -87,11 +150,13 @@ class Table {
       }
     }
 
-    logger.error("visited = {}", visited);
-    for (State s : visited) {
-      logger.error("{}", s.show());
+    if (visited.size() < 10) {
+      logger.error("visited = {}", visited);
+      for (State s : visited) {
+        logger.error("{}", s.show());
+      }
+      logger.error("map = {}", stateMap);
     }
-    logger.error("map = {}", stateMap);
   }
 
   boolean isInFinalState() {
@@ -104,6 +169,10 @@ class Table {
       doInternalTransitions();
 
       Transition t = currentState.doTransition(receivedSpec);
+      if (t == null) {
+        t = defaultLookup(receivedSpec);
+      }
+
       if (t != null) {
         currentState = t.nextState;
         logger.debug("Matched event {} with transition {}, {}", receivedSpec, t, stateToId.get(t.nextState));
@@ -140,7 +209,7 @@ class Table {
           logger.error("No event received");
         } else {
           logger.error("No transitions found for {}", receivedSpec);
-          logger.error("Last state was {}", currentState);
+          logger.error("Last state was {}", currentState.show());
         }
       }
       return false;
@@ -160,15 +229,15 @@ class Table {
 
   private class BaseFA extends FA{
     Spec spec;
-    BaseFA(Spec spec, Block block) {
+    BaseFA(Spec spec, Block block, boolean lastStateInBlock) {
       super(block);
-      startState = new State(nextid());
+      startState = new State(nextid(), block, lastStateInBlock);
       this.spec = spec;
     }
 
     BaseFA(Block block) {
       super(block);
-      startState = new State(nextid());
+      startState = new State(nextid(), block, false);
       startState.isFinalState = true;
     }
 
@@ -206,12 +275,15 @@ class Table {
 
     @Override
     void addSpec(Spec spec) {
-      children.add(new BaseFA(spec, block));
+      children.add(new BaseFA(spec, block, false));
     }
 
     @Override
     void build(FA finalFA) {
+      // original children
+      int numChildren = children.size();
       cloneChildren();
+
       FA next = null; // next FA in sequence
       FA current;
       for (int i = children.size() - 1; i >= 0; i--) {
@@ -219,34 +291,45 @@ class Table {
         current.build(next != null? next : finalFA);
         next = current;
       }
-      if (children.isEmpty()) {
-        startState = finalFA.startState;
-      } else {
-        startState = children.get(0).startState;
+
+      startState = children.get(0).startState;
+      // only original start is block start
+      startState.isBlockStart = true;
+
+      // original start + clones are iteration start
+      for (int i = 0; i < children.size(); i+=numChildren) {
+        children.get(i).startState.isIterationStart = true;
       }
 
-      assert !children.isEmpty();
+      // if first statement is not baseFA then start state
+      // belongs to some other block
+      // i.e first statement in body is repeat(...)
+      // so add block to be initialized on entry to start state
+      if (!(children.get(0) instanceof BaseFA)) {
+        startState.addPreceedingBlockInit(block);
+      }
+    }
+
+    @Override
+    void end() {
+      FA blockEnd = new BaseFA(EventSpec.EPSILON, block, true);
+      children.add(blockEnd);
     }
 
     private void cloneChildren() {
       if (count <= 1) {
         return;
       }
-
-      List<FA> clones = new ArrayList<FA>();
-      for (FA child : children) {
-        clones.add(child);
-      }
+      int numChildren = children.size();
       try {
         for (int i = 0; i < count - 1; i++) {
-          for (FA child : children) {
-            clones.add((FA) child.clone());
+          for (int j = 0; j < numChildren; j++) {
+            children.add((FA) children.get(j).clone());
           }
         }
       } catch (CloneNotSupportedException e) {
         throw new RuntimeException(e);
       }
-        children = clones;
     }
   }
 
@@ -291,20 +374,41 @@ class Table {
 
       return clone;
     }
+
+    void end() { }
   }
 
   class State implements Cloneable{
     final Set<State> children = new HashSet<State>();
     final ID id;
+    final Block block;
     Map<Spec, Transition> transitions = new HashMap<Spec, Transition>();
+    // track which sub state has transitions for an event
+    private Multimap<Spec, State> specToChildStates = HashMultimap.<Spec, State>create();
+    private List<Block> preceedingBlockInits = new ArrayList<Block>();
     boolean isFinalState;
+    boolean lastStateInBlock;
+    boolean isBlockStart;
+    boolean isIterationStart;
+    boolean isMergedState;
+    boolean onEntry = true;
 
-    State(Collection<State> childStates) {
+    State(Collection<State> childStates, Block block) {
+      this.block = block;
+      isMergedState = true;
+
       Set<Integer> ids = new HashSet<Integer>();
       for (State child : childStates) {
+        // final state if child state is final
         if (child.isFinalState) {
           isFinalState = true;
         }
+
+        for (Spec s : child.transitions.keySet()) {
+          specToChildStates.put(s, child);
+        }
+
+        // ids
         for (int cID : child.id.ids) {
           ids.add(cID);
         }
@@ -313,7 +417,9 @@ class Table {
       id = new ID(ids);
     }
 
-    State(int number) {
+    State(int number, Block block, boolean lastStateInBlock) {
+      this.block = block;
+      this.lastStateInBlock = lastStateInBlock;
       id = new ID(number);
     }
 
@@ -322,11 +428,39 @@ class Table {
       transitions.put(t.spec, t);
     }
 
-    Transition doTransition(Spec spec) {
-      return transitions.get(spec);
+    Transition doTransition(EventSpec receivedSpec) {
+      Transition t = null;
+      if (block.handle(receivedSpec)) {
+        t = new Transition(receivedSpec, this, DROP);
+      } else {
+        for (Map.Entry<Spec, Transition> entry : transitions.entrySet()) {
+          Spec spec = entry.getKey();
+          if (spec.match(receivedSpec)) {
+            if (spec instanceof MultiEventSpec) {
+              State nextState = this;
+              if (((MultiEventSpec) spec).isComplete()) {
+                nextState = entry.getValue().nextState;
+              }
+              t = new Transition(receivedSpec, nextState, DROP);
+            } else {
+              t = entry.getValue();
+            }
+          }
+        }
+      }
+      runEntryExitFunctions(receivedSpec, t);
+      return t;
     }
 
     Transition doTransition(boolean ignoreOtherTransitions) {
+      Transition t = lastStateInBlock
+          ? lastStateTransition()
+          : intermediateStateTransition(ignoreOtherTransitions);
+      runEntryExitFunctions(EventSpec.EPSILON, t);
+      return t;
+    }
+
+    Transition intermediateStateTransition(boolean ignoreOtherTransitions) {
       InternalEventSpec internalSpec = null;
       Transition internalTransition = null;
       for (Map.Entry<Spec, Transition> entry : transitions.entrySet()) {
@@ -343,6 +477,51 @@ class Table {
         t.performAction();
       }
       return t;
+    }
+
+    private Transition lastStateTransition() {
+      //logger.error("{}: LAST STATE -> block status = {}", this, block.status());
+      if (!block.hasPendingEvents()) {
+        block.iterationComplete();
+        return transitions.get(EventSpec.EPSILON);
+      }
+      return null;
+    }
+
+    private void runEntryExitFunctions(EventSpec receivedSpec, Transition t) {
+      //logger.error("{}, block = {}", this, block.hashCode());
+      if (t == null) {
+        return;
+      }
+
+      if (onEntry) {
+        onEntry = false;
+        if (isMergedState) {
+          for (State state : specToChildStates.get(receivedSpec)) {
+            state.runEntryExitFunctions(receivedSpec, t);
+          }
+        } else {
+          if (isBlockStart) {
+            for (Block b : preceedingBlockInits) {
+              b.runBlockInit();
+              b.runIterationInit();
+            }
+            block.runBlockInit();
+          }
+          if (isIterationStart) {
+            logger.error("{}, {} -> running iteration inits", this, stateToId.get(this));
+            block.runIterationInit();
+          }
+        }
+      }
+
+      if (t.nextState != this) { // exit
+        onEntry = true;
+      }
+    }
+
+    private void addPreceedingBlockInit(Block preceedingBlock) {
+      preceedingBlockInits.add(preceedingBlock);
     }
 
     @Override
@@ -394,14 +573,12 @@ class Table {
         return false;
       }
       Transition other = (Transition) o;
-      return spec.equals(other.spec); //&& nextState.equals(other.nextState);
+      return spec.equals(other.spec);// && nextState.equals(other.nextState);
     }
 
     @Override
     public int hashCode() {
-      int result = 31 * spec.hashCode();
-      result += 31 * nextState.hashCode();
-      return result;
+      return 31 * spec.hashCode();
     }
 
     @Override

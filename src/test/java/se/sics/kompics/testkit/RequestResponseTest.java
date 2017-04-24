@@ -38,13 +38,13 @@ public class RequestResponseTest {
     tc.
       addComparator(Ping.class, new PingComparator()).
       body().
-      repeat(100).body().
+      repeat(10).body().
         expect(new Ping(count), pinger.getNegative(PingPongPort.class), outgoing).
         expect(new Pong(new Ping(count)), pinger.getNegative(PingPongPort.class), incoming).
         expect(new Pong(new Ping(count)), pinger.getNegative(PingPongPort.class), incoming).
       end();
 
-    assertEquals(tc.getFinalState(), tc.check());
+    assert tc.check_();
   }
 
   @Test
@@ -70,7 +70,7 @@ public class RequestResponseTest {
         expect(new Pong(new Ping(0)), ponger.getPositive(PingPongPort.class), outgoing).
       end();
 
-    assertEquals(tc.getFinalState(), tc.check());
+    assert tc.check_();
   }
 
   public static class Pinger extends ComponentDefinition {
@@ -81,7 +81,6 @@ public class RequestResponseTest {
     Handler<Pong> pongHandler = new Handler<Pong>() {
       @Override
       public void handle(Pong event) {
-        Kompics.logger.error("pinger: Received Pong!{}", event);
         if (RequestResponseTest.replyAfterNPongs) {
           replies++;
           if (replies == RequestResponseTest.numberOfRequiredPongs) {

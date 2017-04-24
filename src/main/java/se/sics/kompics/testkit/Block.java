@@ -38,6 +38,11 @@ class Block {
     throw new UnsupportedOperationException("deprecate start state");
   }
 
+  Block(Block previousBlock, BlockInit blockInit) {
+    this(previousBlock);
+    this.blockInit = blockInit;
+  }
+
   Block(Block previousBlock) {
     this.times = 0;
     this.previousBlock = previousBlock;
@@ -76,10 +81,11 @@ class Block {
   }
 
   void iterationComplete() {
-    currentCount--;
-
-    if (hasMoreIterations()) {
-      runIterationInit();
+    assert pending.isEmpty();
+    //pending.clear();
+    received.clear();
+    for (SingleEventSpec spec : expected) {
+      pending.add(spec);
     }
   }
 
@@ -91,19 +97,21 @@ class Block {
     return startState + 1;
   }
 
-  void expectWithinBlock(SingleEventSpec spec) {
+  void expect(SingleEventSpec spec) {
     expected.add(spec);
+    pending.add(spec);
   }
 
-  private void runIterationInit() {
+
+  void runBlockInit() {
+    if (blockInit != null) {
+      blockInit.init();
+    }
+  }
+
+  void runIterationInit() {
     if (iterationInit != null) {
       iterationInit.init();
-    }
-
-    pending.clear();
-    received.clear();
-    for (SingleEventSpec spec : expected) {
-      pending.add(spec);
     }
   }
 

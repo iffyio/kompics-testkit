@@ -78,15 +78,15 @@ public class UnorderedEventsTest {
     tc.repeat(10).body().
        trigger(ping, pingerPort.getPair()).
        expect(ping, pingerPort, OUTGOING).
-
-            unordered().
+       unordered().
             expect(pong1, pingerPort, INCOMING).
             expect(pong2, pingerPort, INCOMING).
             expect(pong3, pingerPort, INCOMING).
        end().
     end();
 
-    assertEquals(tc.check(), tc.getFinalState());
+    //assertEquals(tc.check(), tc.getFinalState());
+    assert tc.check_();
   }
 
   private ScheduleTimeout st = new ScheduleTimeout(500);
@@ -96,8 +96,9 @@ public class UnorderedEventsTest {
   public void expectWithinSingleBlockTest() {
     initExpectWithinBlock();
 
-    tc.blockExpect(Pong.class, predicateForPong(1), pingerPort, INCOMING).
-            blockExpect(pong2, pingerPort, INCOMING).
+    tc.
+        blockExpect(Pong.class, predicateForPong(1), pingerPort, INCOMING).
+        blockExpect(pong2, pingerPort, INCOMING).
        body().
          trigger(ping, pingerPort.getPair()).
          expect(ping, pingerPort, OUTGOING).
@@ -106,7 +107,8 @@ public class UnorderedEventsTest {
          trigger(timeout, ponger2.getNegative(Timer.class)).
          expect(pong3, pingerPort, INCOMING);
 
-    assertEquals(tc.check(), tc.getFinalState());
+    //assertEquals(tc.check(), tc.getFinalState());
+    assert tc.check_();
   }
 
   private Predicate<Pong> predicateForPong(final int count) {
@@ -148,7 +150,8 @@ public class UnorderedEventsTest {
           body().
           end().
         end();
-    assertEquals(tc.check(), tc.getFinalState());
+    //assertEquals(tc.check(), tc.getFinalState());
+    assert tc.check_();
   }
 
   @Test
@@ -166,12 +169,13 @@ public class UnorderedEventsTest {
           body().
              expect(ping, pingerPort, OUTGOING).
              repeat(1).
-            blockExpect(pong3, pingerPort, INCOMING).
+                blockExpect(pong3, pingerPort, INCOMING).
              body().
              end().
           end().
        end();
-    assertEquals(tc.check(), tc.getFinalState());
+    //assertEquals(tc.check(), tc.getFinalState());
+    assert tc.check_();
   }
 
   public static class Ponger extends ComponentDefinition {

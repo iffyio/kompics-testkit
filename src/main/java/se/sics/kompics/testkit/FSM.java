@@ -107,14 +107,14 @@ class FSM<T extends ComponentDefinition> {
           KompicsEvent event, Port<P> port, Direction direction) {
     checkInHeaderMode();
     EventSpec eventSpec = newEventSpec(event, port, direction);
-    currentBlock.expectWithinBlock(eventSpec);
+    currentBlock.expect(eventSpec);
   }
 
   <P extends PortType, E extends KompicsEvent> void expectWithinBlock(
           Class<E> eventType, Predicate<E> predicate, Port<P> port, Direction direction) {
     checkInHeaderMode();
     PredicateSpec predicateSpec = new PredicateSpec(eventType, predicate, port, direction);
-    currentBlock.expectWithinBlock(predicateSpec);
+    currentBlock.expect(predicateSpec);
   }
 
   void setUnorderedMode() {

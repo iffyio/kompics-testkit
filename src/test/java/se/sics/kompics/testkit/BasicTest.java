@@ -52,8 +52,8 @@ public class BasicTest {
               expect(ping(1), pingerPort, outgoing).
               expect(pong(1), pingerPort, incoming).
 
-              expect(ping(2), pingerPort, outgoing). // expect dropped msg
-              expect(pong(2), pingerPort, incoming).
+/*              expect(ping(2), pingerPort, outgoing). // expect dropped msg
+              expect(pong(2), pingerPort, incoming).*/
 
               expect(ping(3), pingerPort, outgoing).
               expect(pong(3), pingerPort, incoming).
@@ -64,7 +64,8 @@ public class BasicTest {
         expect(ping(2), pingerPort, outgoing).
       end();
 
-    assertEquals(tc.check(), tc.getFinalState());
+    //assertEquals(tc.check(), tc.getFinalState());
+    assert tc.check_();
   }
 
   private Ping ping(int i) {

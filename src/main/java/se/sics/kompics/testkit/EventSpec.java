@@ -53,7 +53,7 @@ class EventSpec implements SingleEventSpec{
   }
 
   public boolean equals(Object o) {
-    if (getClass() == o.getClass()) {
+    if (o instanceof EventSpec) {
       return equalEventSpec((EventSpec) o);
     }
     if (o instanceof PredicateSpec) {
@@ -72,10 +72,9 @@ class EventSpec implements SingleEventSpec{
   private boolean equalEventSpec(EventSpec other) {
     KompicsEvent e = other.getEvent();
 
-    return e.getClass() == event.getClass() &&
-           port.equals(other.getPort()) &&
-           direction.equals(other.getDirection()) &&
-           comparator == null? event.equals(e) : equalByComparator(comparator, e);
+    return port.equals(other.getPort())
+           && direction.equals(other.getDirection())
+           && (comparator == null? event.equals(e) : equalByComparator(this.comparator, e));
   }
 
   private <V extends KompicsEvent> boolean equalByComparator(Comparator<V> comp, KompicsEvent e) {

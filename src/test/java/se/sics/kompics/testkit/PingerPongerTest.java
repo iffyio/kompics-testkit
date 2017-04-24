@@ -28,36 +28,72 @@ public class PingerPongerTest {
   private Negative<PingPongPort> pingerPort;
   private Positive<PingPongPort> pongerPort;
 
-  private Ping ping;
-  private Pong pong;
-  private BlockInit resetPong;
-  private BlockInit incrementCounters;
+  private class Counter {
+    int i = 0;
+  }
+
+  private Counter counter = new Counter();
+
+  private BlockInit increment = new BlockInit() {
+    @Override
+    public void init() {
+      counter.i++;
+    }
+  };
 
   @Test
   public void iterationInitTest() {
+
+    int M = 11, N = 10;
     tc.
-      connect(pingerPort, pongerPort).
-      body().
-
-      repeat(3).
-      body().
-        repeat(3, resetPong).
-          onEachIteration(incrementCounters).
+        connect(pingerPort, pongerPort).
         body().
-          expect(ping, pingerPort, OUTGOING).
-          expect(pong, pingerPort, INCOMING).
-        end().
-      end();
 
-    assertEquals(tc.check(), tc.getFinalState());
+        repeat(M).
+        body().
+            repeat(N, increment).
+                onEachIteration(increment).
+            body()
+                .trigger(new Ping(0), pingerPort.getPair())
+                .expect(new Ping(0), pingerPort, OUTGOING)
+            .end()
+        .end();
+
+    assert tc.check_();
+    assertEquals(counter.i, M * N + M);
+  }
+
+  @Test
+  public void initOnMultipleBlocksTest() {
+
+    int M = 10, N = 12;
+    tc.
+        connect(pingerPort, pongerPort).
+        body().
+
+        repeat(M, increment).
+        body().
+            repeat(N, increment).
+                onEachIteration(increment).
+            body()
+                .trigger(new Ping(0), pingerPort.getPair())
+                .expect(new Ping(0), pingerPort, OUTGOING)
+            .end()
+        .end();
+
+    assert tc.check_();
+    assertEquals(counter.i, M * N + M + M);
   }
 
   @Test
   public void defaultActionTest() {
-    tc.setDefaultAction(Pong.class, new Function<Pong, Action>() {
+    tc.setDefaultAction(Ping.class, new Function<Ping, Action>() {
         @Override
-        public Action apply(Pong event) {
-          return Action.HANDLE;
+        public Action apply(Ping ping) {
+          if (ping.count < 3) {
+            return Action.HANDLE;
+          }
+          return Action.FAIL;
         }
     });
 
@@ -68,43 +104,30 @@ public class PingerPongerTest {
         }
     });
 
+    int M = 3, N = 30;
     tc.connect(pingerPort, pongerPort).
       body().
 
-        repeat(3).
+        repeat(M).
         body().
-          repeat(30, resetPong).
-            onEachIteration(incrementCounters).
-          body().
-            expect(ping, pingerPort, OUTGOING).
-          end().
-        end();
+          repeat(N, increment).
+            onEachIteration(increment).
+          body()
+            .trigger(new Ping(0), pingerPort.getPair())
+            .trigger(new Ping(0), pingerPort.getPair())
+            .trigger(new Ping(0), pingerPort.getPair())
+            .trigger(new Ping(0), pingerPort.getPair())
+            .trigger(new Ping(1), pingerPort.getPair())
+            .expect(new Ping(1), pingerPort, OUTGOING)
+          .end()
+        .end();
 
-    assertEquals(tc.check(), tc.getFinalState());
+    assert tc.check_();
+    assertEquals(counter.i, M * N + M);
   }
 
   @Before
   public void init() {
-    Pinger.counter = 0;
-    Ponger.counter = 0;
-    ping = new Ping(0);
-    pong = new Pong(0);
-    resetPong = new BlockInit() {
-      @Override
-      public void init() {
-        pong.count = 0;
-        Ponger.counter = 0;
-      }
-    };
-
-    incrementCounters = new BlockInit() {
-      @Override
-      public void init() {
-        ping.count++;
-        pong.count++;
-      }
-    };
-
     tc = Testkit.newTestContext(Pinger.class, Init.NONE);
     pinger = tc.getComponentUnderTest();
     ponger = tc.create(Ponger.class, Init.NONE);
@@ -120,14 +143,12 @@ public class PingerPongerTest {
     Handler<Pong> pongHandler = new Handler<Pong>() {
       @Override
       public void handle(Pong event) {
-        trigger(new Ping(++counter), ppPort);
       }
     };
 
     Handler<Start> startHandler = new Handler<Start>() {
       @Override
       public void handle(Start event) {
-          trigger(new Ping(++counter), ppPort);
       }
     };
 
@@ -144,10 +165,7 @@ public class PingerPongerTest {
 
     Handler<Ping> pingHandler = new Handler<Ping>() {
       @Override
-      public void handle(Ping ping) {
-        Pong pong = new Pong(++counter);
-        trigger(pong, pingPongPort);
-      }
+      public void handle(Ping ping) { }
     };
 
     {

@@ -20,14 +20,15 @@ public class InspectTest {
   public void work() {
     tc.connect(pinger.getNegative(PingPongPort.class), ponger.getPositive(PingPongPort.class));
     tc.body().
-       repeat(100).body().
+       repeat(10).body().
         expect(ping, pinger.getNegative(PingPongPort.class), outgoing).
         inspect(expectedPings).
         expect(pong, pinger.getNegative(PingPongPort.class), incoming).
         inspect(expectedPongs).
        end();
 
-    assertEquals(tc.check(), tc.getFinalState());
+    //assertEquals(tc.check(), tc.getFinalState());
+    assert tc.check_();
   }
 
   private Predicate<Pinger> expectedPings = new Predicate<Pinger>() {

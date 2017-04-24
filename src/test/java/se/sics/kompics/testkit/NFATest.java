@@ -1,10 +1,7 @@
 package se.sics.kompics.testkit;
 
-import com.google.common.base.Function;
-
 import org.junit.Before;
 import org.junit.Test;
-import static junit.framework.Assert.assertEquals;
 
 import se.sics.kompics.Component;
 import se.sics.kompics.ComponentDefinition;
@@ -78,22 +75,28 @@ public class NFATest {
 
   @Test
   public void allowDisallowDropTest() {
+    int N = 4, M = 3;
     tc
         .allow(pong(1), pingerPort, INCOMING)
         .disallow(pong(0), pingerPort, INCOMING)
         .drop(pong(2), pingerPort, INCOMING)
         .body()
-            .trigger(pong(2), pongerPort.getPair())
-            .trigger(pong(0), pongerPort.getPair())
-            .trigger(pong(1), pongerPort.getPair())
-            .trigger(pong(3), pongerPort.getPair())
+            .repeat(M).body()
+                .trigger(pong(2), pongerPort.getPair())
+                .trigger(pong(0), pongerPort.getPair())
+                .trigger(pong(1), pongerPort.getPair())
+            .end()
+
+            .repeat(N).body()
+                .trigger(pong(3), pongerPort.getPair())
+            .end()
 
             .trigger(pong(1), pongerPort.getPair())
             .trigger(pong(2), pongerPort.getPair())
             .trigger(pong(2), pongerPort.getPair())
             .trigger(pong(3), pongerPort.getPair())
 
-            .repeat(1)
+            .repeat(N)
                 .allow(pong(0), pingerPort, INCOMING)
                 .allow(pong(2), pingerPort, INCOMING)
             .body()
@@ -104,10 +107,47 @@ public class NFATest {
     ;
 
     assert tc.check_();
-    assert Pinger.counter == 6;
+    assert Pinger.counter == 3 * M + N + 2;
   }
 
+  @Test
+  public void unorderedTest1() {
+    tc.body()
+        .trigger(ping(2), pingerPort.getPair())
+        .trigger(ping(1), pingerPort.getPair())
+        .trigger(ping(3), pingerPort.getPair())
+    ;
+    unorderedTest();
+  }
 
+  @Test
+  public void unorderedTest2() {
+    tc.body()
+        .trigger(ping(0), pingerPort.getPair())
+        .expect(ping(0), pingerPort, OUTGOING)
+
+        .trigger(ping(3), pingerPort.getPair())
+        .trigger(ping(2), pingerPort.getPair())
+        .trigger(ping(1), pingerPort.getPair())
+    ;
+    unorderedTest();
+  }
+
+  private void unorderedTest() {
+    tc
+        .unordered()
+            .expect(ping(1), pingerPort, OUTGOING)
+            .expect(ping(2), pingerPort, OUTGOING)
+            .expect(ping(3), pingerPort, OUTGOING)
+        .end()
+
+        .trigger(ping(0), pingerPort.getPair())
+        .expect(ping(0), pingerPort, OUTGOING)
+
+    ;
+
+    assert tc.check_();
+  }
 
   private Ping ping(int count) {
     return new Ping(count);

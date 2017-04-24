@@ -97,7 +97,7 @@ public class UrbTest {
             expect(new UrbDeliver(counter), p.getPositive(UrbPort.class), outgoing).
       end();
 
-    assertEquals(tc.check(), tc.getFinalState());
+    assert tc.check_();
   }
 
   private BebMsg bebMsg(TAddress src, TAddress dst) {
