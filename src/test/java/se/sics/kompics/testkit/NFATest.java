@@ -13,6 +13,7 @@ import se.sics.kompics.PortType;
 import se.sics.kompics.Positive;
 import se.sics.kompics.Request;
 import se.sics.kompics.Start;
+import se.sics.kompics.testkit.urb.Counter;
 
 import static se.sics.kompics.testkit.Direction.INCOMING;
 import static se.sics.kompics.testkit.Direction.OUTGOING;
@@ -47,6 +48,7 @@ public class NFATest {
     assert tc.check_();
   }
 
+  Counter counter = new Counter();
   @Test
   public void basicRepeatTest() {
     tc.body()

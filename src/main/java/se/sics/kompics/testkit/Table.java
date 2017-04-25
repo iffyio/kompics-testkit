@@ -45,6 +45,7 @@ class Table {
   private Map<Integer, State> stateMap = new HashMap<Integer, State>();
   private Map<State, Integer> stateToId = new HashMap<State, Integer>();
   private State currentState;
+  private final State errorState = new SingleState(nextid(), null, false);
   private Logger logger = Testkit.logger;
   private FA currentFA;
   private Stack<FA> faStack = new Stack<FA>();
@@ -77,11 +78,11 @@ class Table {
         Action action = actionFor(event, registeredType);
         switch (action) {
           case HANDLE:
-            return new Transition(receivedSpec, currentState, HANDLE);
+            return new Transition(receivedSpec, currentState, true);
           case DROP:
-            return new Transition(receivedSpec, currentState, DROP);
+            return new Transition(receivedSpec, currentState);
           default:
-            return new Transition(receivedSpec, currentState, FAIL);
+            return new Transition(receivedSpec, errorState);
         }
       }
     }
@@ -168,7 +169,7 @@ class Table {
     while (true) {
       doInternalTransitions();
 
-      Transition t = currentState.doTransition(receivedSpec);
+      Transition t = currentState.getTransition(receivedSpec);
       if (t == null) {
         t = defaultLookup(receivedSpec);
       }
@@ -177,26 +178,24 @@ class Table {
         currentState = t.nextState;
         logger.debug("Matched event {} with transition {}, {}", receivedSpec, t, stateToId.get(t.nextState));
         // handles all
-        switch (t.action) {
-          case HANDLE:
-            receivedSpec.handle();
-            break;
-          case FAIL:
-            logger.debug("Received unwanted event {} at state {}", receivedSpec, currentState);
-            return false;
+        if (t.nextState == errorState) {
+          logger.debug("Received unwanted event {} at state {}", receivedSpec, currentState);
+          return false;
+        } else if (t.handle) {
+          receivedSpec.handle();
         }
         return true;
       }
 
       // internal actions - ignore other transitions
-      t = currentState.doTransition(true);
+      t = currentState.getTransition(true);
       if (t != null) {
         currentState = t.nextState;
         continue;
       }
 
       // e transitions
-      t = currentState.doTransition(EventSpec.EPSILON);
+      t = currentState.getTransition(EventSpec.EPSILON);
       if (t != null) {
         currentState = t.nextState;
         continue;
@@ -219,7 +218,7 @@ class Table {
   void doInternalTransitions() {
     Transition transition;
     do {
-      transition = currentState.doTransition(true);
+      transition = currentState.getTransition(true);
       if (transition != null) {
         currentState = transition.nextState;
       }
@@ -231,37 +230,74 @@ class Table {
     Spec spec;
     BaseFA(Spec spec, Block block, boolean lastStateInBlock) {
       super(block);
-      startState = new State(nextid(), block, lastStateInBlock);
+      startState = new SingleState(nextid(), block, lastStateInBlock);
       this.spec = spec;
     }
 
     BaseFA(Block block) {
       super(block);
-      startState = new State(nextid(), block, false);
+      startState = new SingleState(nextid(), block, false);
       startState.isFinalState = true;
     }
 
     @Override
     void build(FA finalFA) {
       assert spec != null;
-      startState.addTransition(spec, finalFA.startState, HANDLE);
+      startState.addTransition(new Transition(spec, finalFA.startState, true));
       if (spec instanceof InternalEventSpec) {
+        ((SingleState) startState).internalEventSpec = (InternalEventSpec) spec;
         return; // no need for event transitions
       }
       for (EventSpec spec : block.getAllowedSpecs()) {
-        startState.addTransition(spec, startState, HANDLE);
+        startState.addTransition(new Transition(spec, startState, true));
       }
       for (EventSpec spec : block.getDroppedSpecs()) {
-        startState.addTransition(spec, startState, DROP);
+        startState.addTransition(new Transition(spec, startState));
       }
       for (EventSpec spec : block.getDisallowedSpecs()) {
-        startState.addTransition(spec, startState, FAIL);
+        startState.addTransition(new Transition(spec, errorState));
       }
     }
 
     @Override
     public String toString() {
       return "BaseFA " + startState;
+    }
+  }
+
+  private class KleeneStar extends FA {
+
+    KleeneStar(Block block) {
+      super(block);
+    }
+
+    @Override
+    void addSpec(Spec spec) {
+      children.add(new BaseFA(spec, block, false));
+    }
+
+    @Override
+    void build(FA finalFA) {
+      FA next = children.get(children.size() - 1);
+      FA current;
+      for (int i = children.size() - 2; i >= 0; i--) {
+        current = children.get(i);
+        current.build(next);
+        next = current;
+      }
+
+      startState = children.get(0).startState;
+      mergeWith(finalFA);
+    }
+
+    private void mergeWith(FA finalFA) {
+      
+    }
+
+    @Override
+    void end() {
+      FA blockEnd = new BaseFA(EventSpec.EPSILON, block, true);
+      children.add(blockEnd);
     }
   }
 
@@ -280,11 +316,11 @@ class Table {
 
     @Override
     void build(FA finalFA) {
-      // original children
+      // original
       int numChildren = children.size();
       cloneChildren();
 
-      FA next = null; // next FA in sequence
+      FA next = null;
       FA current;
       for (int i = children.size() - 1; i >= 0; i--) {
         current = children.get(i);
@@ -336,7 +372,7 @@ class Table {
 
   abstract class FA implements Cloneable{
     State startState;
-    State endState;
+    Collection<State> endStates;
     List<FA> children = new ArrayList<FA>();
     Set<State> states = new HashSet<State>();
     final Block block;
@@ -358,7 +394,12 @@ class Table {
     protected Object clone() throws CloneNotSupportedException {
       FA clone = (FA) super.clone();
       clone.startState = startState == null? null : (State) clone.startState.clone();
-      clone.endState = endState == null? null : (State) clone.endState.clone();
+
+      List<State> endStatesClone = new ArrayList<State>();
+      for (State endState : endStates) {
+        endStatesClone.add((State) endState.clone());
+      }
+      clone.endStates = endStatesClone;
 
       List<FA> chldrn = new ArrayList<FA>();
       for (FA child : children) {
@@ -378,24 +419,53 @@ class Table {
     void end() { }
   }
 
-  class State implements Cloneable{
+  private class SingleState extends State {
+
+    InternalEventSpec internalEventSpec;
+    SingleState(int number, Block block, boolean isBlockEnd) {
+      super(block);
+      this.isBlockEnd = isBlockEnd;
+      id = new ID(number);
+    }
+
+    @Override
+    void addTransition(Transition t) {
+      transitions.put(t.spec, t);
+    }
+
+    @Override
+    Transition intermediateStateTransition(boolean ignoreOtherTransitions) {
+      Transition t = transitions.get(internalEventSpec);
+      if (t != null) {
+        internalEventSpec.performInternalEvent();
+      }
+      return t;
+    }
+
+    @Override
+    void runEntryExitFunctions(EventSpec receivedSpec, Transition t) {
+      if (isBlockStart) {
+        for (Block b : preceedingBlockInits) {
+          b.runBlockInit();
+          b.runIterationInit();
+        }
+        block.runBlockInit();
+      }
+
+      if (isIterationStart) {
+        logger.error("{}, {} -> running iteration init", this, stateToId.get(this));
+        block.runIterationInit();
+      }
+    }
+  }
+
+  class MergedState extends State {
     final Set<State> children = new HashSet<State>();
-    final ID id;
-    final Block block;
-    Map<Spec, Transition> transitions = new HashMap<Spec, Transition>();
     // track which sub state has transitions for an event
     private Multimap<Spec, State> specToChildStates = HashMultimap.<Spec, State>create();
-    private List<Block> preceedingBlockInits = new ArrayList<Block>();
-    boolean isFinalState;
-    boolean lastStateInBlock;
-    boolean isBlockStart;
-    boolean isIterationStart;
-    boolean isMergedState;
-    boolean onEntry = true;
 
-    State(Collection<State> childStates, Block block) {
-      this.block = block;
-      isMergedState = true;
+    MergedState(Collection<State> childStates, Block block) {
+      super(block);
 
       Set<Integer> ids = new HashSet<Integer>();
       for (State child : childStates) {
@@ -417,21 +487,58 @@ class Table {
       id = new ID(ids);
     }
 
-    State(int number, Block block, boolean lastStateInBlock) {
+    @Override
+    void addTransition(Transition t) {
+      throw new UnsupportedOperationException("");
+    }
+
+    @Override
+    Transition intermediateStateTransition(boolean ignoreOtherTransitions) {
+      throw new UnsupportedOperationException("");
+    }
+
+    @Override
+    void runEntryExitFunctions(EventSpec receivedSpec, Transition t) {
+      if (t == null) {
+        return;
+      }
+
+      if (onEntry) {
+        onEntry = false;
+      }
+
+      for (State child : specToChildStates.get(receivedSpec)) {
+        child.runEntryExitFunctions(receivedSpec, t);
+      }
+
+      if (t.nextState != this) {
+        onEntry = true;
+      }
+    }
+  }
+
+  abstract class State implements Cloneable{
+    ID id;
+    final Block block;
+    Map<Spec, Transition> transitions = new HashMap<Spec, Transition>();
+
+    List<Block> preceedingBlockInits = new ArrayList<Block>();
+    boolean isFinalState;
+    boolean isBlockEnd;
+    boolean isBlockStart;
+    boolean isIterationStart;
+    boolean onEntry = true;
+
+    State(Block block) {
       this.block = block;
-      this.lastStateInBlock = lastStateInBlock;
-      id = new ID(number);
     }
 
-    void addTransition(Spec spec, State nextState, Action action) {
-      Transition t = new Transition(spec, nextState, action);
-      transitions.put(t.spec, t);
-    }
+    abstract void addTransition(Transition t);
 
-    Transition doTransition(EventSpec receivedSpec) {
+    Transition getTransition(EventSpec receivedSpec) {
       Transition t = null;
       if (block.handle(receivedSpec)) {
-        t = new Transition(receivedSpec, this, DROP);
+        t = new Transition(receivedSpec, this);
       } else {
         for (Map.Entry<Spec, Transition> entry : transitions.entrySet()) {
           Spec spec = entry.getKey();
@@ -441,7 +548,7 @@ class Table {
               if (((MultiEventSpec) spec).isComplete()) {
                 nextState = entry.getValue().nextState;
               }
-              t = new Transition(receivedSpec, nextState, DROP);
+              t = new Transition(receivedSpec, nextState);
             } else {
               t = entry.getValue();
             }
@@ -452,15 +559,16 @@ class Table {
       return t;
     }
 
-    Transition doTransition(boolean ignoreOtherTransitions) {
-      Transition t = lastStateInBlock
-          ? lastStateTransition()
+    Transition getTransition(boolean ignoreOtherTransitions) {
+      Transition t = isBlockEnd
+          ? blockEndTransition()
           : intermediateStateTransition(ignoreOtherTransitions);
       runEntryExitFunctions(EventSpec.EPSILON, t);
       return t;
     }
 
-    Transition intermediateStateTransition(boolean ignoreOtherTransitions) {
+    abstract Transition intermediateStateTransition(boolean ignoreOtherTransitions);
+/*    Transition intermediateStateTransition(boolean ignoreOtherTransitions) {
       InternalEventSpec internalSpec = null;
       Transition internalTransition = null;
       for (Map.Entry<Spec, Transition> entry : transitions.entrySet()) {
@@ -477,9 +585,9 @@ class Table {
         t.performAction();
       }
       return t;
-    }
+    }*/
 
-    private Transition lastStateTransition() {
+    private Transition blockEndTransition() {
       //logger.error("{}: LAST STATE -> block status = {}", this, block.status());
       if (!block.hasPendingEvents()) {
         block.iterationComplete();
@@ -488,6 +596,8 @@ class Table {
       return null;
     }
 
+    abstract void runEntryExitFunctions(EventSpec receivedSpec, Transition t);
+/*
     private void runEntryExitFunctions(EventSpec receivedSpec, Transition t) {
       //logger.error("{}, block = {}", this, block.hashCode());
       if (t == null) {
@@ -519,6 +629,7 @@ class Table {
         onEntry = true;
       }
     }
+*/
 
     private void addPreceedingBlockInit(Block preceedingBlock) {
       preceedingBlockInits.add(preceedingBlock);
@@ -547,24 +658,19 @@ class Table {
     }
   }
 
-  class Transition implements Cloneable{
+  private class Transition implements Cloneable{
     final Spec spec;
     final State nextState;
-    final Action action;
+    //final Action action;
+    boolean handle;
 
-    Transition(Spec spec, State nextState, Action action) {
+    Transition(Spec spec, State nextState) {
       this.spec = spec;
       this.nextState = nextState;
-      this.action = action;
     }
-
-    void performAction() {
-      // if has loop start -> run
-      // if has loop end -> run
-      // if has internal event -> run
-      if (spec instanceof InternalEventSpec) {
-        ((InternalEventSpec) spec).performInternalEvent();
-      }
+    Transition(Spec spec, State nextState, boolean handle) {
+      this(spec, nextState);
+      this.handle = handle;
     }
 
     @Override
