@@ -44,7 +44,7 @@ public class PingerPongerTest {
   @Test
   public void iterationInitTest() {
 
-    int M = 11, N = 10;
+    int M = 5, N = 2;
     tc.
         connect(pingerPort, pongerPort).
         body().
@@ -66,7 +66,7 @@ public class PingerPongerTest {
   @Test
   public void initOnMultipleBlocksTest() {
 
-    int M = 10, N = 12;
+    int M = 20, N = 30;
     tc.
         connect(pingerPort, pongerPort).
         body().
@@ -79,10 +79,49 @@ public class PingerPongerTest {
                 .trigger(new Ping(0), pingerPort.getPair())
                 .expect(new Ping(0), pingerPort, OUTGOING)
             .end()
+
+            .repeat(N, increment)
+                .onEachIteration(increment)
+            .body()
+            .end()
+
+            .repeat(N, increment)
+                .onEachIteration(increment)
+            .body()
+            .end()
+
         .end();
 
     assert tc.check_();
-    assertEquals(counter.i, M * N + M + M);
+    System.out.println(counter.i);
+    assertEquals(counter.i, 3 *(M * N + M) + 1);
+  }
+
+  @Test
+  public void nestedblockAndIterationInitsTest() {
+    tc.body()
+        .repeat(3, increment)
+            .onEachIteration(increment)
+        .body()
+            .repeat(4, increment)
+                .onEachIteration(increment)
+            .body()
+
+                .repeat(5, increment)
+                    .onEachIteration(increment)
+                .body()
+                    .repeat(6, increment)
+                        .onEachIteration(increment)
+                    .body().end()
+                .end()
+                .repeat(7, increment)
+                    .onEachIteration(increment)
+                .body().end()
+            .end()
+        .end()
+    ;
+    assert tc.check_();
+    System.out.println(counter.i);
   }
 
   @Test

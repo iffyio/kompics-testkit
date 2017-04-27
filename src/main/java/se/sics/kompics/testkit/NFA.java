@@ -32,35 +32,19 @@ class NFA<T extends ComponentDefinition> {
   private final T definitionUnderTest;
   private final EventQueue eventQueue;
 
-/*  static final int ERROR_STATE = -1;
-  private String ERROR_MESSAGE = "";
-  private int FINAL_STATE;
-  private boolean STARTED = false;*/
   private boolean STARTED = false;
 
   private final ComponentCore proxyComponent;
   private Collection<Component> participants = new HashSet<Component>();
 
-/*  private final Stack<Block> balancedBlock = new Stack<Block>();
-  private Map<Integer, Block> blockStart = new HashMap<Integer, Block>();
-  private Map<Integer, Block> blockEnd = new HashMap<Integer, Block>();
-
-  private List<SingleEventSpec> expectUnordered = new ArrayList<SingleEventSpec>();
-  private ExpectMapper expectMapper;
-  private ExpectFuture expectFuture;*/
-
   private ExpectMapper expectMapper;
   private ExpectFuture expectFuture;
   private List<SingleEventSpec> expectUnordered = new ArrayList<SingleEventSpec>();
   private ComparatorMap comparators = new ComparatorMap();
-  //private StateTable table = new StateTable();
 
-  //private int currentState = 0;
-  private Block currentBlock = new Block(null);
+  private Block currentBlock = new Block(null, 1);
 
-  //private Conditional currentConditional;
-
-  private Table table = new Table(this, currentBlock);
+  private Table table = new Table(currentBlock);
 
   private int balancedEnd = 0;
   private Stack<MODE> previousMode = new Stack<MODE>();
@@ -71,8 +55,6 @@ class NFA<T extends ComponentDefinition> {
     this.proxyComponent =  proxy.getComponentCore();
     this.definitionUnderTest = definitionUnderTest;
     previousMode.push(HEADER);
-
-    //repeat(1);
   }
 
   void addParticipant(Component c) {
@@ -254,12 +236,12 @@ class NFA<T extends ComponentDefinition> {
   void repeat(int count) {
 /*    Block block = new Block(currentBlock, count, currentState);*/
 /*    enterNewBlock(block);*/
-    Block block = new Block(currentBlock);
+    Block block = new Block(currentBlock, count);
     enterNewBlock(count, block);
   }
 
   void repeat(int count, BlockInit init) {
-    Block block = new Block(currentBlock,  init);
+    Block block = new Block(currentBlock, count, init);
     enterNewBlock(count, block);
   }
 
@@ -375,16 +357,6 @@ class NFA<T extends ComponentDefinition> {
     }
     return false;
   }
-/*  int start() {
-    if (!STARTED) {
-      STARTED = true;
-      addFinalState();
-      checkBalancedRepeatBlocks();
-      printTable(FINAL_STATE);
-      run();
-    }
-    return currentState == FINAL_STATE + 1 ? FINAL_STATE : currentState;
-  }*/
 
   <P extends  PortType, E extends KompicsEvent> EventSpec newEventSpec(
       KompicsEvent event, Port<P> port, Direction direction) {
@@ -395,12 +367,18 @@ class NFA<T extends ComponentDefinition> {
   private boolean run() {
     table.build();
     while (true) {
-      table.doInternalTransitions();
+      table.tryInternalEventTransitions();
       if (table.isInFinalState()) {
+        logger.debug("final state");
         return true;
       }
       EventSpec receivedSpec = removeEventFromQueue();
       boolean successful = table.doTransition(receivedSpec);
+      //logger.debug("in Final State? = {}", table.isInFinalState());
+      if (table.isInFinalState()) {
+        logger.debug("final state");
+        return true;
+      }
       if (!successful) {
         return false;
       }

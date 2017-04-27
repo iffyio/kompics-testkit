@@ -2,11 +2,9 @@ package se.sics.kompics.testkit;
 
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.Multiset;
-import se.sics.kompics.KompicsEvent;
 
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
@@ -19,6 +17,9 @@ class Block {
 
   private BlockInit blockInit, iterationInit;
   final Block previousBlock;
+
+  boolean currentlyExecuting;
+  boolean iterationInitHasRun;
 
   private Set<EventSpec> disallowed;
   private Set<EventSpec> allowed;
@@ -38,13 +39,13 @@ class Block {
     throw new UnsupportedOperationException("deprecate start state");
   }
 
-  Block(Block previousBlock, BlockInit blockInit) {
-    this(previousBlock);
+  Block(Block previousBlock, int count, BlockInit blockInit) {
+    this(previousBlock, count);
     this.blockInit = blockInit;
   }
 
-  Block(Block previousBlock) {
-    this.times = 0;
+  Block(Block previousBlock, int count) {
+    this.times = count;
     this.previousBlock = previousBlock;
 
     if (previousBlock == null) {
@@ -57,12 +58,15 @@ class Block {
   }
 
   Block(Block previousBlock, int times, int startState) {
-    this(previousBlock);
+    this(previousBlock, times);
     this.startState = startState;
     throw new UnsupportedOperationException("deprecate block");
   }
 
   void initialize() {
+    assert !currentlyExecuting; // don't try to initialize a block that isn't done executing
+    assert !iterationInitHasRun;
+    currentlyExecuting = true;
     currentCount = times;
 
     if (blockInit != null) {
@@ -81,8 +85,17 @@ class Block {
   }
 
   void iterationComplete() {
+    currentCount--;
+    assert currentCount >= 0;
+    iterationInitHasRun = false;
     assert pending.isEmpty();
-    //pending.clear();
+    reset();
+  }
+
+  void reset() {
+    //assert currentlyExecuting;
+    //assert iterationInitHasRun;
+    pending.clear();
     received.clear();
     for (SingleEventSpec spec : expected) {
       pending.add(spec);
@@ -110,6 +123,8 @@ class Block {
   }
 
   void runIterationInit() {
+    assert !iterationInitHasRun;
+    iterationInitHasRun = true;
     if (iterationInit != null) {
       iterationInit.init();
     }
