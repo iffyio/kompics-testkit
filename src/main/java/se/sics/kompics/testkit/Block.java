@@ -14,6 +14,9 @@ class Block {
   final int times;
   private int startState;
   private int currentCount;
+  static final int STAR = -1;
+
+  private boolean isKleeneBlock;
 
   private BlockInit blockInit, iterationInit;
   final Block previousBlock;
@@ -46,6 +49,11 @@ class Block {
 
   Block(Block previousBlock, int count) {
     this.times = count;
+
+    if (count == STAR) {
+      isKleeneBlock = true;
+    }
+
     this.previousBlock = previousBlock;
 
     if (previousBlock == null) {
@@ -63,19 +71,6 @@ class Block {
     throw new UnsupportedOperationException("deprecate block");
   }
 
-  void initialize() {
-    assert !currentlyExecuting; // don't try to initialize a block that isn't done executing
-    assert !iterationInitHasRun;
-    currentlyExecuting = true;
-    currentCount = times;
-
-    if (blockInit != null) {
-      blockInit.init();
-    }
-
-    runIterationInit();
-  }
-
   void setIterationInit(BlockInit iterationInit) {
     this.iterationInit = iterationInit;
   }
@@ -84,19 +79,50 @@ class Block {
     return currentCount;
   }
 
+  void initialize() {
+    assert !currentlyExecuting; // don't try to initialize a block that isn't done executing
+    assert !iterationInitHasRun;
+
+    currentlyExecuting = true;
+
+    if (!isKleeneBlock) {
+      currentCount = times;
+    }
+
+    if (blockInit != null) {
+      blockInit.init();
+    }
+
+    runIterationInit();
+  }
+
   void iterationComplete() {
-    currentCount--;
-    assert currentCount >= 0;
+    assert iterationInitHasRun;
     iterationInitHasRun = false;
+
     assert pending.isEmpty();
-    reset();
+    resetBlockEvents();
+
+    if (!isKleeneBlock) {
+      currentCount--;
+      assert currentCount >= 0;
+    }
   }
 
   void reset() {
-    //assert currentlyExecuting;
-    //assert iterationInitHasRun;
+    if (isKleeneBlock) {
+      // without explicit end conditions -
+      // kleene blocks only go out of scope when the thread is discontinued by the NFA
+      // close the block to re-enable block init to run later if needed
+      currentlyExecuting = false;
+    }
+    resetBlockEvents();
+  }
+
+  private void resetBlockEvents() {
     pending.clear();
     received.clear();
+
     for (SingleEventSpec spec : expected) {
       pending.add(spec);
     }
@@ -113,13 +139,6 @@ class Block {
   void expect(SingleEventSpec spec) {
     expected.add(spec);
     pending.add(spec);
-  }
-
-
-  void runBlockInit() {
-    if (blockInit != null) {
-      blockInit.init();
-    }
   }
 
   void runIterationInit() {
@@ -166,7 +185,7 @@ class Block {
 
   String status() {
     StringBuilder sb = new StringBuilder("Block[");
-    sb.append(times).append(" Received").append(received);
+    sb.append(times == STAR? "*" : times).append(" Received").append(received);
     sb.append(" Pending").append(pending);
     sb.append("]");
     return sb.toString();
@@ -212,6 +231,6 @@ class Block {
 
   @Override
   public String toString() {
-    return "Repeat(" + times + ")";
+    return "Repeat(" + (times == STAR? "*" : times) + ")";
   }
 }

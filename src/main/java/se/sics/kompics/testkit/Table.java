@@ -1,14 +1,14 @@
 package se.sics.kompics.testkit;
 
 import com.google.common.base.Function;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
 import org.slf4j.Logger;
-import se.sics.kompics.ComponentDefinition;
 import se.sics.kompics.KompicsEvent;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -41,12 +41,13 @@ class Table {
   private final State errorState = new State(nextid(), null);
   private Logger logger = Testkit.logger;
   private FA currentFA;
-  private Stack<FA> faStack = new Stack<FA>();
+  private Stack<FA> previousFA = new Stack<FA>();
+  private HashSet<Block> activeBlocks = new HashSet<Block>();
 
   Table(Block initialBlock) {
     repeatMain = new RepeatFA(1, initialBlock);
     currentFA = repeatMain;
-    faStack.push(repeatMain);
+    previousFA.push(repeatMain);
   }
 
   private int nextid() {
@@ -89,18 +90,20 @@ class Table {
   }
 
   void addRepeat(int count, Block block) {
-    currentFA = new RepeatFA(count, block);
-    faStack.push(currentFA);
+    currentFA = count == Block.STAR
+        ? new KleeneFA(block)
+        : new RepeatFA(count, block);
+    previousFA.push(currentFA);
   }
 
   void endRepeat() {
-    FA child = faStack.pop();
+    FA child = previousFA.pop();
     assert child == currentFA;
-    if (faStack.isEmpty()) {
+    if (previousFA.isEmpty()) {
       throw new IllegalStateException("no matching block for end repeat");
     }
     currentFA.end();
-    currentFA = faStack.peek(); // previous
+    currentFA = previousFA.peek(); // previous
     currentFA.addFA(child);
   }
 
@@ -108,14 +111,14 @@ class Table {
     assert repeatMain == currentFA;
     repeatMain.end();
     BaseFA finalFA = new BaseFA(repeatMain.block);
+    finalFA.startState.isFinalState = true;
     repeatMain.build(finalFA);
-    //assignNumbersToStates();
-    currentStates = repeatMain.startState.eclosure();
-    Testkit.logger.debug("start state = {}", currentStates);
+    currentStates = new HashSet<State>(repeatMain.startState.eclosure());
+    Testkit.logger.debug("start state is {}", currentStates);
     for (State s : currentStates) {
       logger.debug("{}", s.show());
     }
-    Testkit.logger.debug("final state = {}", finalFA.startState);
+    Testkit.logger.debug("final state is {}", finalFA.startState);
   }
 
   private void showCurrentState() {
@@ -137,7 +140,7 @@ class Table {
   }
 
   boolean doTransition(EventSpec receivedSpec) {
-    logger.debug("{}: lookup event {}", currentStates, receivedSpec);
+    logger.debug("{}: received event {}", currentStates, receivedSpec);
     while (true) {
       tryInternalEventTransitions();
 
@@ -145,13 +148,13 @@ class Table {
       Set<State> nextStates = new HashSet<State>();
       Set<Transition> transitions = new HashSet<Transition>();
       for (State state : currentStates) {
-        Transition t = state.getTransition(receivedSpec);
-        if (t != null) {
-          nextStates.add(t.nextState);
-          transitions.add(t);
+        Collection<Transition> t = state.getTransition(receivedSpec);
+        //logger.debug("got {} for {}", t, state);
+        for (Transition transition : t) {
+          nextStates.add(transition.nextState);
+          transitions.add(transition);
         }
       }
-
 
       if (!nextStates.isEmpty()) {
         //logger.debug("{} some transitions were found from current state", currentStates);
@@ -181,7 +184,7 @@ class Table {
         logger.debug("No internal transition(s) found");
         logger.debug("trying e-transitions");
 
-        // no transitions found yet
+/*        // no transitions found yet
         // try e-transitions from each current state
         // if found, kill those without and retry handle received spec
         performEpsilonTransitions(nextStates);
@@ -190,7 +193,7 @@ class Table {
           updateCurrentState(nextStates);
           continue;
         }
-        //logger.debug("NO e-transitions were found");
+        //logger.debug("NO e-transitions were found");*/
       }
 
       //logger.debug("Checking default action for event");
@@ -235,8 +238,11 @@ class Table {
     assert nextStates.isEmpty();
     for (State state : currentStates) {
       if (state.canPerformInternalTransition()) {
-        Transition t = state.getTransition(EventSpec.EPSILON);
-        nextStates.add(t.nextState);
+        Collection<Transition> transitions = state.getTransition(EventSpec.EPSILON);
+        assert !transitions.isEmpty();
+        for (Transition t : transitions) {
+          nextStates.add(t.nextState);
+        }
       }
     }
   }
@@ -245,8 +251,11 @@ class Table {
     assert nextStates.isEmpty();
     for (State state : currentStates) {
       if (state.canPerformInternalTransition()) {
-        Transition t = state.doInternalEventTransition();
-        nextStates.add(t.nextState);
+        Collection<Transition> transitions = state.doInternalEventTransition();
+        assert !transitions.isEmpty();
+        for (Transition t : transitions) {
+          nextStates.add(t.nextState);
+        }
       }
     }
   }
@@ -267,10 +276,12 @@ class Table {
       // if so, non-singular set currentStates implies an ambiguous test specification
       Set<State> nextStates = new HashSet<State>();
       for (State state : currentStates) {
-        logger.debug("{}", state);
-        Transition t = state.doInternalEventTransition();
-        assert t != null;
-        nextStates.add(t.nextState);
+        //logger.debug("{} performing internal transition", state);
+        Collection<Transition> transitions = state.doInternalEventTransition();
+        assert !transitions.isEmpty();
+        for (Transition t : transitions) {
+          nextStates.add(t.nextState);
+        }
       }
       assert !nextStates.isEmpty();
       //logger.debug("all states have internal transitions");
@@ -280,52 +291,48 @@ class Table {
 
   private void updateCurrentState(Set<State> nextStates) {
     logger.debug("{}: new state is {}", currentStates, nextStates);
-    // for each thread discontinued by NFA -
-    // reset events seen within block
-    // get discontinued states in and reset their blocks
-    Set<Block> discontinued = new HashSet<Block>();
-    Set<Block> active = new HashSet<Block>();
+
+    // recompute active blocks
+    activeBlocks.clear();
+
+    // reset discontinued blocks
+    Block block;
     for (State state : nextStates) {
-      active.add(state.block);
+      block = state.block;
+      while (block != null && !activeBlocks.contains(block)) {
+        activeBlocks.add(block);
+        block = block.previousBlock;
+      }
     }
+    //logger.debug("active blocks = {}", activeBlocks);
 
     for (State state : currentStates) {
-      if (!nextStates.contains(state)) {
-        discontinued.add(state.block);
+      if (!nextStates.contains(state) && !activeBlocks.contains(state.block)) {
+        logger.debug("resetting {}, for state {}", state.block, state);
+        state.block.reset();
       }
     }
 
-    //logger.debug("discontinued {}, active {}", discontinued, active);
-
-    discontinued.removeAll(active);
-    for (Block block : discontinued) {
-      logger.debug("reseting {}", block);
-      block.reset();
-    }
-
     // update current state
-    currentStates = nextStates;
+    currentStates.clear();
+    for (State state : nextStates) {
+      assert !state.eclosure().isEmpty();
+      currentStates.addAll(state.eclosure());
+    }
   }
 
+  /**
+   *
+   *    PRIVATE CLASSES
+   *
+   */
 
   private class BaseFA extends FA{
     Spec spec;
-    BaseFA(Spec spec, Block block) {
-      super(block);
-      startState = new State(nextid(), block);
-      this.spec = spec;
-    }
-
-    BaseFA(Spec spec, Block block, State startState) {
-      super(block);
-      this.startState = startState;
-      this.spec = spec;
-    }
 
     BaseFA(Block block) {
       super(block);
       startState = new State(nextid(), block);
-      startState.isFinalState = true;
     }
 
     @Override
@@ -342,6 +349,62 @@ class Table {
     public String toString() {
       return "BaseFA " + startState;
     }
+
+    @Override
+    void end() {}
+  }
+
+  private class KleeneFA extends FA {
+
+    KleeneFA(Block block) {
+      super(block);
+    }
+
+    @Override
+    void addSpec(Spec spec) {
+      // TODO: 4/27/17 merge with repeatFA addspec
+      BaseFA child = new BaseFA(block);
+      child.spec = spec;
+      children.add(child);
+    }
+
+    @Override
+    void build(FA finalFA) {
+      FA endFA = children.get(children.size() - 1);
+
+      FA next = endFA;
+      FA current;
+      for (int i = children.size() - 2; i >= 0; i--) { // ignore last
+        current = children.get(i);
+        current.build(next);
+        next = current;
+      }
+
+      // set kleene start
+      FA firstChild = children.get(0);
+      firstChild.startState.isKleeneStart = true;
+      startState = firstChild.startState;
+
+      // set loopback transition from end
+      State endState = endFA.startState;
+      assert endState.isKleeneEnd;
+      endState.loopTransition.add(new Transition(startState));
+
+      // set e-transition outside of block
+      startState.addTransition(new Transition(EventSpec.EPSILON, finalFA.startState));
+
+      if (!(firstChild instanceof BaseFA)) {
+        startState.parentBlocks.add(0, block);
+      }
+    }
+
+    @Override
+    void end() {
+      FA blockEnd = new BaseFA(block);
+      blockEnd.startState.setKleenEnd();
+      children.add(blockEnd);
+    }
+
   }
 
   private class RepeatFA extends FA {
@@ -354,22 +417,15 @@ class Table {
 
     @Override
     void addSpec(Spec spec) {
-      if (children.isEmpty()) {
-        State repeatStartState = new State(nextid(), block);
-        repeatStartState.isRepeatStart = true;
-        children.add(new BaseFA(spec, block, repeatStartState));
-      } else {
-        children.add(new BaseFA(spec, block));
-      }
+      BaseFA child = new BaseFA(block);
+      child.spec = spec;
+      children.add(child);
     }
 
     @Override
     void build(FA finalFA) {
+      // build children
       FA endFA = children.get(children.size() - 1);
-      State endState = endFA.startState;
-      assert endState.isRepeatEnd;
-      endState.exitTransition = new Transition(EventSpec.EPSILON, finalFA.startState);
-
       FA next = endFA;
       FA current;
       for (int i = children.size() - 2; i >= 0; i--) { // ignore repeatend
@@ -378,48 +434,37 @@ class Table {
         next = current;
       }
 
-      startState = children.get(0).startState;
+      // set start of repeat block
+      FA firstChild = children.get(0);
+      startState = firstChild.startState;
       startState.isRepeatStart = true;
-      //assert startState.isRepeatStart;
-      //assert startState instanceof RepeatStartState;
-      endState.loopTransition = new Transition(EventSpec.EPSILON, startState);
+
+      // end of repeat block
+      State endState = endFA.startState;
+      assert endState.isRepeatEnd;
+      endState.exitTransition.add(new Transition(finalFA.startState));
+      endState.loopTransition.add(new Transition(startState));
 
       // if repeat has a nested start state 's' belonging to another block
       // register block to be run on entry to 's'
-      if (!(children.get(0) instanceof BaseFA)) {
-        assert startState.isRepeatStart;
+      if (!(firstChild instanceof BaseFA)) {
+        //assert startState.isRepeatStart;
         startState.parentBlocks.add(0, block);
       }
     }
 
     @Override
     void end() {
-      State repeatend = new State(nextid(), block);
-      repeatend.isRepeatEnd = true;
-      FA blockEnd = new BaseFA(EventSpec.EPSILON, block, repeatend);
+      FA blockEnd = new BaseFA(block);
+      blockEnd.startState.setRepeatEnd();
       children.add(blockEnd);
-    }
-
-    private void cloneChildren() {
-      if (count <= 1) {
-        return;
-      }
-      int numChildren = children.size();
-      try {
-        for (int i = 0; i < count - 1; i++) {
-          for (int j = 0; j < numChildren; j++) {
-            children.add((FA) children.get(j).clone());
-          }
-        }
-      } catch (CloneNotSupportedException e) {
-        throw new RuntimeException(e);
-      }
     }
   }
 
   abstract class FA implements Cloneable{
     State startState;
     Collection<State> endStates;
+    // TODO: 4/27/17 dont create new list for baseFAs
     List<FA> children = new ArrayList<FA>();
     Set<State> states = new HashSet<State>();
     final Block block;
@@ -438,51 +483,28 @@ class Table {
       children.add(childFA) ;
     }
 
-    protected Object clone() throws CloneNotSupportedException {
-      FA clone = (FA) super.clone();
-      clone.startState = startState == null? null : (State) clone.startState.clone();
-
-      List<State> endStatesClone = new ArrayList<State>();
-      for (State endState : endStates) {
-        endStatesClone.add((State) endState.clone());
-      }
-      clone.endStates = endStatesClone;
-
-      List<FA> chldrn = new ArrayList<FA>();
-      for (FA child : children) {
-        chldrn.add((FA) child.clone());
-      }
-      clone.children = chldrn;
-
-      Set<State> sts = new HashSet<State>();
-      for (State state : states) {
-        sts.add((State) state.clone());
-      }
-      clone.states = sts;
-
-      return clone;
-    }
-
-    void end() { }
+    abstract void end();
   }
 
 
   class State implements Cloneable{
     final ID id;
     final Block block;
-    Map<Spec, Transition> transitions = new HashMap<Spec, Transition>();
+    Multimap<Spec, Transition> transitions = HashMultimap.<Spec, Transition>create();
 
     boolean isFinalState;
     boolean isRepeatStart;
     boolean isRepeatEnd;
+    boolean isKleeneStart;
+    boolean isKleeneEnd;
     InternalEventSpec internalEventSpec;
     List<Block> parentBlocks = new LinkedList<Block>();
 
     Set<State> eclosure;
 
-    Transition loopTransition;
-    Transition exitTransition;
-    Transition selfTransition = new Transition(EventSpec.EPSILON, this);
+    Collection<Transition> loopTransition;
+    Collection<Transition> exitTransition;
+    Collection<Transition> selfTransition;// = new Transition(this);
 
     State(int number, Block block) {
       this.block = block;
@@ -493,16 +515,22 @@ class Table {
       transitions.put(t.spec, t);
     }
 
-    Transition getTransition(EventSpec receivedSpec) {
-      if (isRepeatEnd && !block.hasPendingEvents()) {
-        return null;
+    Collection<Transition> getTransition(EventSpec receivedSpec) {
+      Collection<Transition> t = new HashSet<Transition>();
+
+      // don't transition out of completed loop on event
+      if (isEndOfLoop() && !block.hasPendingEvents()) {
+        return t;
       }
 
-      Transition t = null;
+      // blockExpect
       if (block.handle(receivedSpec)) {
-        t = new Transition(receivedSpec, this, true); // handle received event
-      } else {
-        for (Map.Entry<Spec, Transition> entry : transitions.entrySet()) {
+        t.add(new Transition(receivedSpec, this, true)); // handle received event
+      }
+
+      // if block doesn't handle, consider other transitions
+      if (t.isEmpty()) {
+        for (Map.Entry<Spec, Transition> entry : transitions.entries()) {
           Spec spec = entry.getKey();
           if (spec.match(receivedSpec)) {
             if (spec instanceof MultiEventSpec) {
@@ -510,18 +538,23 @@ class Table {
               if (((MultiEventSpec) spec).isComplete()) {
                 nextState = entry.getValue().nextState;
               }
-              t = new Transition(receivedSpec, nextState);
+              t.add(new Transition(receivedSpec, nextState));
             } else {
-              t = entry.getValue();
+              t.add(entry.getValue());
             }
           }
         }
       }
-      if (t == null) {
-        t = handleWithBlockTransitions(receivedSpec);
+
+      // allow, disallow, drop transitions
+      if (t.isEmpty()) {
+        Transition blockTransition = handleWithBlockTransitions(receivedSpec);
+        if (blockTransition != null) {
+          t.add(blockTransition);
+        }
       }
 
-      if (isRepeatStart && t != null) {
+      if (isStartOfLoop() && !t.isEmpty()) {
         runBlockInits();
       }
 
@@ -529,7 +562,7 @@ class Table {
     }
 
     private Transition handleWithBlockTransitions(EventSpec receivedSpec) {
-      Testkit.logger.debug("{}: looking up {} with block {}", this, receivedSpec, block.status());
+      logger.debug("{}: looking up {} with constraints {}", this, receivedSpec, block.status());
       if (block.getAllowedSpecs().contains(receivedSpec)) {
         return new Transition(receivedSpec, this, true);
       }
@@ -542,75 +575,89 @@ class Table {
       return null;
     }
 
-    Transition doInternalEventTransition() {
-      if (isRepeatStart) {
+    Collection<Transition> doInternalEventTransition() {
+      // if start state is trigger, inspect etc (run block init before performing event)
+      if (isStartOfLoop()) {
         runBlockInits();
       }
+
+      // trigger, inspect, etc
       if (internalEventSpec != null) {
         internalEventSpec.performInternalEvent();
         return transitions.get(internalEventSpec);
       }
-      if (isRepeatEnd) {
-        return getRepeatEndTransition();
+
+      if (isEndOfLoop()) {
+        return getLoopEndTransition();
       }
       return null;
     }
 
     private boolean canPerformInternalTransition() {
-      if (isRepeatEnd) {
+      if (isEndOfLoop()) { // if block is complete, loop back transition is possible
         return !block.hasPendingEvents();
       }
       return internalEventSpec != null;
-      //return internalEventSpec != null || isRepeatEnd;
     }
 
     private void runBlockInits() {
       if (!block.currentlyExecuting) {
-        boolean notExecuting = false; // if a parent block is closed, all others nested must have been closed as well
+        boolean assertNotExecuting = false; // parent block is closed -> nested blocks are closed
         for (Block parent : parentBlocks) {
-          if (notExecuting) {
+          if (assertNotExecuting) {
             assert !parent.currentlyExecuting;
           }
           if (!parent.currentlyExecuting) {
-            notExecuting = true;
-            //logger.debug("{}, initializing parent {}", currentStates, parent);
-            logger.debug("init {}", parent);
-            parent.initialize();
+            assertNotExecuting = true;
+            runInitializeFor(parent);
           } else if (!parent.iterationInitHasRun) {
-            logger.debug("iteration init {}", parent);
-            parent.runIterationInit();
+            runIterationInitFor(parent);
           }
         }
-        logger.debug("init {}", block);
-        //logger.debug("{}, block initialize", currentStates);
-        block.initialize();
+
+        runInitializeFor(block);
       } else {
         if (!block.iterationInitHasRun) {
           for (Block parent : parentBlocks) {
             if (!parent.iterationInitHasRun) {
-              logger.debug("iteration init {}", parent);
-              parent.runIterationInit();
+              runIterationInitFor(parent);
             }
           }
-          logger.debug("iteration init {}", block);
-          block.runIterationInit();
+
+          runIterationInitFor(block);
         }
       }
     }
 
-    private Transition getRepeatEndTransition() {
+    private void runInitializeFor(Block block) {
+      logger.debug("{}: running initialize() for block {}", this, block);
+      block.initialize();
+    }
+
+    private void runIterationInitFor(Block block) {
+      logger.debug("{}: running iterationInit {}", this, block);
+      block.runIterationInit();
+    }
+
+    private Collection<Transition> getLoopEndTransition() {
       //logger.debug("loop = {}, exit = {}", loopTransition, exitTransition);
       if (!block.hasPendingEvents()) {
         logger.debug("end{} count = {}", block, block.getCurrentCount());
+
+        assert block.currentlyExecuting;
         assert block.iterationInitHasRun; // iterationInit must have been run on this iteration
-        block.iterationComplete();
+        block.iterationComplete(); // decrement loop count (for kleene closure disable block)
         assert !block.iterationInitHasRun; // reset flag for next iteration
 
         assert loopTransition != null;
-        assert exitTransition != null;
+
+        if (isRepeatEnd) {
+          assert exitTransition != null;
+        }
+
         //logger.debug("{}, block iterations? = {}", currentStates, block.hasMoreIterations());
 
-        if (block.hasMoreIterations()) {
+        if (isKleeneEnd || (isRepeatEnd && block.hasMoreIterations())) {
           return loopTransition;
         } else {
           // close block on exit
@@ -622,17 +669,9 @@ class Table {
       return selfTransition;
     }
 
-    private Transition blockEndTransition() {
-      //logger.error("{}: LAST STATE -> block status = {}", this, block.status());
-      if (!block.hasPendingEvents()) {
-        block.iterationComplete();
-        return transitions.get(EventSpec.EPSILON);
-      }
-      return null;
-    }
-
     Set<State> eclosure() {
       if (eclosure != null) {
+        assert !eclosure.isEmpty();
         return eclosure;
       }
       Set<State> eclose = new HashSet<State>();
@@ -642,7 +681,7 @@ class Table {
         State current = pending.removeFirst();
         eclose.add(current);
 
-        for (Map.Entry<Spec, Transition> entry : current.transitions.entrySet()) {
+        for (Map.Entry<Spec, Transition> entry : current.transitions.entries()) {
           State s = entry.getValue().nextState;
           if (entry.getKey() == EventSpec.EPSILON && !(eclose.contains(s) || pending.contains(s))) {
             pending.add(s);
@@ -651,6 +690,29 @@ class Table {
       }
       eclosure = eclose;
       return eclosure;
+    }
+
+    void setRepeatEnd() {
+      isRepeatEnd = true;
+      loopTransition = new HashSet<Transition>();
+      exitTransition = new HashSet<Transition>();
+      selfTransition = new HashSet<Transition>();
+      selfTransition.add(new Transition(this));
+    }
+
+    void setKleenEnd() {
+      isKleeneEnd = true;
+      loopTransition = new HashSet<Transition>();
+      selfTransition = new HashSet<Transition>();
+      selfTransition.add(new Transition(this));
+    }
+
+    private boolean isEndOfLoop() {
+      return isRepeatEnd || isKleeneEnd;
+    }
+
+    private boolean isStartOfLoop() {
+      return isRepeatStart || isKleeneStart;
     }
 
     @Override
@@ -663,46 +725,26 @@ class Table {
       sb.append(transitions.values());
       return sb.toString();
     }
-
-    @Override
-    protected Object clone() throws CloneNotSupportedException {
-      State clone = (State) super.clone();
-      Map<Spec, Transition> t = new HashMap<Spec, Transition>();
-      for (Map.Entry<Spec, Transition> entry : transitions.entrySet()) {
-        t.put(entry.getKey(), entry.getValue());
-      }
-      clone.transitions = t;
-      return clone;
-    }
   }
 
   private class Transition implements Cloneable{
     final Spec spec;
     final State nextState;
     boolean handle;
-    boolean isBlockTransition;
 
     Transition(Spec spec, State nextState) {
       this.spec = spec;
       this.nextState = nextState;
     }
+
+    Transition(State nextState) {
+      this.nextState = nextState;
+      this.spec = null;
+    }
+
     Transition(Spec spec, State nextState, boolean handle) {
       this(spec, nextState);
       this.handle = handle;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (!(o instanceof Transition)) {
-        return false;
-      }
-      Transition other = (Transition) o;
-      return spec.equals(other.spec);// && nextState.equals(other.nextState);
-    }
-
-    @Override
-    public int hashCode() {
-      return 31 * spec.hashCode();
     }
 
     @Override
@@ -750,7 +792,6 @@ class Table {
       for (int id : ids) sum += id;
       return sum;
     }
-
   }
-
 }
+

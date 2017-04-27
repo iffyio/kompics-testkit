@@ -75,6 +75,54 @@ public class NFATest {
     assert Pinger.counter == 10;
   }
 
+  BlockInit increment = new BlockInit() {
+    @Override
+    public void init() {
+      counter.i++;
+    }
+  };
+
+  @Test
+  public void kleeneStarAmbiguousTest() {
+    tc.body()
+        .repeat(increment)
+            .onEachIteration(increment)
+        .body()
+        .end()
+
+        .trigger(ping(0), pingerPort.getPair())
+        .expect(ping(0), pingerPort, OUTGOING)
+    ;
+
+    assert tc.check_();
+  }
+
+  @Test
+  public void kleeneStarTest() {
+    tc
+        .blockExpect(ping(3), pingerPort, OUTGOING)
+        .blockExpect(ping(4), pingerPort, OUTGOING)
+
+    .body()
+        .trigger(ping(0), pingerPort.getPair())
+        .trigger(ping(0), pingerPort.getPair())
+        .trigger(ping(0), pingerPort.getPair())
+        .trigger(ping(4), pingerPort.getPair())
+        .trigger(ping(1), pingerPort.getPair())
+
+        .repeat()
+        .body()
+            .expect(ping(0), pingerPort, OUTGOING)
+        .end()
+
+        .expect(ping(1), pingerPort, OUTGOING)
+        .trigger(ping(3), pingerPort.getPair())
+        //.expect(ping(3), pingerPort, OUTGOING)
+    ;
+
+    assert tc.check_();
+  }
+
   @Test
   public void allowDisallowDropTest() {
     int N = 4, M = 3;

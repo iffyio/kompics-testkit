@@ -108,9 +108,20 @@ public class TestContext<T extends ComponentDefinition> {
     return this;
   }
 
+  public TestContext<T> repeat() {
+    fsm.repeat();
+    return this;
+  }
+
   public TestContext<T> repeat(int times, BlockInit blockInit) {
     Testkit.checkNotNull(blockInit);
     fsm.repeat(times, blockInit);
+    return this;
+  }
+
+  public TestContext<T> repeat(BlockInit blockInit) {
+    Testkit.checkNotNull(blockInit);
+    fsm.repeat(blockInit);
     return this;
   }
 

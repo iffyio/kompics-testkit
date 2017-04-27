@@ -25,6 +25,7 @@ import se.sics.kompics.Start;
 
 import static se.sics.kompics.testkit.Block.MODE;
 import static se.sics.kompics.testkit.Block.MODE.*;
+import static se.sics.kompics.testkit.Block.STAR;
 
 class NFA<T extends ComponentDefinition> {
   static final Logger logger = Testkit.logger;
@@ -240,9 +241,21 @@ class NFA<T extends ComponentDefinition> {
     enterNewBlock(count, block);
   }
 
+  void repeat() {
+/*    Block block = new Block(currentBlock, count, currentState);*/
+/*    enterNewBlock(block);*/
+    Block block = new Block(currentBlock, STAR);
+    enterNewBlock(STAR, block);
+  }
+
   void repeat(int count, BlockInit init) {
     Block block = new Block(currentBlock, count, init);
     enterNewBlock(count, block);
+  }
+
+  void repeat(BlockInit init) {
+    Block block = new Block(currentBlock, STAR, init);
+    enterNewBlock(STAR, block);
   }
 
   void body() {
@@ -522,7 +535,7 @@ class NFA<T extends ComponentDefinition> {
       fail(BODY);
     }
 
-    if (count <= 0) {
+    if (count <= 0 && count != Block.STAR) {
       throw new IllegalArgumentException("only positive value allowed for block");
     }
 
