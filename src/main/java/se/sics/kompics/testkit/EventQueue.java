@@ -6,7 +6,7 @@ import java.util.concurrent.TimeUnit;
 
 class EventQueue {
 
-  private long timeoutMS = 1000;
+  private long timeoutMS = 100;
   private final BlockingQueue<EventSpec> q = new LinkedBlockingQueue<EventSpec>();
 
   void setTimeout(long timeout) {

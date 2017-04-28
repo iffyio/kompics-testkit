@@ -144,32 +144,13 @@ class Table {
     while (true) {
       tryInternalEventTransitions();
 
-      // for each current state, get next state for spec
       Set<State> nextStates = new HashSet<State>();
-      Set<Transition> transitions = new HashSet<Transition>();
-      for (State state : currentStates) {
-        Collection<Transition> t = state.getTransition(receivedSpec);
-        //logger.debug("got {} for {}", t, state);
-        for (Transition transition : t) {
-          nextStates.add(transition.nextState);
-          transitions.add(transition);
-        }
+      if (receivedSpec != null) {
+        tryStateTransitions(receivedSpec, nextStates);
       }
 
       if (!nextStates.isEmpty()) {
-        //logger.debug("{} some transitions were found from current state", currentStates);
-        // kill threads without transitions and set new current states to next states
-        updateCurrentState(nextStates);
-
-        // handle received spec at most once
-        for (Transition tr : transitions) {
-          if (tr.handle) {
-            receivedSpec.handle();
-            break;
-          }
-        }
         return true;
-
       } else {
         //logger.debug("{} NO transitions were found from current state", currentStates);
         //logger.debug("{} forcing internal event transition");
@@ -179,8 +160,14 @@ class Table {
         if (!nextStates.isEmpty()) {
           logger.debug("internal transition(s) found");
           updateCurrentState(nextStates);
-          continue;
+
+          if (receivedSpec == null) { // retry event queue
+            return true;
+          } else {
+            continue;
+          }
         }
+
         logger.debug("No internal transition(s) found");
         logger.debug("trying e-transitions");
 
@@ -212,6 +199,33 @@ class Table {
         logger.debug("Last state was {}", currentStates);
       }
       return false;
+    }
+  }
+
+  private void tryStateTransitions(EventSpec receivedSpec, Set<State> nextStates) {
+    Set<Transition> transitions = new HashSet<Transition>();
+    // for each current state, get next state for spec
+    for (State state : currentStates) {
+      Collection<Transition> t = state.getTransition(receivedSpec);
+      //logger.debug("got {} for {}", t, state);
+      for (Transition transition : t) {
+        nextStates.add(transition.nextState);
+        transitions.add(transition);
+      }
+    }
+
+    if (!nextStates.isEmpty()) {
+      //logger.debug("{} some transitions were found from current state", currentStates);
+      // kill threads without transitions and set new current states to next states
+      updateCurrentState(nextStates);
+
+      // handle received spec at most once
+      for (Transition tr : transitions) {
+        if (tr.handle) {
+          receivedSpec.handle();
+          return;
+        }
+      }
     }
   }
 
@@ -401,7 +415,7 @@ class Table {
     @Override
     void end() {
       FA blockEnd = new BaseFA(block);
-      blockEnd.startState.setKleenEnd();
+      blockEnd.startState.setKleeneEnd();
       children.add(blockEnd);
     }
 
@@ -700,7 +714,7 @@ class Table {
       selfTransition.add(new Transition(this));
     }
 
-    void setKleenEnd() {
+    void setKleeneEnd() {
       isKleeneEnd = true;
       loopTransition = new HashSet<Transition>();
       selfTransition = new HashSet<Transition>();

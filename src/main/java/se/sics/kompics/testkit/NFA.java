@@ -387,7 +387,6 @@ class NFA<T extends ComponentDefinition> {
       }
       EventSpec receivedSpec = removeEventFromQueue();
       boolean successful = table.doTransition(receivedSpec);
-      //logger.debug("in Final State? = {}", table.isInFinalState());
       if (table.isInFinalState()) {
         logger.debug("final state");
         return true;

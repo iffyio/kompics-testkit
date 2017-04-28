@@ -1,5 +1,6 @@
 package se.sics.kompics.testkit;
 
+import com.google.common.base.Predicate;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -121,6 +122,51 @@ public class NFATest {
     ;
 
     assert tc.check_();
+  }
+
+  @Test
+  public void kleeneStar_Test() {
+    tc
+        .body()
+        .repeat(10, increment)
+            .onEachIteration(increment)
+        .body()
+            .trigger(ping(1), pingerPort.getPair())
+            .trigger(ping(2), pingerPort.getPair())
+            .trigger(ping(3), pingerPort.getPair())
+        .end()
+
+        .repeat(increment)
+            .onEachIteration(increment)
+        .body()
+            .expect(ping(1), pingerPort, OUTGOING)
+            .expect(ping(2), pingerPort, OUTGOING)
+            .expect(ping(3), pingerPort, OUTGOING)
+        .end()
+
+        .trigger(ping(9), pingerPort.getPair())
+        .expect(ping(9), pingerPort, OUTGOING)
+
+        .repeat(10)
+        .body()
+            .trigger(ping(4), pingerPort.getPair())
+            .trigger(ping(5), pingerPort.getPair())
+            .trigger(ping(6), pingerPort.getPair())
+
+            .repeat()
+            .body()
+                .expect(Ping.class, new Predicate<Ping>() {
+                  @Override
+                  public boolean apply(Ping ping) {
+                    return true;
+                  }
+                }, pingerPort, OUTGOING)
+            .end()
+        .end()
+    ;
+
+    assert tc.check_();
+    assert counter.i == 22;
   }
 
   @Test
