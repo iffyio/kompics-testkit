@@ -128,9 +128,25 @@ public class NFATest {
   public void kleeneStar_Test() {
     tc
         .body()
-        .repeat(10, increment)
+        .repeat(7, increment)
             .onEachIteration(increment)
         .body()
+            .repeat(8)
+            .body()
+                .trigger(ping(4), pingerPort.getPair())
+                .trigger(ping(5), pingerPort.getPair())
+                .trigger(ping(6), pingerPort.getPair())
+
+                .repeat()
+                .body()
+                    .expect(Ping.class, new Predicate<Ping>() {
+                      @Override
+                      public boolean apply(Ping ping) {
+                        return true;
+                      }
+                    }, pingerPort, OUTGOING)
+                .end()
+            .end()
             .trigger(ping(1), pingerPort.getPair())
             .trigger(ping(2), pingerPort.getPair())
             .trigger(ping(3), pingerPort.getPair())
@@ -149,9 +165,9 @@ public class NFATest {
 
         .repeat(10)
         .body()
-            .trigger(ping(4), pingerPort.getPair())
-            .trigger(ping(5), pingerPort.getPair())
-            .trigger(ping(6), pingerPort.getPair())
+            .trigger(ping(7), pingerPort.getPair())
+            .trigger(ping(8), pingerPort.getPair())
+            .trigger(ping(9), pingerPort.getPair())
 
             .repeat()
             .body()
@@ -166,7 +182,8 @@ public class NFATest {
     ;
 
     assert tc.check_();
-    assert counter.i == 22;
+    System.out.println(counter.i);
+    assert counter.i == 10;
   }
 
   @Test
