@@ -90,9 +90,11 @@ class Table {
   }
 
   void addRepeat(int count, Block block) {
-    currentFA = count == Block.STAR
-        ? new KleeneFA(block)
-        : new RepeatFA(count, block);
+    if (count == Block.STAR) {
+      currentFA = new KleeneFA(block);
+    } else {
+      currentFA = new RepeatFA(count, block);
+    }
     previousFA.push(currentFA);
   }
 
@@ -107,8 +109,22 @@ class Table {
     currentFA.addFA(child);
   }
 
+  void either(Block block) {
+    currentFA = new ConditionalFA(block);
+    previousFA.push(currentFA);
+  }
+
+  void or() {
+    if (!(currentFA instanceof ConditionalFA)) {
+      throw new IllegalStateException("Not in conditional mode");
+    }
+    ((ConditionalFA) currentFA).or();
+  }
+
   void build() {
     assert repeatMain == currentFA;
+    assert repeatMain == previousFA.pop();
+    assert  previousFA.isEmpty();
     repeatMain.end();
     BaseFA finalFA = new BaseFA(repeatMain.block);
     finalFA.startState.isFinalState = true;
@@ -119,15 +135,6 @@ class Table {
       logger.debug("{}", s.show());
     }
     Testkit.logger.debug("final state is {}", finalFA.startState);
-  }
-
-  private void showCurrentState() {
-    HashSet<State> visited = new HashSet<State>();
-    LinkedList<Set<State>> pending = new LinkedList<Set<State>>();
-    pending.add(currentStates);
-    for (State state : currentStates) {
-      logger.debug("{}[{}]", state, state.transitions);
-    }
   }
 
   boolean isInFinalState() {
@@ -170,24 +177,11 @@ class Table {
 
         logger.debug("No internal transition(s) found");
         logger.debug("trying e-transitions");
-
-/*        // no transitions found yet
-        // try e-transitions from each current state
-        // if found, kill those without and retry handle received spec
-        performEpsilonTransitions(nextStates);
-        if (!nextStates.isEmpty()) {
-          //logger.debug("e-transitions were found");
-          updateCurrentState(nextStates);
-          continue;
-        }
-        //logger.debug("NO e-transitions were found");*/
       }
 
-      //logger.debug("Checking default action for event");
       // try registered default actions
       boolean handleByDefault = tryDefaultActions(receivedSpec);
       if (handleByDefault) {
-        //logger.debug("event was handled per default");
         return true;
       }
 
@@ -207,7 +201,6 @@ class Table {
     // for each current state, get next state for spec
     for (State state : currentStates) {
       Collection<Transition> t = state.getTransition(receivedSpec);
-      //logger.debug("got {} for {}", t, state);
       for (Transition transition : t) {
         nextStates.add(transition.nextState);
         transitions.add(transition);
@@ -248,19 +241,6 @@ class Table {
     }
   }
 
-  private void performEpsilonTransitions(Set<State> nextStates) {
-    assert nextStates.isEmpty();
-    for (State state : currentStates) {
-      if (state.canPerformInternalTransition()) {
-        Collection<Transition> transitions = state.getTransition(EventSpec.EPSILON);
-        assert !transitions.isEmpty();
-        for (Transition t : transitions) {
-          nextStates.add(t.nextState);
-        }
-      }
-    }
-  }
-
   private void forceInternalEventTransitions(Set<State> nextStates) {
     assert nextStates.isEmpty();
     for (State state : currentStates) {
@@ -270,6 +250,7 @@ class Table {
         for (Transition t : transitions) {
           nextStates.add(t.nextState);
         }
+        //return;
       }
     }
   }
@@ -475,7 +456,75 @@ class Table {
     }
   }
 
-  abstract class FA implements Cloneable{
+  private class ConditionalFA extends FA{
+    private boolean inEitherBlock = true;
+    private List<FA> eitherBranch = new ArrayList<FA>();
+    private List<FA> orBranch = new ArrayList<FA>();
+
+    ConditionalFA(Block block) {
+      super(block);
+      startState = new State(nextid(), block);
+    }
+
+    void or() {
+      if (!inEitherBlock) {
+        throw new IllegalStateException("multiple calls to or for conditional");
+      }
+      inEitherBlock = false;
+    }
+
+    void addSpec(Spec spec) {
+      // // TODO: 5/13/17 merge with repeat/kleene
+      BaseFA child = new BaseFA(block);
+      child.spec = spec;
+      addFA(child);
+    }
+
+    void addFA(FA childFA) {
+      if (inEitherBlock) {
+        eitherBranch.add(childFA);
+      } else {
+        orBranch.add(childFA);
+      }
+    }
+
+    @Override
+    void build(FA finalFA) {
+      buildBranch(finalFA, eitherBranch);
+      buildBranch(finalFA, orBranch);
+    }
+
+    private void buildBranch(FA finalFA, List<FA> branch) {
+      FA next = finalFA;
+      FA current;
+      for (int i = branch.size() - 1; i >= 0; i--) {
+        current = branch.get(i);
+        current.build(next);
+        next = current;
+      }
+      State branchStartState = branch.get(0).startState;
+      startState.addTransition(new Transition(EventSpec.EPSILON, branchStartState));
+    }
+
+    private void checkNonEmptyBranch() {
+      String branch = null;
+      if (eitherBranch.isEmpty()) {
+        branch = "either";
+      } else if (orBranch.isEmpty()) {
+        branch = "or";
+      }
+      if (branch != null) {
+        throw new IllegalStateException("empty " + branch + " branch");
+      }
+    }
+
+    @Override
+    void end() {
+      checkNonEmptyBranch();
+    }
+  }
+
+  abstract class FA {
     State startState;
     Collection<State> endStates;
     // TODO: 4/27/17 dont create new list for baseFAs
@@ -493,7 +542,7 @@ class Table {
       throw new UnsupportedOperationException();
     }
 
-    final void addFA(FA childFA) {
+    void addFA(FA childFA) {
       children.add(childFA) ;
     }
 
@@ -501,8 +550,8 @@ class Table {
   }
 
 
-  class State implements Cloneable{
-    final ID id;
+  class State {
+    final int id;
     final Block block;
     Multimap<Spec, Transition> transitions = HashMultimap.<Spec, Transition>create();
 
@@ -518,11 +567,11 @@ class Table {
 
     Collection<Transition> loopTransition;
     Collection<Transition> exitTransition;
-    Collection<Transition> selfTransition;// = new Transition(this);
+    Collection<Transition> selfTransition;
 
     State(int number, Block block) {
       this.block = block;
-      id = new ID(number);
+      id = number;
     }
 
     void addTransition(Transition t) {
@@ -590,7 +639,7 @@ class Table {
     }
 
     Collection<Transition> doInternalEventTransition() {
-      // if start state is trigger, inspect etc (run block init before performing event)
+      // if start state is interaction etc (run block init before performing event)
       if (isStartOfLoop()) {
         runBlockInits();
       }
@@ -615,53 +664,30 @@ class Table {
     }
 
     private void runBlockInits() {
-      if (!block.currentlyExecuting) {
-        boolean assertNotExecuting = false; // parent block is closed -> nested blocks are closed
-        for (Block parent : parentBlocks) {
-          if (assertNotExecuting) {
-            assert !parent.currentlyExecuting;
-          }
-          if (!parent.currentlyExecuting) {
-            assertNotExecuting = true;
-            runInitializeFor(parent);
-          } else if (!parent.iterationInitHasRun) {
-            runIterationInitFor(parent);
-          }
+      boolean canRunInit = false; // parent block is closed -> nested blocks are closed
+      for (Block parent : parentBlocks) {
+        if (canRunInit) {
+          assert parent.canRunInit();
         }
 
-        runInitializeFor(block);
-      } else {
-        if (!block.iterationInitHasRun) {
-          for (Block parent : parentBlocks) {
-            if (!parent.iterationInitHasRun) {
-              runIterationInitFor(parent);
-            }
-          }
-
-          runIterationInitFor(block);
+        if (parent.canRunInit()) {
+          canRunInit = true;
+          runInitializeFor(parent);
         }
       }
+      runInitializeFor(block);
     }
 
     private void runInitializeFor(Block block) {
-      logger.debug("{}: running initialize() for block {}", this, block);
+      logger.trace("{}: running initialize() for block {}", this, block);
       block.initialize();
     }
 
-    private void runIterationInitFor(Block block) {
-      logger.debug("{}: running iterationInit {}", this, block);
-      block.runIterationInit();
-    }
-
     private Collection<Transition> getLoopEndTransition() {
-      //logger.debug("loop = {}, exit = {}", loopTransition, exitTransition);
       if (!block.hasPendingEvents()) {
         logger.debug("end{} count = {}", block, block.getCurrentCount());
 
-        assert block.currentlyExecuting;
-        assert block.iterationInitHasRun; // iterationInit must have been run on this iteration
         block.iterationComplete(); // decrement loop count (for kleene closure disable block)
-        assert !block.iterationInitHasRun; // reset flag for next iteration
 
         assert loopTransition != null;
 
@@ -669,20 +695,17 @@ class Table {
           assert exitTransition != null;
         }
 
-        //logger.debug("{}, block iterations? = {}", currentStates, block.hasMoreIterations());
-
         if (isKleeneEnd || (isRepeatEnd && block.hasMoreIterations())) {
           return loopTransition;
         } else {
           // close block on exit
-          block.currentlyExecuting = false;
+          block.close();
 
           return exitTransition;
         }
       }
       return selfTransition;
     }
-
     Set<State> eclosure() {
       if (eclosure != null) {
         assert !eclosure.isEmpty();
@@ -731,17 +754,18 @@ class Table {
 
     @Override
     public String toString() {
-      return id.toString();
+      //return id.toString();
+      return Integer.toString(id);
     }
 
     String show() {
-      StringBuilder sb = new StringBuilder(id.toString());
+      StringBuilder sb = new StringBuilder(id);
       sb.append(transitions.values());
       return sb.toString();
     }
   }
 
-  private class Transition implements Cloneable{
+  private class Transition {
     final Spec spec;
     final State nextState;
     boolean handle;
@@ -766,46 +790,6 @@ class Table {
       return spec + "->" + nextState;
     }
 
-  }
-
-  private class ID implements Cloneable{
-    private final Set<Integer> ids;
-    ID(Set<Integer> ids) {
-      this.ids = ids;
-    }
-
-    ID(int id) {
-      ids = new HashSet<Integer>(id);
-      ids.add(id);
-    }
-
-    @Override
-    public String toString() {
-      StringBuilder sb = new StringBuilder("{");
-      boolean first = true;
-      for (int id : ids) {
-        if (!first) {
-          sb.append(",");
-        } else {
-          first = false;
-        }
-        sb.append(id);
-      }
-      sb.append("}");
-      return sb.toString();
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      return o instanceof ID && ids.equals(((ID) o).ids);
-    }
-
-    @Override
-    public int hashCode() {
-      int sum = 0;
-      for (int id : ids) sum += id;
-      return sum;
-    }
   }
 }
 

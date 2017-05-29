@@ -125,12 +125,6 @@ public class TestContext<T extends ComponentDefinition> {
     return this;
   }
 
-  public TestContext<T> onEachIteration(BlockInit iterationInit) {
-    Testkit.checkNotNull(iterationInit);
-    fsm.setIterationInit(iterationInit);
-    return this;
-  }
-
   public TestContext<T> end() {
     fsm.end();
     return this;
@@ -317,18 +311,7 @@ public class TestContext<T extends ComponentDefinition> {
     return this;
   }
 
-  public int check() {
-    if (checked) {
-      throw new IllegalStateException("test has previously been run");
-    } else {
-      checked = true;
-      int errorCode = -1;//= fsm.start();
-      scheduler.shutdown();
-      return errorCode;
-    }
-  }
-
-  public boolean check_() {
+  public boolean check() {
     if (checked) {
       throw new IllegalStateException("test has previously been run");
     } else {

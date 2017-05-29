@@ -16,7 +16,6 @@ import se.sics.kompics.testkit.pingpong.PingComparator;
 import se.sics.kompics.testkit.pingpong.Pong;
 import se.sics.kompics.testkit.pingpong.PongComparator;
 
-import static junit.framework.Assert.assertEquals;
 import static se.sics.kompics.testkit.Direction.*;
 
 public class ConditionalTest {
@@ -78,7 +77,8 @@ public class ConditionalTest {
 
     tc.expect(ping(6), pingerPort, OUTGOING).end(); // end repeat
 
-    assertEquals(tc.check(), tc.getFinalState());
+    assert tc.check();
+    //assertEquals(tc.check(), tc.getFinalState());
   }
 
   @Test
@@ -227,7 +227,7 @@ public class ConditionalTest {
 
     tc.expect(ping(6), pingerPort, OUTGOING).end(); // end repeat
 
-    assertEquals(tc.check(), tc.getFinalState());
+    assert tc.check();
   }
 
   @Test
@@ -247,7 +247,7 @@ public class ConditionalTest {
     .or()
         .expect(pong(3), pingerPort, INCOMING)
     .end();
-    assertEquals(tc.check(), tc.getFinalState());
+    assert tc.check();
   }
 
   @Test
@@ -297,7 +297,7 @@ public class ConditionalTest {
     .end();
     tc.expect(pong(2), pingerPort, INCOMING).end(); // end repeat
 
-    assertEquals(tc.check(), tc.getFinalState());
+    assert tc.check();
   }
 
   @Test
@@ -357,16 +357,16 @@ public class ConditionalTest {
     .end();
     tc.expect(pong(9), pingerPort, INCOMING).end(); // end repeat
 
-    assertEquals(tc.check(), tc.getFinalState());
+    assert tc.check();
   }
 
-  @Test
-  public void conditionalTriggerSelectAnyTransitionTest() {
+/*  @Test
+  public void conditionalTriggerAmbiguousTest() {
     tc.body();
     tc.trigger(pong(4), pongerPort.getPair());
     tc.trigger(pong(3), pongerPort.getPair());
     conditionalTrigger();
-  }
+  }*/
 
   @Test
   public void conditionalTriggerInternalTransitionTest() {
@@ -394,7 +394,7 @@ public class ConditionalTest {
         .trigger(pong(9), pongerPort.getPair())
     .end();
     tc.expect(pong(9), pingerPort, INCOMING);
-    assertEquals(tc.check(), tc.getFinalState());
+    assert tc.check();
   }
 
   @Test
@@ -442,7 +442,47 @@ public class ConditionalTest {
         })
     .end();
 
-    assertEquals(tc.check(), tc.getFinalState());
+    assert tc.check();
+  }
+
+  @Test
+  public void conditionalRepeatTest() {
+    tc.body()
+        .repeat(3)
+        .body()
+            .trigger(ping(0), pingerPort.getPair())
+        .end()
+        .either()
+            .repeat(3)
+            .body()
+                .expect(ping(0), pingerPort, OUTGOING)
+            .end()
+        .or()
+            .expect(ping(0), pingerPort, OUTGOING)
+        .end()
+    ;
+
+    assert tc.check();
+  }
+
+  @Test
+  public void conditionalKleeneTest() {
+    tc.body()
+/*        .repeat(3)
+        .body()
+            .trigger(ping(0), pingerPort.getPair())
+        .end()*/
+        .either()
+            .repeat()
+            .body()
+                .expect(ping(0), pingerPort, OUTGOING)
+            .end()
+        .or()
+            .expect(ping(0), pingerPort, OUTGOING)
+        .end()
+    ;
+
+    assert tc.check();
   }
 
   private PFuture future1 = new PFuture();

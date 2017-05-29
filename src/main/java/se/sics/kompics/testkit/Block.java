@@ -15,14 +15,15 @@ class Block {
   private int startState;
   private int currentCount;
   static final int STAR = -1;
+  private boolean isMainBlock;
 
   private boolean isKleeneBlock;
 
-  private BlockInit blockInit, iterationInit;
+  private BlockInit blockInit;
   final Block previousBlock;
 
-  boolean currentlyExecuting;
-  boolean iterationInitHasRun;
+  private boolean currentlyExecuting;
+  private boolean runInit = true;
 
   private Set<EventSpec> disallowed;
   private Set<EventSpec> allowed;
@@ -45,6 +46,11 @@ class Block {
   Block(Block previousBlock, int count, BlockInit blockInit) {
     this(previousBlock, count);
     this.blockInit = blockInit;
+  }
+
+  Block() {
+    this(null, 1);
+    isMainBlock = true;
   }
 
   Block(Block previousBlock, int count) {
@@ -72,7 +78,7 @@ class Block {
   }
 
   void setIterationInit(BlockInit iterationInit) {
-    this.iterationInit = iterationInit;
+    throw new UnsupportedOperationException("deprecate iterinit");
   }
 
   int getCurrentCount() {
@@ -80,12 +86,7 @@ class Block {
   }
 
   void initialize() {
-    assert !currentlyExecuting; // don't try to initialize a block that isn't done executing
-    assert !iterationInitHasRun;
-
-    currentlyExecuting = true;
-
-    if (!isKleeneBlock) {
+    if (!isKleeneBlock && !isOpen()) {
       currentCount = times;
     }
 
@@ -93,23 +94,32 @@ class Block {
       blockInit.init();
     }
 
-    runIterationInit();
+    currentlyExecuting = true;
+    runInit = false;
   }
 
   void iterationComplete() {
-    assert iterationInitHasRun;
-    iterationInitHasRun = false;
-
+    //assert isOpen();
     assert pending.isEmpty();
     resetBlockEvents();
 
-    if (!isKleeneBlock) {
+    if (!(isKleeneBlock)) {
       currentCount--;
-      assert currentCount >= 0;
+      // main block may be decremented multiple times
+      assert isMainBlock || currentCount >= 0;
     }
+    runInit = true;
+  }
+
+  boolean canRunInit() {
+    return runInit;
   }
 
   void reset() {
+    if (isMainBlock) {
+      return;
+    }
+
     if (isKleeneBlock) {
       // without explicit end conditions -
       // kleene blocks only go out of scope when the thread is discontinued by the NFA
@@ -117,6 +127,19 @@ class Block {
       currentlyExecuting = false;
     }
     resetBlockEvents();
+  }
+
+  void close() {
+    if (isMainBlock) {
+      // don't close main block since it cannot be reopened
+      return;
+    }
+    assert isOpen(); // block that doesn't do anything at runtime will still be closed
+    currentlyExecuting = false;
+  }
+
+  boolean isOpen() {
+    return currentlyExecuting;
   }
 
   private void resetBlockEvents() {
@@ -139,14 +162,6 @@ class Block {
   void expect(SingleEventSpec spec) {
     expected.add(spec);
     pending.add(spec);
-  }
-
-  void runIterationInit() {
-    assert !iterationInitHasRun;
-    iterationInitHasRun = true;
-    if (iterationInit != null) {
-      iterationInit.init();
-    }
   }
 
   StateTable.Transition getTransition(int state, EventSpec receivedSpec) {

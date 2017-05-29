@@ -44,7 +44,7 @@ public class RequestResponseTest {
         expect(new Pong(new Ping(count)), pinger.getNegative(PingPongPort.class), incoming).
       end();
 
-    assert tc.check_();
+    assert tc.check();
   }
 
   @Test
@@ -70,7 +70,7 @@ public class RequestResponseTest {
         expect(new Pong(new Ping(0)), ponger.getPositive(PingPongPort.class), outgoing).
       end();
 
-    assert tc.check_();
+    assert tc.check();
   }
 
   public static class Pinger extends ComponentDefinition {

@@ -52,31 +52,25 @@ public class ExpectFaultTest {
 
   @Test
   public void faultPairedWithExpectTest() {
-    tc.
-      connect(pinger.getNegative(PingPongPort.class), ponger.getPositive(PingPongPort.class)).
-      body().
-
-        repeat(10).
-        body().
-          repeat(N - 1). // pinger receive n - 1 pongs
-            onEachIteration(incrementCounters).
-          body().
-            trigger(pong, ponger.getPositive(PingPongPort.class).getPair()).
-            expect(pong, pinger.getNegative(PingPongPort.class), INCOMING).
-          end().
+    tc.connect(pinger.getNegative(PingPongPort.class), ponger.getPositive(PingPongPort.class)).body()
+        .repeat(10)
+        .body()
+            .repeat(N - 1, incrementCounters) // pinger receive n - 1 pongs
+            .body()
+                .trigger(pong, ponger.getPositive(PingPongPort.class).getPair())
+                .expect(pong, pinger.getNegative(PingPongPort.class), INCOMING)
+            .end()
 
             // on Nth pong, throws exception
-          repeat(1).
-            onEachIteration(incrementCounters).
-          body().
-            trigger(pong, ponger.getPositive(PingPongPort.class).getPair()).
-            expect(pong, pinger.getNegative(PingPongPort.class), INCOMING).
-            expectFault(IllegalStateException.class, Fault.ResolveAction.IGNORE).
-          end().
-        end();
-
-    //assertEquals(tc.check(), tc.getFinalState());
-    assert tc.check_();
+            .repeat(1, incrementCounters)
+            .body()
+                .trigger(pong, ponger.getPositive(PingPongPort.class).getPair())
+                .expect(pong, pinger.getNegative(PingPongPort.class), INCOMING)
+                .expectFault(IllegalStateException.class, Fault.ResolveAction.IGNORE)
+            .end()
+        .end()
+    ;
+    assert tc.check();
   }
 
   @Test
@@ -88,27 +82,24 @@ public class ExpectFaultTest {
   private void throwErrorOnNegativeFault(boolean matchByClass) {
     Pong negativePong = new Pong(-1);
 
-    tc.
-      connect(pinger.getNegative(PingPongPort.class), ponger.getPositive(PingPongPort.class)).
-      body().
+    tc.connect(pinger.getNegative(PingPongPort.class), ponger.getPositive(PingPongPort.class)).body()
+        .repeat(1, incrementCounters)
+        .body()
+            .trigger(pong, ponger.getPositive(PingPongPort.class).getPair())
+            .expect(pong, pinger.getNegative(PingPongPort.class), INCOMING)
 
-      repeat(10, incrementCounters).
-        body().
-          trigger(pong, ponger.getPositive(PingPongPort.class).getPair()).
-          expect(pong, pinger.getNegative(PingPongPort.class), INCOMING).
+            // trigger from ponger's port
+            .trigger(negativePong, ponger.getPositive(PingPongPort.class).getPair())
+            .expect(negativePong, pinger.getNegative(PingPongPort.class), INCOMING);
 
-          // trigger from ponger's port
-          trigger(negativePong, ponger.getPositive(PingPongPort.class).getPair()).
-          expect(negativePong, pinger.getNegative(PingPongPort.class), INCOMING);
-          matchNegativePong(matchByClass);
+    matchNegativePong(matchByClass);
 
           // trigger directly on pinger's port
-          tc.trigger(negativePong, pinger.getNegative(PingPongPort.class));
-          matchNegativePong(matchByClass);
-      tc.end();
+            tc.trigger(negativePong, pinger.getNegative(PingPongPort.class));
+            matchNegativePong(matchByClass);
+    tc.end();
 
-    //assertEquals(tc.check(), tc.getFinalState());
-    assert tc.check_();
+    assert tc.check();
   }
 
   private void matchNegativePong(boolean matchByClass) {

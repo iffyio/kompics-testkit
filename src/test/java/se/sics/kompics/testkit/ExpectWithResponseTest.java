@@ -68,7 +68,7 @@ public class ExpectWithResponseTest {
             end();
 
     //assertEquals(tc.check(), tc.getFinalState());
-    assert tc.check_();
+    assert tc.check();
   }
 
   @Test
@@ -99,7 +99,7 @@ public class ExpectWithResponseTest {
             end();
 
     //assertEquals(tc.check(), tc.getFinalState());
-    assert tc.check_();
+    assert tc.check();
   }
 
   private PFuture future1 = new PFuture(true);

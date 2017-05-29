@@ -86,7 +86,7 @@ public class UnorderedEventsTest {
     end();
 
     //assertEquals(tc.check(), tc.getFinalState());
-    assert tc.check_();
+    assert tc.check();
   }
 
   private ScheduleTimeout st = new ScheduleTimeout(500);
@@ -108,7 +108,7 @@ public class UnorderedEventsTest {
          expect(pong3, pingerPort, INCOMING);
 
     //assertEquals(tc.check(), tc.getFinalState());
-    assert tc.check_();
+    assert tc.check();
   }
 
   private Predicate<Pong> predicateForPong(final int count) {
@@ -151,7 +151,7 @@ public class UnorderedEventsTest {
           end().
         end();
     //assertEquals(tc.check(), tc.getFinalState());
-    assert tc.check_();
+    assert tc.check();
   }
 
   @Test
@@ -175,7 +175,7 @@ public class UnorderedEventsTest {
           end().
        end();
     //assertEquals(tc.check(), tc.getFinalState());
-    assert tc.check_();
+    assert tc.check();
   }
 
   public static class Ponger extends ComponentDefinition {

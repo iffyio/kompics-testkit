@@ -13,9 +13,9 @@ import se.sics.kompics.Negative;
 import se.sics.kompics.PortType;
 import se.sics.kompics.Positive;
 import se.sics.kompics.Request;
-import se.sics.kompics.Start;
 import se.sics.kompics.testkit.urb.Counter;
 
+import static junit.framework.Assert.assertEquals;
 import static se.sics.kompics.testkit.Direction.INCOMING;
 import static se.sics.kompics.testkit.Direction.OUTGOING;
 
@@ -46,7 +46,7 @@ public class NFATest {
         .expect(ping(0), pingerPort, OUTGOING)
         .expect(ping(1), pingerPort, OUTGOING)
         .expect(ping(2), pingerPort, OUTGOING);
-    assert tc.check_();
+    assert tc.check();
   }
 
   Counter counter = new Counter();
@@ -72,8 +72,8 @@ public class NFATest {
             .expect(pong(1), pingerPort, INCOMING)
         .end()
     ;
-    assert tc.check_();
-    assert Pinger.counter == 10;
+    assert tc.check();
+    assert ((Pinger) tc.getComponentUnderTest().getComponent()).counter == 10;
   }
 
   BlockInit increment = new BlockInit() {
@@ -87,7 +87,6 @@ public class NFATest {
   public void kleeneStarAmbiguousTest() {
     tc.body()
         .repeat(increment)
-            .onEachIteration(increment)
         .body()
         .end()
 
@@ -95,7 +94,7 @@ public class NFATest {
         .expect(ping(0), pingerPort, OUTGOING)
     ;
 
-    assert tc.check_();
+    assert tc.check();
   }
 
   @Test
@@ -121,15 +120,13 @@ public class NFATest {
         //.expect(ping(3), pingerPort, OUTGOING)
     ;
 
-    assert tc.check_();
+    assert tc.check();
   }
 
   @Test
   public void kleeneStar_Test() {
-    tc
-        .body()
+    tc.setTimeout(10).body()
         .repeat(7, increment)
-            .onEachIteration(increment)
         .body()
             .repeat(8)
             .body()
@@ -153,7 +150,6 @@ public class NFATest {
         .end()
 
         .repeat(increment)
-            .onEachIteration(increment)
         .body()
             .expect(ping(1), pingerPort, OUTGOING)
             .expect(ping(2), pingerPort, OUTGOING)
@@ -181,9 +177,8 @@ public class NFATest {
         .end()
     ;
 
-    assert tc.check_();
-    System.out.println(counter.i);
-    assert counter.i == 10;
+    assert tc.check();
+    assertEquals(counter.i, 8);
   }
 
   @Test
@@ -219,8 +214,8 @@ public class NFATest {
             .expect(pong(3), pingerPort, INCOMING)
     ;
 
-    assert tc.check_();
-    assert Pinger.counter == 3 * M + N + 2;
+    assert tc.check();
+    assert ((Pinger) tc.getComponentUnderTest().getComponent()).counter == 3 * M + N + 2;
   }
 
   @Test
@@ -259,7 +254,34 @@ public class NFATest {
 
     ;
 
-    assert tc.check_();
+    assert tc.check();
+  }
+
+  @Test
+  public void basicEitherTest() {
+    tc.body()
+        .trigger(pong(1), pongerPort.getPair())
+        .trigger(pong(2), pongerPort.getPair())
+        //.trigger(ping(2), pingerPort.getPair())
+
+        .expect(pong(1), pingerPort, INCOMING);
+
+    tc
+        .either()
+            .expect(pong(1), pingerPort, INCOMING)
+/*            .expect(pong(2), pingerPort, INCOMING)
+            .expect(pong(4), pingerPort, INCOMING)
+            .expect(pong(5), pingerPort, INCOMING)*/
+        .or()
+            .expect(pong(2), pingerPort, INCOMING)
+            //.expect(ping(2), pingerPort, OUTGOING)
+/*            .expect(ping(3), pingerPort, OUTGOING)
+            .expect(ping(4), pingerPort, OUTGOING)
+            .expect(ping(5), pingerPort, OUTGOING)
+            .expect(pong(1), pingerPort, INCOMING)*/
+        .end();
+
+    assert tc.check();
   }
 
   private Ping ping(int count) {
@@ -272,12 +294,11 @@ public class NFATest {
 
   public static class Pinger extends ComponentDefinition {
     Positive<PingPongPort> ppPort = requires(PingPongPort.class);
-    static int counter = 0;
+    int counter = 0;
 
     Handler<Pong> pongHandler = new Handler<Pong>() {
       @Override
       public void handle(Pong event) {
-        //trigger(new Ping(++counter), ppPort);
         counter++;
       }
     };
@@ -288,8 +309,6 @@ public class NFATest {
   }
 
   public static class Ponger extends ComponentDefinition {
-    static int counter = 0;
-
     { provides(PingPongPort.class); }
   }
 

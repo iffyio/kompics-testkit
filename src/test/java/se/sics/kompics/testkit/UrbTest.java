@@ -76,8 +76,7 @@ public class UrbTest {
       body();
 
     tc.
-      repeat(10).
-            onEachIteration(incrementCount).
+      repeat(10, incrementCount).
       body().
             trigger(new UrbBroadcast(counter), p.getPositive(UrbPort.class)).
             unordered().
@@ -97,7 +96,7 @@ public class UrbTest {
             expect(new UrbDeliver(counter), p.getPositive(UrbPort.class), outgoing).
       end();
 
-    assert tc.check_();
+    assert tc.check();
   }
 
   private BebMsg bebMsg(TAddress src, TAddress dst) {

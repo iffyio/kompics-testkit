@@ -43,7 +43,7 @@ class NFA<T extends ComponentDefinition> {
   private List<SingleEventSpec> expectUnordered = new ArrayList<SingleEventSpec>();
   private ComparatorMap comparators = new ComparatorMap();
 
-  private Block currentBlock = new Block(null, 1);
+  private Block currentBlock = new Block();
 
   private Table table = new Table(currentBlock);
 
@@ -107,9 +107,11 @@ class NFA<T extends ComponentDefinition> {
   }
 
   void setUnorderedMode() {
-    previousMode.push(currentMode);
+/*    previousMode.push(currentMode);
     assertMode(BODY);
-    setMode(UNORDERED);
+    setMode(UNORDERED);*/
+    assertBodyorConditionalMode();
+    pushNewMode(UNORDERED);
     expectUnordered = new ArrayList<SingleEventSpec>();
     balancedEnd++;
 /*    if (currentBlock.mode == CONDITIONAL) {
@@ -123,9 +125,11 @@ class NFA<T extends ComponentDefinition> {
   }
 
   void setExpectWithMapperMode() {
-    assertMode(BODY);
+/*    assertMode(BODY);
     previousMode.push(currentMode);
-    setMode(EXPECT_MAPPER);
+    setMode(EXPECT_MAPPER);*/
+    assertBodyorConditionalMode();
+    pushNewMode(EXPECT_MAPPER);
     balancedEnd++;
     expectMapper = new ExpectMapper(proxyComponent);
 /*    if (currentBlock.mode == CONDITIONAL) {
@@ -158,9 +162,11 @@ class NFA<T extends ComponentDefinition> {
   }
 
   void setExpectWithFutureMode() {
-    assertMode(BODY);
+/*    assertMode(BODY);
     previousMode.push(currentMode);
-    setMode(EXPECT_FUTURE);
+    setMode(EXPECT_FUTURE);*/
+    assertBodyorConditionalMode();
+    pushNewMode(EXPECT_FUTURE);
     //// TODO: 4/25/17 move to decrement function
     balancedEnd++;
     expectFuture = new ExpectFuture(proxyComponent);
@@ -188,50 +194,27 @@ class NFA<T extends ComponentDefinition> {
 
   void trigger(KompicsEvent event, Port<? extends PortType> port) {
     InternalEventSpec spec = new InternalEventSpec(event, port);
-    assertMode(BODY);
+    assertBodyorConditionalMode();
     table.addSpec(spec);
-  }
-  void trigger_(KompicsEvent event, Port<? extends PortType> port) {
-/*    throw new UnsupportedOperationException("");
-    InternalEventSpec spec = new InternalEventSpec(event, port);
-    if (currentBlock.mode == CONDITIONAL) {
-      currentConditional.addChild(spec);
-    } else {
-      checkInBodyMode();
-      //table.addTransition(currentState, currentState + 1, spec, currentBlock);
-      table.addSpec(spec);
-      incrementState();
-    }*/
   }
 
   void either() {
-    throw new UnsupportedOperationException("");
-/*    if (currentBlock.mode == BODY) {
-      currentConditional = new Conditional(null);
-      currentBlock.mode = CONDITIONAL;
-    } else {
-      checkMode(CONDITIONAL);
-      Conditional child = new Conditional(currentConditional);
-      currentConditional.addChild(child);
-      currentConditional = child;
-    }*/
+    assertBodyorConditionalMode();
+    pushNewMode(CONDITIONAL);
+    table.either(currentBlock);
+    balancedEnd++;
   }
 
   void or() {
-    throw new UnsupportedOperationException("");
-/*    checkMode(CONDITIONAL);
-    currentConditional.or();*/
+    assertBodyorConditionalMode();
+    table.or();
   }
 
   private void endConditional() {
-    throw new UnsupportedOperationException("");
-/*    currentConditional.end();
-    if (currentConditional.isMain()) {
-      currentBlock.mode = BODY;
-      currentState = currentConditional.resolve(currentState, table, currentBlock);
-    } else {
-      currentConditional = currentConditional.parent;
-    }*/
+    assertMode(CONDITIONAL);
+    currentMode = previousMode.pop();
+    balancedEnd--;
+    table.endRepeat();
   }
 
   void repeat(int count) {
@@ -262,10 +245,6 @@ class NFA<T extends ComponentDefinition> {
     assertMode(HEADER);
     setMode(BODY);
   }
-/*  void body_() {
-    checkInHeaderMode();
-    currentBlock.mode = BODY;
-  }*/
 
   void end() {
     switch (currentMode) {
@@ -297,7 +276,7 @@ class NFA<T extends ComponentDefinition> {
   // // TODO: 4/22/17 remove resolveAction if not needed later on
   void expectFault(
       Class<? extends Throwable> exceptionType, Fault.ResolveAction resolveAction) {
-    assertMode(BODY);
+    assertBodyorConditionalMode();
     FaultSpec spec = new FaultSpec(definitionUnderTest.getControlPort(), exceptionType);
     table.addSpec(spec);
 /*    checkInBodyMode();
@@ -310,7 +289,7 @@ class NFA<T extends ComponentDefinition> {
   // // TODO: 4/22/17 remove resolveAction if not needed later on
   void expectFault(
       Predicate<Throwable> exceptionPredicate, Fault.ResolveAction resolveAction) {
-    assertMode(BODY);
+    assertBodyorConditionalMode();
     FaultSpec spec = new FaultSpec(definitionUnderTest.getControlPort(), exceptionPredicate);
     table.addSpec(spec);
 /*    checkInBodyMode();
@@ -321,17 +300,9 @@ class NFA<T extends ComponentDefinition> {
   }
 
   void inspect(Predicate<T> inspectPredicate) {
+    assertBodyorConditionalMode();
     InternalEventSpec spec = new InternalEventSpec(definitionUnderTest, inspectPredicate);
-    assertMode(BODY);
     table.addSpec(spec);
-/*    InternalEventSpec spec = new InternalEventSpec(definitionUnderTest, inspectPredicate);
-    if (currentBlock.mode == CONDITIONAL) {
-      currentConditional.addChild(spec);
-    } else {
-      checkInBodyMode();
-      table.addTransition(currentState, currentState + 1, spec, currentBlock);
-      incrementState();
-    }*/
   }
 
   <E extends KompicsEvent> void addComparator(
@@ -381,17 +352,17 @@ class NFA<T extends ComponentDefinition> {
     table.build();
     while (true) {
       table.tryInternalEventTransitions();
-      if (table.isInFinalState()) {
-        logger.debug("final state");
-        return true;
-      }
       EventSpec receivedSpec = removeEventFromQueue();
-      boolean successful = table.doTransition(receivedSpec);
-      if (table.isInFinalState()) {
+      if (receivedSpec == null && table.isInFinalState()) {
         logger.debug("final state");
         return true;
       }
-      if (!successful) {
+      boolean successful = table.doTransition(receivedSpec);
+/*      if (table.isInFinalState()) {
+        logger.debug("final state");
+        return true;
+      }*/
+      if (!successful && !table.isInFinalState()) {
         return false;
       }
     }
@@ -400,6 +371,7 @@ class NFA<T extends ComponentDefinition> {
   private void registerSpec(SingleEventSpec spec) {
     switch (currentMode) {
       case BODY:
+      case CONDITIONAL:
         table.addSpec(spec);
         break;
       case UNORDERED:
@@ -427,19 +399,6 @@ class NFA<T extends ComponentDefinition> {
     table.addSpec(spec);
     currentMode = previousMode.pop();
     balancedEnd--;
-
-    /*
-
-    UnorderedSpec spec = new UnorderedSpec(expectUnordered);
-    if (currentBlock.previousMode == BODY) {
-      table.addTransition(currentState, currentState + 1,
-          spec, currentBlock);
-      incrementState();
-    } else {
-      assert currentBlock.previousMode == CONDITIONAL;
-      currentConditional.addChild(spec);
-    }
-    currentBlock.mode = currentBlock.previousMode;*/
   }
 
   private void endExpect(MODE mode) {
@@ -461,28 +420,6 @@ class NFA<T extends ComponentDefinition> {
       throw new IllegalStateException("No events were specified in " + mode + " mode");
     }
     table.addSpec(spec);
-/*    Spec spec;
-    boolean emptySpec;
-    if (mode == EXPECT_FUTURE) {
-      spec = expectFuture;
-      emptySpec = expectFuture.expected.isEmpty();
-    } else if (mode == EXPECT_MAPPER) {
-      spec = expectMapper;
-      emptySpec = expectMapper.expected.isEmpty();
-    } else {
-      throw new IllegalStateException(String.format("Expected [%s] or [%s] mode",
-          EXPECT_FUTURE, EXPECT_MAPPER));
-    }
-    if (emptySpec) {
-      throw new IllegalStateException("No events were specified in " + mode + " mode");
-    }
-    if (currentBlock.previousMode == CONDITIONAL) {
-      currentConditional.addChild(spec);
-    } else {
-      table.addTransition(currentState, currentState + 1, spec, currentBlock);
-      incrementState();
-    }
-    currentBlock.mode = currentBlock.previousMode;*/
   }
 
   private void endRepeat() {
@@ -498,49 +435,19 @@ class NFA<T extends ComponentDefinition> {
     currentMode = previousMode.pop();
 
     table.endRepeat();
-
-/*    if (balancedBlock.isEmpty()) {
-      throw new IllegalStateException("matching repeat not found for end");
-    }*//*
-    // // TODO: 4/23/17 move to method
-    MODE previousMode = previousMode.pop();
-    assertMode(previousMode, HEADER);
-
-    balancedRepeat--;
-    if (!balancedBlock.isEmpty()) {
-      throw new IllegalStateException("");
-    }
-    // restore previous block
-    currentBlock = currentBlock.previousBlock;*/
-  }
-
-  private void endBlock() {
-    throw new UnsupportedOperationException("");
-/*    checkInBodyMode();
-    if (balancedBlock.isEmpty()) {
-      throw new IllegalStateException("matching repeat not found for end");
-    }
-
-    blockEnd.put(currentState, currentBlock);
-    // restore previous block
-    if (!balancedBlock.isEmpty()) {
-      currentBlock = balancedBlock.pop().previousBlock;
-    }
-    incrementState();*/
   }
 
   private void enterNewBlock(int count, Block block) {
-    if (currentMode != BODY && currentMode != CONDITIONAL) {
-      fail(BODY);
-    }
+    assertBodyorConditionalMode();
+    pushNewMode(HEADER);
 
     if (count <= 0 && count != Block.STAR) {
       throw new IllegalArgumentException("only positive value allowed for block");
     }
 
     // mode
-    previousMode.push(currentMode);
-    setMode(HEADER);
+/*    previousMode.push(currentMode);
+    setMode(HEADER);*/
 
     // blocks
     balancedEnd++;
@@ -569,8 +476,17 @@ class NFA<T extends ComponentDefinition> {
     incrementState();*/
   }
 
-  private boolean inMode(MODE mode) {
-    return currentMode == mode;
+  private void pushNewMode(MODE mode) {
+    previousMode.push(currentMode);
+    setMode(mode);
+  }
+
+  private void assertBodyorConditionalMode() {
+    if (!(currentMode == BODY || currentMode == CONDITIONAL)) {
+      throw new IllegalStateException(
+          String.format("Expected mode [%s] or [%s], Current mode [%s]",
+              BODY, CONDITIONAL, currentMode));
+    }
   }
 
   private void assertMode(MODE mode) {
@@ -589,143 +505,6 @@ class NFA<T extends ComponentDefinition> {
     //previousMode.push(currentMode);
   }
 
-/*  private void addFinalState() {
-    FINAL_STATE = currentState;
-    endBlock();
-  }*/
-
-/*  private void checkExpectedFaultHasMatchingClause() {
-    //// TODO: 4/21/17 not necessarily previous if conditional
-    int previousState = currentState - 1;
-    if (!(table.hasState(previousState))) {
-      throw new IllegalStateException("expected fault must be preceded by an expect or trigger");
-    }
-  }*/
-
-/*  private boolean expectingAnEvent() {
-    return !(isStartOfBlock() || isEndOfBlock()
-        || performedInternalTransition());
-  }*/
-
-  // returns false if state was updated to error state
-/*
-  private boolean updateState(
-      String expected, EventSpec receivedSpec, StateTable.Transition transition) {
-    if (transition != null && transition.nextState != ERROR_STATE) {
-      logger.debug("{}: Transitioned on {}", currentState, transition);
-      currentState = transition.nextState;
-      return true;
-    }
-    String errorMessage = String.format("Received %s message <%s> while expecting <%s>",
-        (transition == null? "unexpected" : "unwanted"),
-        receivedSpec.toString(), expected);
-    gotoErrorState(errorMessage);
-    return false;
-  }
-*/
-
-/*
-  private boolean performedInternalTransition() {
-    StateTable.Transition transition = table.performInternalTransition(currentState, false);
-    if (transition == null) {
-      return false;
-    }
-    if (transition.errorMessage != null) {
-      gotoErrorState(transition.errorMessage);
-    } else {
-      currentState = transition.nextState;
-    }
-    return true;
-  }
-
-  private boolean isStartOfBlock() {
-    Block block = blockStart.get(currentState);
-    if (block == null) {
-      return false;
-    } else {
-      block.initialize();
-      logger.debug("{}: repeat({})\t", currentState, block.getCurrentCount());
-      incrementState();
-      return true;
-    }
-  }
-
-  private boolean isEndOfBlock() {
-    Block block = blockEnd.get(currentState);
-    if (block == null) { // not end of block
-      return false;
-    }
-    logger.debug("{}: end({})\t", currentState, block.times);
-
-    while (block.hasPendingEvents()) {
-      logger.debug("{}: Awaiting events {}", currentState, block.status());
-      if (!handleNextEvent(block.status(), block)) {
-        return true;
-      }
-    }
-    block.iterationComplete();
-
-    if (block.hasMoreIterations()) {
-      currentState = block.indexOfFirstState();
-    } else {
-      incrementState();
-    }
-    return true;
-  }
-
-  private boolean handleNextEvent(String expected, Block block) {
-    EventSpec received = removeEventFromQueue();
-    StateTable.Transition transition;
-
-    // if no event received -
-    // try perform an internal event transition in-case current state -
-    // is a merged with a normal spec
-    // if not, try an e-transition for state
-    if (received == null) {
-      transition = table.performInternalTransition(currentState, true);
-      if (transition != null) {
-        if (transition.errorMessage != null) {
-          gotoErrorState(transition.errorMessage);
-          return false;
-        } else {
-          currentState = transition.nextState;
-          return true;
-        }
-      }
-      received = EventSpec.EPSILON;
-    }
-    logger.debug("{}: Received {}", currentState, received);
-
-    //// TODO: 4/21/17 separate block use case
-    // use block for lookup if given
-    if (block == null) {
-      transition = table.lookup(currentState, received);
-    } else {
-      transition = table.lookup(currentState, received, block);
-    }
-
-    // if transition not found for normal event, try any e-transitions before failing
-    if (received != EventSpec.EPSILON && block == null) {
-      // take e-transition to next state and lookup event
-      while (transition == null) {
-        transition = table.lookup(currentState, EventSpec.EPSILON);
-        if (transition != null) {
-          currentState = transition.nextState;
-          transition = table.lookup(currentState, received);
-        } else {
-          break;
-        }
-      }
-    }
-
-    logger.debug("Transition = {}", transition);
-    if (transition == null && received == EventSpec.EPSILON) {
-      gotoErrorState("timed-out expecting " + expected);
-      return false;
-    }
-    return updateState(expected, received, transition);
-  }
-*/
 
   private void runStartState() {
     logger.trace("Sending Start to {} participant component(s)", participants.size());
@@ -734,53 +513,6 @@ class NFA<T extends ComponentDefinition> {
     }
   }
 
-/*
-  private void runFinalState() {
-    logger.info("Done!({})", currentState == ERROR_STATE? "FAILURE -> " + ERROR_MESSAGE : "PASS");
-    Kompics.shutdown();
-  }
-
-  private void checkBalancedRepeatBlocks() {
-    if (!balancedBlock.isEmpty()) {
-      throw new IllegalStateException("unmatched end for block");
-    }
-  }
-
-  private void checkMode(MODE mode) {
-    if (currentBlock != null && currentBlock.mode != mode) {
-      throw new IllegalStateException(String.format("Expected mode [%s], Actual mode [%s]",
-          mode, currentBlock.mode));
-    }
-  }
-
-  private void checkInBodyMode() {
-    if (currentBlock == null) {
-      return;
-    }
-    checkMode(BODY);
-  }
-
-  private void checkInHeaderMode() {
-    checkMode(HEADER);
-  }
-
-  private void checkInExpectMapperMode() {
-    checkMode(EXPECT_MAPPER);
-  }
-
-  private void checkInExpectFutureMode() {
-    checkMode(EXPECT_FUTURE);
-  }
-
-  private void incrementState() {
-    currentState++;
-  }
-
-  private void gotoErrorState(String errorMessage) {
-    currentState = ERROR_STATE;
-    ERROR_MESSAGE = errorMessage;
-  }
-*/
 
   private EventSpec removeEventFromQueue() {
     return eventQueue.poll();

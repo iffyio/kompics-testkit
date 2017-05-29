@@ -17,7 +17,6 @@ import se.sics.kompics.Positive;
 import se.sics.kompics.Request;
 import se.sics.kompics.Start;
 
-import static se.sics.kompics.testkit.Direction.INCOMING;
 import static se.sics.kompics.testkit.Direction.OUTGOING;
 
 public class PingerPongerTest {
@@ -42,86 +41,62 @@ public class PingerPongerTest {
   };
 
   @Test
-  public void iterationInitTest() {
-
+  public void blockInitTest() {
     int M = 5, N = 2;
-    tc.
-        connect(pingerPort, pongerPort).
-        body().
-
-        repeat(M).
-        body().
-            repeat(N, increment).
-                onEachIteration(increment).
-            body()
+    tc.connect(pingerPort, pongerPort).body()
+        .repeat(M)
+        .body()
+            .repeat(N, increment)
+            .body()
                 .trigger(new Ping(0), pingerPort.getPair())
                 .expect(new Ping(0), pingerPort, OUTGOING)
             .end()
-        .end();
+        .end()
 
-    assert tc.check_();
-    assertEquals(counter.i, M * N + M);
+    ;
+    assert tc.check();
+    assertEquals(counter.i, M * N);
   }
 
   @Test
-  public void initOnMultipleBlocksTest() {
+  public void blockInitNestedTest() {
 
-    int M = 20, N = 30;
-    tc.
-        connect(pingerPort, pongerPort).
-        body().
-
-        repeat(M, increment).
-        body().
-            repeat(N, increment).
-                onEachIteration(increment).
-            body()
+    int M = 2, N = 1;
+    tc.connect(pingerPort, pongerPort).body()
+        .repeat(M, increment)
+        .body()
+            .repeat(N, increment)
+            .body()
                 .trigger(new Ping(0), pingerPort.getPair())
                 .expect(new Ping(0), pingerPort, OUTGOING)
             .end()
 
-            .repeat(N, increment)
-                .onEachIteration(increment)
-            .body()
-            .end()
-
-            .repeat(N, increment)
-                .onEachIteration(increment)
-            .body()
-            .end()
-
+            .repeat(N, increment).body().end()
+            .repeat(N, increment).body().end()
         .end();
 
-    assert tc.check_();
-    System.out.println(counter.i);
-    assertEquals(counter.i, 3 *(M * N + M) + 1);
+    assert tc.check();
+    assertEquals(counter.i, (M * 3 * N) + M);
   }
 
   @Test
   public void nestedblockAndIterationInitsTest() {
+    int A = 3, B = 4, C = 5, D = 6, E = 7;
     tc.body()
-        .repeat(3, increment)
-            .onEachIteration(increment)
+        .repeat(A, increment) // A
         .body()
-            .repeat(4, increment)
-                .onEachIteration(increment)
+            .repeat(B, increment) // A * B
             .body()
-
-                .repeat(5, increment)
-                    .onEachIteration(increment)
+                .repeat(C, increment) // A * B * C
                 .body()
-                    .repeat(6, increment)
-                        .onEachIteration(increment)
-                    .body().end()
+                    .repeat(D, increment).body().end() // A * B * C * D
                 .end()
-                .repeat(7, increment)
-                    .onEachIteration(increment)
-                .body().end()
+                .repeat(7, increment).body().end() // A * B * E
             .end()
         .end()
     ;
-    assert tc.check_();
-    System.out.println(counter.i);
+    assert tc.check();
+    assertEquals(counter.i, A + (A*B) + (A*B*C) + (A * B * E) + (A*B*C*D));
   }
 
   @Test
@@ -144,25 +119,22 @@ public class PingerPongerTest {
     });
 
     int M = 3, N = 30;
-    tc.connect(pingerPort, pongerPort).
-      body().
-
-        repeat(M).
-        body().
-          repeat(N, increment).
-            onEachIteration(increment).
-          body()
-            .trigger(new Ping(0), pingerPort.getPair())
-            .trigger(new Ping(0), pingerPort.getPair())
-            .trigger(new Ping(0), pingerPort.getPair())
-            .trigger(new Ping(0), pingerPort.getPair())
-            .trigger(new Ping(1), pingerPort.getPair())
-            .expect(new Ping(1), pingerPort, OUTGOING)
-          .end()
-        .end();
-
-    assert tc.check_();
-    assertEquals(counter.i, M * N + M);
+    tc.connect(pingerPort, pongerPort).body()
+        .repeat(M)
+        .body()
+            .repeat(N, increment)
+            .body()
+                .trigger(new Ping(0), pingerPort.getPair())
+                .trigger(new Ping(0), pingerPort.getPair())
+                .trigger(new Ping(0), pingerPort.getPair())
+                .trigger(new Ping(0), pingerPort.getPair())
+                .trigger(new Ping(1), pingerPort.getPair())
+                .expect(new Ping(1), pingerPort, OUTGOING)
+            .end()
+        .end()
+    ;
+    assert tc.check();
+    assertEquals(counter.i, M * N);
   }
 
   @Before
@@ -198,8 +170,6 @@ public class PingerPongerTest {
   }
 
   public static class Ponger extends ComponentDefinition {
-    static int counter = 0;
-
     Negative<PingPongPort> pingPongPort = provides(PingPongPort.class);
 
     Handler<Ping> pingHandler = new Handler<Ping>() {

@@ -28,7 +28,7 @@ public class InspectTest {
        end();
 
     //assertEquals(tc.check(), tc.getFinalState());
-    assert tc.check_();
+    assert tc.check();
   }
 
   private Predicate<Pinger> expectedPings = new Predicate<Pinger>() {

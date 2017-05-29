@@ -44,7 +44,7 @@ public class PredicateTest {
 
     ;
     //assertEquals(tc.check(), tc.getFinalState());
-    assert tc.check_();
+    assert tc.check();
   }
 
   private Ping ping(int count) {
