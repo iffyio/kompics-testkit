@@ -3,8 +3,8 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 <modelVersion>4.0.0</modelVersion>
 
-<groupId>kompics-testkit</groupId>
-<artifactId>kompics-testkit</artifactId>
+<groupId>kompics-testing</groupId>
+<artifactId>kompics-testing</artifactId>
 <version>1.0-SNAPSHOT</version>
 
 <properties>
@@ -37,11 +37,6 @@
         <version>${kompics.version}</version>
         <scope>compile</scope>
     </dependency>
-<!--    <dependency>
-        <groupId>se.sics.kompics.simulator</groupId>
-        <artifactId>core</artifactId>
-        <version>${kompics.version}</version>
-    </dependency>-->
     <dependency>
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-log4j12</artifactId>
